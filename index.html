@@ -1,34 +1,80 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" class="scroll-smooth">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>MPortal</title>
-  <link rel="stylesheet" href="style.css">
+  <title>Mase</title>
+  
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  
+  <!-- Animate.css for entrance animations -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/animate.css/4.1.1/animate.min.css"/>
+  
+  <!-- Google Font (clean modern feel) -->
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;500;700&display=swap" rel="stylesheet">
+  
+  <!-- Particles.js CDN -->
+  <script src="https://cdn.jsdelivr.net/npm/particles.js@2.0.0/particles.min.js"></script>
+  
+  <style>
+    body { font-family: 'Inter', sans-serif; }
+  </style>
 </head>
-<body>
-  <header class="header">
-    <h1>Mase</h1>
-    <p>Forestry student & occasional web tinkerer</p>
-  </header>
-
-  <main class="grid">
-    <a href="projects.html" class="card">
-      <div class="card-content">
-        <h2>Projects</h2>
-        <p>Some things I've built or worked on</p>
-      </div>
-    </a>
-
-    <a href="blog.html" class="card">
-      <div class="card-content">
-        <h2>Blog</h2>
-        <p>Random thoughts</p>
-      </div>
-    </a>
-
-  </main>
-
-  <script src="script.js"></script>
+<body class="bg-gray-900 text-white min-h-screen overflow-x-hidden">
+  <!-- Particle background (full screen, behind content) -->
+  <div id="particles-js" class="fixed inset-0 -z-10"></div>
+  
+  <!-- Main content -->
+  <div class="relative z-10 flex flex-col items-center justify-center min-h-screen px-6 text-center">
+    <!-- Heading with fade-in-down -->
+    <h1 class="text-6xl md:text-8xl font-bold tracking-tight animate__animated animate__fadeInDown">
+      Mase
+    </h1>
+    
+    <!-- Tagline with fade-in-up -->
+    <p class="mt-6 text-xl md:text-3xl text-gray-300 animate__animated animate__fadeInUp animation-delay-500">
+      Forestry student & occasional web tinkerer
+    </p>
+    
+    <!-- Buttons with hover scale + color pop -->
+    <div class="mt-16 flex flex-col sm:flex-row gap-8">
+      <a href="/projects.html" class="bg-emerald-600 hover:bg-emerald-500 text-white font-semibold text-xl px-10 py-5 rounded-xl shadow-lg transition transform hover:scale-110 hover:shadow-2xl">
+        Projects<br><span class="text-sm font-normal opacity-80">Some things I've built or worked on</span>
+      </a>
+      <a href="/blog.html" class="bg-indigo-600 hover:bg-indigo-500 text-white font-semibold text-xl px-10 py-5 rounded-xl shadow-lg transition transform hover:scale-110 hover:shadow-2xl">
+        Blog<br><span class="text-sm font-normal opacity-80">Random thoughts</span>
+      </a>
+    </div>
+    
+    <!-- Optional subtle footer (add your socials later if you want) -->
+    <footer class="absolute bottom-8 text-gray-500 text-sm">
+      © 2026 Mase • Built with curiosity
+    </footer>
+  </div>
+  
+  <!-- Particles.js config (green forestry vibe) -->
+  <script>
+    particlesJS("particles-js", {
+      "particles": {
+        "number": { "value": 80, "density": { "enable": true, "value_area": 800 } },
+        "color": { "value": "#10b981" }, /* emerald-500 */
+        "shape": { "type": "circle" },
+        "opacity": { "value": 0.5, "random": true },
+        "size": { "value": 3, "random": true },
+        "line_linked": { "enable": true, "distance": 150, "color": "#10b981", "opacity": 0.3, "width": 1 },
+        "move": { "enable": true, "speed": 2, "direction": "none", "random": false }
+      },
+      "interactivity": {
+        "detect_on": "canvas",
+        "events": {
+          "onhover": { "enable": true, "mode": "repulse" },
+          "onclick": { "enable": true, "mode": "push" },
+          "resize": true
+        }
+      },
+      "retina_detect": true
+    });
+  </script>
 </body>
 </html>
