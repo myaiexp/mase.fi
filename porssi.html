@@ -3,8 +3,8 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Pörssisähkö Dashboard – mase.fi</title>
-  <meta name="description" content="Sensible overview of today's and tomorrow's Finnish spot electricity prices (pörssisähkö) with relative cheap/normal/expensive hours.">
+  <title>Pörssisähkö – mase.fi</title>
+  <meta name="description" content="Overview of today's and tomorrow's Finnish spot electricity prices (pörssisähkö) with relative cheap/normal/expensive hours.">
   <script src="https://cdn.tailwindcss.com"></script>
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
   <style>
@@ -16,80 +16,89 @@
 <body class="bg-gray-50 dark:bg-gray-900 text-gray-900 dark:text-gray-100 min-h-screen">
   <div class="max-w-4xl mx-auto p-6">
     <header class="text-center my-12">
-      <h1 class="text-4xl font-bold mb-4">Pörssisähkö – Sensible Overview</h1>
-      <p class="text-lg mb-2">Finnish spot electricity prices (incl. 25.5% VAT) – divided into relative cheap/normal/expensive hours for the day.</p>
-      <p class="text-sm text-gray-600 dark:text-gray-400">Perfect for low-usage folks: constant stuff (PC, lights) doesn't matter much – just shift occasional bigger loads if convenient.</p>
+      <h1 class="text-4xl font-bold mb-4">Pörssisähkö Overview</h1>
+      <p class="text-lg mb-2">Finnish spot electricity prices (incl. VAT)</p>
       <a href="index.html" class="inline-block mt-6 text-blue-600 hover:underline">&larr; Back to mase.fi</a>
     </header>
-
     <div class="bg-white dark:bg-gray-800 rounded-xl shadow-lg p-8 mb-12 text-center">
       <p class="text-xl">Current price (right now):</p>
       <p id="current-price" class="text-6xl font-bold text-orange-600 dark:text-orange-400 my-4">Loading...</p>
+      <p id="current-rank" class="text-2xl font-semibold text-gray-700 dark:text-gray-300">Loading...</p>
       <p class="text-sm text-gray-500">c/kWh incl. VAT • Updates on page load</p>
     </div>
-
     <div class="tabs flex justify-center mb-8 border-b-2 border-gray-300 dark:border-gray-700">
       <button id="tab-today" class="tab-btn px-8 py-4 font-semibold">Today</button>
       <button id="tab-tomorrow" class="tab-btn px-8 py-4 font-semibold text-gray-500">Tomorrow</button>
     </div>
-
     <div id="today-section" class="bg-white dark:bg-gray-800 rounded-xl shadow-lg p-8">
       <canvas id="todayChart" height="200"></canvas>
       <div id="today-tips" class="mt-8 text-lg"></div>
     </div>
-
     <div id="tomorrow-section" class="hidden bg-white dark:bg-gray-800 rounded-xl shadow-lg p-8">
       <canvas id="tomorrowChart" height="200"></canvas>
       <div id="tomorrow-tips" class="mt-8 text-lg"></div>
     </div>
-
     <footer class="text-center mt-12 text-sm text-gray-500">
-      Data from <a href="https://fingrid.fi" class="underline">Fingrid</a> • Made by <a href="https://mase.fi" class="underline">mase.fi</a>
+      Data from Nord Pool via <a href="https://spot-hinta.fi" class="underline">api.spot-hinta.fi</a> • Made by <a href="https://mase.fi" class="underline">mase.fi</a>
     </footer>
   </div>
-
   <script>
     async function loadElectricityPrices() {
       try {
-        const now = new Date();
-        const today = now.toISOString().slice(0,10);
-        const tomorrowDay = new Date(now.getTime() + 86400000);
-        const tomorrow = tomorrowDay.toISOString().slice(0,10);
-        const dayAfter = new Date(tomorrowDay.getTime() + 86400000).toISOString().slice(0,10);
+        let currentPriceRaw = null;
+        let currentPriceText = 'Loading...';
 
-        // Today data
-        const todayRes = await fetch(`https://api.fingrid.fi/v1/spotprices?index=10&start=${today}&end=${tomorrow}`);
-        const todayJson = await todayRes.json();
-        const todayData = todayJson.spotprices || [];
-
-        // Current price (current hour from today data)
-        const currentHourUnix = Math.floor(now.getTime() / 3600000) * 3600;
-        const currentEntry = todayData.find(p => p.start_timestamp === currentHourUnix);
-        let currentPriceText = 'N/A';
-        if (currentEntry) {
-          const priceCKwh = currentEntry.price / 10 * 1.255;
-          currentPriceText = priceCKwh.toFixed(2) + ' c/kWh';
+        // Current price – accurate + timezone-safe
+        try {
+          const justNowRes = await fetch('https://api.spot-hinta.fi/JustNow');
+          if (justNowRes.ok) {
+            const justNow = await justNowRes.json();
+            currentPriceRaw = justNow.PriceWithTax * 100;
+            currentPriceText = currentPriceRaw.toFixed(2) + ' c/kWh';
+          }
+        } catch (e) {
+          console.error('JustNow failed', e);
         }
         document.getElementById('current-price').textContent = currentPriceText;
 
-        // Render Today
-        renderDay('today', todayData);
+        // Today – always available
+        const todayRes = await fetch('https://api.spot-hinta.fi/Today');
+        if (!todayRes.ok) throw new Error('Today failed');
+        const todayData = await todayRes.json(); // 96 slots
+        const todayPrices = aggregateToHourly(todayData);
 
-        // Tomorrow data
-        const tomorrowRes = await fetch(`https://api.fingrid.fi/v1/spotprices?index=10&start=${tomorrow}&end=${dayAfter}`);
-        const tomorrowJson = await tomorrowRes.json();
-        const tomorrowData = tomorrowJson.spotprices || [];
+        renderDay('today', todayPrices);
 
-        // Tomorrow handling
-        if (tomorrowData.length < 24) {
-          document.getElementById('tab-tomorrow').classList.add('hidden');
-          document.getElementById('tomorrow-section').innerHTML = '<p class="text-center text-gray-600 dark:text-gray-400">Tomorrow\'s prices are usually published after ~14:00 Finnish time.</p>';
+        // Current rank
+        if (currentPriceRaw !== null && todayPrices.length === 24) {
+          const cheaper = todayPrices.filter(p => p < currentPriceRaw).length;
+          const rank = cheaper + 1;
+          document.getElementById('current-rank').textContent = `${rank}/24 cheapest today`;
         } else {
-          renderDay('tomorrow', tomorrowData);
-          document.getElementById('tab-tomorrow').classList.remove('hidden', 'text-gray-500');
+          document.getElementById('current-rank').textContent = '–/24';
         }
 
-        // Tab setup
+        // Tomorrow – optional, shows message if not ready
+        let tomorrowPrices = [];
+        try {
+          const tomorrowRes = await fetch('https://api.spot-hinta.fi/Tomorrow');
+          if (tomorrowRes.ok) {
+            const tomorrowData = await tomorrowRes.json();
+            if (tomorrowData.length >= 96) {
+              tomorrowPrices = aggregateToHourly(tomorrowData);
+              renderDay('tomorrow', tomorrowPrices);
+              document.getElementById('tab-tomorrow').classList.remove('hidden', 'text-gray-500');
+            }
+          }
+        } catch (e) {
+          console.log('Tomorrow not available yet');
+        }
+
+        if (tomorrowPrices.length === 0) {
+          document.getElementById('tomorrow-section').innerHTML = '<p class="text-center text-gray-600 dark:text-gray-400">Tomorrow\'s prices are usually published after ~14:00 Finnish time.</p>';
+        }
+
+        // Tabs
         document.getElementById('tab-today').onclick = () => showTab('today');
         document.getElementById('tab-tomorrow').onclick = () => showTab('tomorrow');
         document.getElementById('tab-today').classList.add('active', 'border-blue-600', 'text-blue-600');
@@ -97,25 +106,31 @@
 
       } catch (error) {
         document.getElementById('current-price').textContent = 'Error loading data';
+        document.getElementById('current-rank').textContent = '–/24';
         console.error(error);
       }
     }
 
-    function renderDay(day, data) {
-      const labels = data.map(item => {
-        const hour = new Date(item.start_timestamp * 1000).getHours();
-        return `${hour}:00`;
-      });
-      const prices = data.map(item => item.price / 10 * 1.255); // EUR/MWh ex VAT → c/kWh incl. 25.5% VAT
+    function aggregateToHourly(data96) {
+      if (data96.length < 96) return [];
+      const hourly = [];
+      for (let h = 0; h < 24; h++) {
+        const slot = data96[h * 4]; // price identical within hour
+        hourly.push(slot.PriceWithTax * 100);
+      }
+      return hourly;
+    }
 
+    function renderDay(day, prices) {
+      if (prices.length !== 24) return;
+
+      const labels = Array.from({length: 24}, (_, i) => `${i.toString().padStart(2, '0')}:00`);
       const avg = prices.reduce((a, b) => a + b, 0) / prices.length;
 
-      // Tertiles (33% each)
       const sorted = [...prices].sort((a, b) => a - b);
       const lowThresh = sorted[Math.floor(sorted.length * 0.33)];
       const highThresh = sorted[Math.floor(sorted.length * 0.67)];
 
-      // Categorize
       const cheap = [], normal = [], expensive = [];
       prices.forEach((p, i) => {
         const hour = labels[i];
@@ -124,18 +139,15 @@
         else expensive.push(hour);
       });
 
-      // Colors
       const colors = prices.map(p =>
-        p <= lowThresh ? 'rgba(34, 197, 94, 0.8)' :   // green
-        p <= highThresh ? 'rgba(234, 179, 8, 0.8)' :  // yellow
-        'rgba(239, 68, 68, 0.8)'                      // red
+        p <= lowThresh ? 'rgba(34, 197, 94, 0.8)' :
+        p <= highThresh ? 'rgba(234, 179, 8, 0.8)' :
+        'rgba(239, 68, 68, 0.8)'
       );
 
-      // Destroy old chart if exists
       const chartId = `${day}Chart`;
       if (Chart.getChart(chartId)) Chart.getChart(chartId).destroy();
 
-      // New chart
       new Chart(document.getElementById(chartId), {
         type: 'bar',
         data: {
@@ -155,27 +167,22 @@
         }
       });
 
-      // Tips
       document.getElementById(`${day}-tips`).innerHTML = `
         <p><strong>Average ${day === 'today' ? 'today' : 'tomorrow'}:</strong> ${avg.toFixed(2)} c/kWh</p>
         <div class="grid md:grid-cols-3 gap-6 mt-6">
           <div class="text-green-700 dark:text-green-400">
-            <strong>Cheap (~${(cheap.length/24*100).toFixed(0)}%):</strong><br>
-            ${cheap.join(', ') || 'None'}<br>
-            <span class="text-sm">Best for heavier tasks (laundry, dishwasher)</span>
+            <strong>Cheap (~${Math.round(cheap.length/24*100)}%):</strong><br>
+            ${cheap.join(', ') || 'None'}
           </div>
           <div class="text-yellow-700 dark:text-yellow-400">
-            <strong>Normal (~${(normal.length/24*100).toFixed(0)}%):</strong><br>
-            ${normal.join(', ') || 'None'}<br>
-            <span class="text-sm">Totally fine – no need to shift</span>
+            <strong>Normal (~${Math.round(normal.length/24*100)}%):</strong><br>
+            ${normal.join(', ') || 'None'}
           </div>
           <div class="text-red-700 dark:text-red-400">
-            <strong>Expensive (~${(expensive.length/24*100).toFixed(0)}%):</strong><br>
-            ${expensive.join(', ') || 'None'}<br>
-            <span class="text-sm">Shift if super easy, otherwise ignore</span>
+            <strong>Expensive (~${Math.round(expensive.length/24*100)}%):</strong><br>
+            ${expensive.join(', ') || 'None'}
           </div>
         </div>
-        <p class="mt-6 text-sm text-gray-600 dark:text-gray-400">For low everyday usage (PC, LEDs), the differences barely matter – this is just sensible guidance.</p>
       `;
     }
 
