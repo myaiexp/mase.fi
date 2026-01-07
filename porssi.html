@@ -73,7 +73,7 @@
         if (currentPriceRaw !== null && todayPrices.length === 24) {
           const cheaper = todayPrices.filter(p => p < currentPriceRaw).length;
           const rank = cheaper + 1;
-          document.getElementById('current-rank').textContent = `${rank}/24 cheapest today`;
+          document.getElementById('current-rank').textContent = `${rank}th cheapest hour of the day`;
         } else {
           document.getElementById('current-rank').textContent = '–/24';
         }
