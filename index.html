@@ -4,7 +4,22 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>MPortal</title>
-  <script src="https://cdn.tailwindcss.com"></script>
+<script src="https://cdn.tailwindcss.com"></script>
+<script>
+  tailwind.config = {
+    safelist: [
+      'grid', 'grid-cols-1', 'md:grid-cols-2', 'lg:grid-cols-3', 'gap-12',
+      'bg-gray-800/50', 'backdrop-blur-sm', 'rounded-2xl', 'p-10', 'shadow-xl',
+      'transition-all', 'duration-500',
+      'hover:shadow-emerald-500/30', 'hover:bg-gray-800', 'hover:scale-105', 'hover:-translate-y-4',
+      'border', 'border-gray-700', 'hover:border-emerald-600',
+      'text-3xl', 'font-bold', 'mb-4', 'text-gray-300', 'mb-8',
+      'text-emerald-400', 'hover:text-emerald-300', 'font-medium', 'transition',
+      'text-gray-500', 'italic'
+    ]
+  }
+</script>
+</script>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;500;700&display=swap" rel="stylesheet">
   <script src="https://cdn.jsdelivr.net/npm/particles.js@2.0.0/particles.min.js"></script>
   
@@ -14,10 +29,8 @@
 </head>
 <body class="bg-gray-900 text-white min-h-screen overflow-x-hidden">
   
-  <!-- Particle background -->
   <div id="particles-js" class="fixed inset-0 -z-10"></div>
   
-  <!-- Hero -->
   <section class="relative z-10 flex flex-col items-center min-h-screen px-6 text-center">
     <div class="grow flex flex-col justify-center items-center">
       <h1 class="text-6xl md:text-8xl font-bold tracking-tight">
@@ -35,7 +48,6 @@
       </div>
     </div>
     
-  <!-- Recent Updates Log -->
   <div class="w-full max-w-xl pb-20 px-6">
     <h3 class="text-lg font-medium text-center text-gray-600 mb-6">
       Recent Updates
@@ -57,76 +69,13 @@
   </div>
 </section>
   
-  <!-- Projects Section -->
   <section id="projects" class="relative z-10 py-32 px-6">
     <div class="max-w-7xl mx-auto">
       <h2 class="text-5xl md:text-6xl font-bold text-center mb-24">
         Projects
       </h2>
-      
-      <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-12">
-        <!-- Card 1: mase.fi (real project) -->
-        <div class="bg-gray-800/50 backdrop-blur-sm rounded-2xl p-10 shadow-xl transition-all duration-500 hover:shadow-emerald-500/30 hover:bg-gray-800 hover:scale-105 hover:-translate-y-4 border border-gray-700 hover:border-emerald-600">
-          <h3 class="text-3xl font-bold mb-4">mase.fi</h3>
-          <p class="text-gray-300 mb-8">
-            This personal site & portfolio portal. Static HTML/Tailwind/particles.js, git-deployed on UpCloud VPS behind Cloudflare.
-          </p>
-          <div class="flex flex-wrap gap-2 mb-8">
-            <span class="px-3 py-1 bg-emerald-900/50 text-emerald-300 text-sm rounded-full">HTML</span>
-            <span class="px-3 py-1 bg-emerald-900/50 text-emerald-300 text-sm rounded-full">Tailwind CSS</span>
-            <span class="px-3 py-1 bg-emerald-900/50 text-emerald-300 text-sm rounded-full">JavaScript</span>
-            <span class="px-3 py-1 bg-emerald-900/50 text-emerald-300 text-sm rounded-full">particles.js</span>
-          </div>
-          <a href="https://github.com/myaiexp/mase.fi" target="_blank" class="text-emerald-400 hover:text-emerald-300 font-medium transition">
-            View source on GitHub →
-          </a>
-        </div>
 
-        <!-- Card: Pörssisähkö Dashboard (new project) -->
-        <div class="bg-gray-800/50 backdrop-blur-sm rounded-2xl p-10 shadow-xl transition-all duration-500 hover:shadow-emerald-500/30 hover:bg-gray-800 hover:scale-105 hover:-translate-y-4 border border-gray-700 hover:border-emerald-600">
-          <h3 class="text-3xl font-bold mb-4">Pörssisähkö Dashboard</h3>
-          <p class="text-gray-300 mb-8">
-            Sensible daily overview of Finnish spot electricity prices (pörssisähkö) – current price, today/tomorrow charts, and relative cheap/normal/expensive hours.
-          </p>
-          <div class="flex flex-wrap gap-2 mb-8">
-            <span class="px-3 py-1 bg-emerald-900/50 text-emerald-300 text-sm rounded-full">HTML</span>
-            <span class="px-3 py-1 bg-emerald-900/50 text-emerald-300 text-sm rounded-full">Tailwind CSS</span>
-            <span class="px-3 py-1 bg-emerald-900/50 text-emerald-300 text-sm rounded-full">JavaScript</span>
-            <span class="px-3 py-1 bg-emerald-900/50 text-emerald-300 text-sm rounded-full">Chart.js</span>
-            <span class="px-3 py-1 bg-emerald-900/50 text-emerald-300 text-sm rounded-full">spot-hinta.fi API</span>
-          </div>
-          <a href="porssi.html" class="text-emerald-400 hover:text-emerald-300 font-medium transition">
-            View live demo →
-          </a>
-        </div>
-        
-        <!-- Card 2: Coming soon (AI/web) -->
-        <div class="bg-gray-800/30 rounded-2xl p-10 shadow-xl transition-all duration-500 hover:shadow-emerald-500/20 hover:bg-gray-800/50 hover:scale-105 hover:-translate-y-4 opacity-70 border border-gray-800">
-          <h3 class="text-3xl font-bold mb-4 text-gray-400">AI Experiments</h3>
-          <p class="text-gray-500 mb-8">
-            Small tools, prompts, and scripts playing with AI—prompt engineering, simple bots, or data stuff.
-          </p>
-          <div class="flex flex-wrap gap-2 mb-8">
-            <span class="px-3 py-1 bg-gray-700/50 text-gray-400 text-sm rounded-full">Coming soon</span>
-          </div>
-          <span class="text-gray-500">In progress...</span>
-        </div>
-        
-        <div class="bg-gray-800/30 rounded-2xl p-10 shadow-xl transition-all duration-500 hover:shadow-emerald-500/20 hover:bg-gray-800/50 hover:scale-105 hover:-translate-y-4 opacity-70 border border-gray-800">
-          <h3 class="text-3xl font-bold mb-4 text-gray-400">Forestry Tools</h3>
-          <p class="text-gray-500 mb-8">
-            Notes, calculators, or visualizations related to forestry studies—tree inventory, growth models, etc.
-          </p>
-          <div class="flex flex-wrap gap-2 mb-8">
-            <span class="px-3 py-1 bg-gray-700/50 text-gray-400 text-sm rounded-full">Coming soon</span>
-          </div>
-          <span class="text-gray-500">In progress...</span>
-        </div>
-      </div>
-      
-      <div class="text-center mt-20">
-        <a href="#" class="text-gray-400 hover:text-white transition">↑ Back to top</a>
-      </div>
+      <div id="projects-container" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-12"></div>
     </div>
   </section>
   
@@ -160,5 +109,54 @@
       "retina_detect": true
     });
   </script>
+
+<script type="module">
+  async function loadProjects() {
+    try {
+      const apiUrl = 'https://mase.fi/api/collections/projects/records?perPage=50&sort=sort_order';
+      
+      const response = await fetch(apiUrl);
+      if (!response.ok) throw new Error(`API error: ${response.status}`);
+
+      const data = await response.json();
+      const container = document.getElementById('projects-container');
+      container.innerHTML = '';
+
+      if (data.items.length === 0) {
+        container.innerHTML = '<p class="text-gray-500 italic text-center col-span-full">No projects yet...</p>';
+        return;
+      }
+
+      data.items.forEach(project => {
+        const hasLinks = project.demo_url || project.github_url;
+
+        const el = document.createElement('div');
+        el.className = 'bg-gray-800/50 backdrop-blur-sm rounded-2xl p-10 shadow-xl transition-all duration-500 hover:shadow-emerald-500/30 hover:bg-gray-800 hover:scale-105 hover:-translate-y-4 border border-gray-700 hover:border-emerald-600';
+        el.innerHTML = `
+          <h3 class="text-3xl font-bold mb-4">${project.title}</h3>
+          <p class="text-gray-300 mb-8">${project.description}</p>
+          ${hasLinks ? `
+            ${project.demo_url ? `<a href="${project.demo_url}" target="_blank" rel="noopener" class="text-emerald-400 hover:text-emerald-300 font-medium transition block mt-4">View live demo →</a>` : ''}
+            ${project.github_url ? `<a href="${project.github_url}" target="_blank" rel="noopener" class="text-emerald-400 hover:text-emerald-300 font-medium transition block mt-4">View source on GitHub →</a>` : ''}
+          ` : '<p class="text-gray-500 italic">In progress...</p>'}
+        `;
+        container.appendChild(el);
+      });
+
+      if (location.hostname === '127.0.0.1' || location.hostname === 'localhost') {
+        const banner = document.createElement('p');
+        banner.className = 'text-xs text-yellow-500 italic mt-8 text-center col-span-full';
+        banner.textContent = 'Local preview: Projects loaded from live production API';
+        container.appendChild(banner);
+      }
+    } catch (err) {
+      console.error('Projects failed to load:', err);
+      document.getElementById('projects-container').innerHTML = '<p class="text-red-500 text-center col-span-full">Failed to load projects—check console.</p>';
+    }
+  }
+
+  loadProjects();
+</script>
+
 </body>
 </html>
