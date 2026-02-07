@@ -1,0 +1,521 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Todo — mase.fi</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    body { font-family: 'Inter', sans-serif; }
+    .task-enter { animation: slideIn 0.2s ease-out; }
+    @keyframes slideIn { from { opacity: 0; transform: translateY(-8px); } to { opacity: 1; transform: translateY(0); } }
+    .drag-over { border-color: #10b981 !important; background: rgba(16, 185, 129, 0.05); }
+  </style>
+</head>
+<body class="bg-gray-900 text-white min-h-screen">
+
+  <!-- Setup modal (GitHub token) -->
+  <div id="setup-modal" class="hidden fixed inset-0 z-50 bg-black/70 flex items-center justify-center p-4">
+    <div class="bg-gray-800 rounded-2xl p-8 max-w-lg w-full border border-gray-700 shadow-2xl">
+      <h2 class="text-2xl font-bold mb-2">Connect to GitHub</h2>
+      <p class="text-gray-400 mb-6 text-sm">
+        Public tasks are saved as <code class="text-emerald-400">todo.json</code> in your repo via GitHub's API.
+        You need a personal access token with <strong>repo</strong> scope.
+        It's stored only in your browser.
+      </p>
+      <div class="space-y-4">
+        <div>
+          <label class="block text-sm text-gray-400 mb-1">GitHub Token</label>
+          <input id="setup-token" type="password" placeholder="ghp_..."
+            class="w-full bg-gray-900 border border-gray-600 rounded-lg px-4 py-3 text-white focus:outline-none focus:border-emerald-500 transition">
+        </div>
+        <div>
+          <label class="block text-sm text-gray-400 mb-1">Repository</label>
+          <input id="setup-repo" type="text" value="myaiexp/mase.fi"
+            class="w-full bg-gray-900 border border-gray-600 rounded-lg px-4 py-3 text-white focus:outline-none focus:border-emerald-500 transition">
+        </div>
+        <div>
+          <label class="block text-sm text-gray-400 mb-1">Branch</label>
+          <input id="setup-branch" type="text" value="main"
+            class="w-full bg-gray-900 border border-gray-600 rounded-lg px-4 py-3 text-white focus:outline-none focus:border-emerald-500 transition">
+        </div>
+      </div>
+      <div class="flex gap-3 mt-6">
+        <button onclick="saveSetup()" class="flex-1 bg-emerald-600 hover:bg-emerald-500 text-white font-semibold py-3 rounded-lg transition">
+          Save & Connect
+        </button>
+        <button onclick="skipSetup()" class="px-6 py-3 text-gray-400 hover:text-white transition">
+          Skip (local only)
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Main app -->
+  <div class="max-w-3xl mx-auto px-4 py-8">
+
+    <!-- Header -->
+    <div class="flex items-center justify-between mb-8">
+      <div>
+        <a href="index.html" class="text-gray-500 hover:text-gray-300 text-sm transition">← mase.fi</a>
+        <h1 class="text-4xl font-bold mt-1">Todo</h1>
+      </div>
+      <div class="flex items-center gap-3">
+        <div id="sync-status" class="text-xs text-gray-500"></div>
+        <button onclick="showSetup()" id="settings-btn" title="Settings"
+          class="p-2 text-gray-500 hover:text-white rounded-lg hover:bg-gray-800 transition">
+          <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.066 2.573c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.573 1.066c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.066-2.573c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"/>
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/>
+          </svg>
+        </button>
+      </div>
+    </div>
+
+    <!-- Add task -->
+    <div class="flex gap-2 mb-6">
+      <input id="new-task" type="text" placeholder="Add a task..."
+        class="flex-1 bg-gray-800 border border-gray-700 rounded-lg px-4 py-3 text-white placeholder-gray-500 focus:outline-none focus:border-emerald-500 transition"
+        onkeydown="if(event.key==='Enter')addTask()">
+      <button onclick="togglePrivacy()" id="privacy-btn" title="Toggle public/private"
+        class="px-3 py-3 rounded-lg border border-gray-700 hover:border-emerald-500 transition text-sm">
+        🌍
+      </button>
+      <button onclick="addTask()"
+        class="bg-emerald-600 hover:bg-emerald-500 text-white font-semibold px-6 py-3 rounded-lg transition">
+        Add
+      </button>
+    </div>
+
+    <!-- Filter tabs -->
+    <div class="flex gap-1 mb-6 bg-gray-800/50 rounded-lg p-1">
+      <button onclick="setFilter('all')" data-filter="all" class="filter-tab flex-1 py-2 rounded-md text-sm font-medium transition text-gray-400 hover:text-white">All</button>
+      <button onclick="setFilter('active')" data-filter="active" class="filter-tab flex-1 py-2 rounded-md text-sm font-medium transition text-gray-400 hover:text-white">Active</button>
+      <button onclick="setFilter('completed')" data-filter="completed" class="filter-tab flex-1 py-2 rounded-md text-sm font-medium transition text-gray-400 hover:text-white">Done</button>
+      <button onclick="setFilter('public')" data-filter="public" class="filter-tab flex-1 py-2 rounded-md text-sm font-medium transition text-gray-400 hover:text-white">Public</button>
+      <button onclick="setFilter('private')" data-filter="private" class="filter-tab flex-1 py-2 rounded-md text-sm font-medium transition text-gray-400 hover:text-white">Private</button>
+    </div>
+
+    <!-- Task list -->
+    <div id="task-list" class="space-y-2"></div>
+
+    <!-- Footer stats -->
+    <div class="mt-8 flex items-center justify-between text-sm text-gray-500">
+      <span id="stats"></span>
+      <div class="flex gap-3">
+        <button onclick="saveToGitHub()" id="save-btn" class="hidden text-emerald-400 hover:text-emerald-300 transition font-medium">
+          Save to GitHub
+        </button>
+        <button onclick="clearCompleted()" class="text-gray-500 hover:text-red-400 transition">
+          Clear completed
+        </button>
+      </div>
+    </div>
+
+    <!-- JSON preview -->
+    <details class="mt-12 group">
+      <summary class="text-sm text-gray-500 cursor-pointer hover:text-gray-300 transition">
+        View JSON (what AI sees)
+      </summary>
+      <pre id="json-preview" class="mt-3 bg-gray-800 rounded-lg p-4 text-xs text-gray-400 overflow-x-auto border border-gray-700 max-h-96 overflow-y-auto"></pre>
+    </details>
+  </div>
+
+<script>
+// ── State ──
+let tasks = [];
+let currentFilter = 'all';
+let newTaskPrivate = false;
+let dirty = false; // unsaved public changes
+
+const STORAGE_KEY = 'masefi_todo_tasks';
+const CONFIG_KEY = 'masefi_todo_config';
+
+// ── Config (GitHub) ──
+function getConfig() {
+  try { return JSON.parse(localStorage.getItem(CONFIG_KEY)) || {}; }
+  catch { return {}; }
+}
+function setConfig(c) { localStorage.setItem(CONFIG_KEY, JSON.stringify(c)); }
+function isConnected() { const c = getConfig(); return !!(c.token && c.repo); }
+
+// ── Init ──
+document.addEventListener('DOMContentLoaded', async () => {
+  loadLocal();
+  if (!isConnected()) {
+    document.getElementById('setup-modal').classList.remove('hidden');
+  } else {
+    await pullFromGitHub();
+  }
+  render();
+  setFilter('all');
+});
+
+// ── Tasks: CRUD ──
+function generateId() {
+  return Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
+}
+
+function addTask() {
+  const input = document.getElementById('new-task');
+  const text = input.value.trim();
+  if (!text) return;
+
+  const now = new Date().toISOString();
+  tasks.unshift({
+    id: generateId(),
+    text,
+    status: 'active',
+    public: !newTaskPrivate,
+    priority: 'normal',
+    createdAt: now,
+    completedAt: null,
+    history: [{ action: 'created', at: now }]
+  });
+
+  input.value = '';
+  dirty = true;
+  saveLocal();
+  render();
+  autoSave();
+}
+
+function toggleTask(id) {
+  const task = tasks.find(t => t.id === id);
+  if (!task) return;
+  const now = new Date().toISOString();
+  if (task.status === 'active') {
+    task.status = 'completed';
+    task.completedAt = now;
+    task.history.push({ action: 'completed', at: now });
+  } else {
+    task.status = 'active';
+    task.completedAt = null;
+    task.history.push({ action: 'reopened', at: now });
+  }
+  dirty = true;
+  saveLocal();
+  render();
+  autoSave();
+}
+
+function deleteTask(id) {
+  tasks = tasks.filter(t => t.id !== id);
+  dirty = true;
+  saveLocal();
+  render();
+  autoSave();
+}
+
+function editTask(id) {
+  const task = tasks.find(t => t.id === id);
+  if (!task) return;
+  const el = document.querySelector(`[data-task-id="${id}"] .task-text`);
+  if (!el) return;
+
+  const input = document.createElement('input');
+  input.type = 'text';
+  input.value = task.text;
+  input.className = 'bg-gray-900 border border-emerald-500 rounded px-2 py-1 text-white text-sm w-full focus:outline-none';
+
+  const finish = () => {
+    const newText = input.value.trim();
+    if (newText && newText !== task.text) {
+      const now = new Date().toISOString();
+      task.history.push({ action: 'edited', from: task.text, to: newText, at: now });
+      task.text = newText;
+      dirty = true;
+      saveLocal();
+      autoSave();
+    }
+    render();
+  };
+
+  input.addEventListener('blur', finish);
+  input.addEventListener('keydown', e => { if (e.key === 'Enter') finish(); if (e.key === 'Escape') render(); });
+  el.replaceWith(input);
+  input.focus();
+}
+
+function toggleTaskPrivacy(id) {
+  const task = tasks.find(t => t.id === id);
+  if (!task) return;
+  const now = new Date().toISOString();
+  task.public = !task.public;
+  task.history.push({ action: task.public ? 'made_public' : 'made_private', at: now });
+  dirty = true;
+  saveLocal();
+  render();
+  autoSave();
+}
+
+function cyclePriority(id) {
+  const task = tasks.find(t => t.id === id);
+  if (!task) return;
+  const cycle = ['low', 'normal', 'high'];
+  const idx = cycle.indexOf(task.priority);
+  task.priority = cycle[(idx + 1) % cycle.length];
+  const now = new Date().toISOString();
+  task.history.push({ action: 'priority_changed', to: task.priority, at: now });
+  dirty = true;
+  saveLocal();
+  render();
+  autoSave();
+}
+
+function clearCompleted() {
+  tasks = tasks.filter(t => t.status !== 'completed');
+  dirty = true;
+  saveLocal();
+  render();
+  autoSave();
+}
+
+// ── Filtering ──
+function setFilter(f) {
+  currentFilter = f;
+  document.querySelectorAll('.filter-tab').forEach(btn => {
+    const active = btn.dataset.filter === f;
+    btn.classList.toggle('bg-gray-700', active);
+    btn.classList.toggle('text-white', active);
+    btn.classList.toggle('text-gray-400', !active);
+  });
+  render();
+}
+
+function filteredTasks() {
+  return tasks.filter(t => {
+    if (currentFilter === 'active') return t.status === 'active';
+    if (currentFilter === 'completed') return t.status === 'completed';
+    if (currentFilter === 'public') return t.public;
+    if (currentFilter === 'private') return !t.public;
+    return true;
+  });
+}
+
+// ── Privacy toggle for new tasks ──
+function togglePrivacy() {
+  newTaskPrivate = !newTaskPrivate;
+  const btn = document.getElementById('privacy-btn');
+  btn.textContent = newTaskPrivate ? '🔒' : '🌍';
+  btn.title = newTaskPrivate ? 'New tasks: private (click to toggle)' : 'New tasks: public (click to toggle)';
+}
+
+// ── Render ──
+function render() {
+  const list = document.getElementById('task-list');
+  const visible = filteredTasks();
+
+  if (visible.length === 0) {
+    list.innerHTML = '<p class="text-center text-gray-600 py-12">No tasks here.</p>';
+  } else {
+    list.innerHTML = visible.map(t => {
+      const priorityColors = { low: 'text-blue-400', normal: 'text-gray-400', high: 'text-red-400' };
+      const priorityLabels = { low: '↓', normal: '•', high: '↑' };
+      const done = t.status === 'completed';
+      return `
+        <div data-task-id="${t.id}" class="task-enter group flex items-center gap-3 bg-gray-800/50 border border-gray-700 rounded-lg px-4 py-3 hover:border-gray-600 transition">
+          <button onclick="toggleTask('${t.id}')" class="flex-shrink-0 w-5 h-5 rounded border-2 ${done ? 'bg-emerald-500 border-emerald-500' : 'border-gray-500 hover:border-emerald-500'} transition flex items-center justify-center">
+            ${done ? '<svg class="w-3 h-3 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M5 13l4 4L19 7"/></svg>' : ''}
+          </button>
+          <span class="task-text flex-1 text-sm ${done ? 'line-through text-gray-500' : 'text-gray-200'} cursor-pointer" ondblclick="editTask('${t.id}')">${escapeHtml(t.text)}</span>
+          <div class="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition">
+            <button onclick="cyclePriority('${t.id}')" class="${priorityColors[t.priority]} hover:opacity-80 text-xs px-1" title="Priority: ${t.priority}">${priorityLabels[t.priority]}</button>
+            <button onclick="toggleTaskPrivacy('${t.id}')" class="text-xs px-1 ${t.public ? 'text-emerald-400' : 'text-gray-500'}" title="${t.public ? 'Public' : 'Private'}">${t.public ? '🌍' : '🔒'}</button>
+            <button onclick="deleteTask('${t.id}')" class="text-gray-500 hover:text-red-400 text-xs px-1" title="Delete">✕</button>
+          </div>
+        </div>`;
+    }).join('');
+  }
+
+  // Stats
+  const active = tasks.filter(t => t.status === 'active').length;
+  const completed = tasks.filter(t => t.status === 'completed').length;
+  const pub = tasks.filter(t => t.public).length;
+  document.getElementById('stats').textContent = `${active} active · ${completed} done · ${pub} public`;
+
+  // Save button visibility
+  const saveBtn = document.getElementById('save-btn');
+  if (isConnected() && dirty) {
+    saveBtn.classList.remove('hidden');
+  } else {
+    saveBtn.classList.add('hidden');
+  }
+
+  // JSON preview
+  document.getElementById('json-preview').textContent = JSON.stringify(buildPublicJson(), null, 2);
+}
+
+function escapeHtml(s) {
+  const d = document.createElement('div');
+  d.textContent = s;
+  return d.innerHTML;
+}
+
+// ── Local storage ──
+function saveLocal() {
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(tasks));
+}
+function loadLocal() {
+  try { tasks = JSON.parse(localStorage.getItem(STORAGE_KEY)) || []; }
+  catch { tasks = []; }
+}
+
+// ── Build public JSON (only public tasks) ──
+function buildPublicJson() {
+  const publicTasks = tasks.filter(t => t.public).map(t => ({
+    id: t.id,
+    text: t.text,
+    status: t.status,
+    priority: t.priority,
+    createdAt: t.createdAt,
+    completedAt: t.completedAt,
+    history: t.history
+  }));
+
+  return {
+    schema_version: 1,
+    description: "Public task list for mase.fi — machine-readable accountability log",
+    last_updated: new Date().toISOString(),
+    stats: {
+      total: publicTasks.length,
+      active: publicTasks.filter(t => t.status === 'active').length,
+      completed: publicTasks.filter(t => t.status === 'completed').length
+    },
+    tasks: publicTasks
+  };
+}
+
+// ── GitHub sync ──
+let saveTimeout = null;
+function autoSave() {
+  if (!isConnected() || !dirty) return;
+  clearTimeout(saveTimeout);
+  saveTimeout = setTimeout(() => saveToGitHub(), 3000);
+}
+
+async function saveToGitHub() {
+  if (!isConnected()) return;
+  const config = getConfig();
+  const status = document.getElementById('sync-status');
+  status.textContent = 'Saving...';
+  status.className = 'text-xs text-yellow-400';
+
+  try {
+    // Get current file SHA
+    const getRes = await fetch(`https://api.github.com/repos/${config.repo}/contents/todo.json?ref=${config.branch || 'main'}`, {
+      headers: { 'Authorization': `Bearer ${config.token}`, 'Accept': 'application/vnd.github.v3+json' }
+    });
+
+    let sha = null;
+    if (getRes.ok) {
+      const data = await getRes.json();
+      sha = data.sha;
+    }
+
+    // Write file
+    const content = btoa(unescape(encodeURIComponent(JSON.stringify(buildPublicJson(), null, 2) + '\n')));
+    const body = {
+      message: `todo: update tasks (${tasks.filter(t => t.public && t.status === 'active').length} active, ${tasks.filter(t => t.public && t.status === 'completed').length} done)`,
+      content,
+      branch: config.branch || 'main'
+    };
+    if (sha) body.sha = sha;
+
+    const putRes = await fetch(`https://api.github.com/repos/${config.repo}/contents/todo.json`, {
+      method: 'PUT',
+      headers: { 'Authorization': `Bearer ${config.token}`, 'Accept': 'application/vnd.github.v3+json', 'Content-Type': 'application/json' },
+      body: JSON.stringify(body)
+    });
+
+    if (!putRes.ok) {
+      const err = await putRes.json();
+      throw new Error(err.message || `HTTP ${putRes.status}`);
+    }
+
+    dirty = false;
+    status.textContent = 'Saved ✓';
+    status.className = 'text-xs text-emerald-400';
+    document.getElementById('save-btn').classList.add('hidden');
+    setTimeout(() => { status.textContent = ''; }, 3000);
+  } catch (err) {
+    console.error('GitHub save failed:', err);
+    status.textContent = 'Save failed';
+    status.className = 'text-xs text-red-400';
+  }
+}
+
+async function pullFromGitHub() {
+  if (!isConnected()) return;
+  const config = getConfig();
+  const status = document.getElementById('sync-status');
+  status.textContent = 'Syncing...';
+  status.className = 'text-xs text-yellow-400';
+
+  try {
+    const res = await fetch(`https://api.github.com/repos/${config.repo}/contents/todo.json?ref=${config.branch || 'main'}`, {
+      headers: { 'Authorization': `Bearer ${config.token}`, 'Accept': 'application/vnd.github.v3+json' }
+    });
+
+    if (!res.ok) {
+      if (res.status === 404) {
+        status.textContent = 'No remote todo.json yet';
+        status.className = 'text-xs text-gray-500';
+        return;
+      }
+      throw new Error(`HTTP ${res.status}`);
+    }
+
+    const data = await res.json();
+    const content = JSON.parse(decodeURIComponent(escape(atob(data.content))));
+
+    if (content.tasks && Array.isArray(content.tasks)) {
+      // Merge: remote public tasks + local private tasks
+      const localPrivate = tasks.filter(t => !t.public);
+      const remoteTasks = content.tasks.map(t => ({ ...t, public: true }));
+
+      // Build a map of existing local public tasks for preserving local-only state
+      const localPublicMap = new Map(tasks.filter(t => t.public).map(t => [t.id, t]));
+
+      // Use remote as source of truth for public tasks, keep local private tasks
+      const merged = [...remoteTasks, ...localPrivate];
+
+      tasks = merged;
+      saveLocal();
+    }
+
+    status.textContent = 'Synced ✓';
+    status.className = 'text-xs text-emerald-400';
+    setTimeout(() => { status.textContent = ''; }, 2000);
+  } catch (err) {
+    console.error('GitHub pull failed:', err);
+    status.textContent = 'Sync failed';
+    status.className = 'text-xs text-red-400';
+  }
+}
+
+// ── Setup modal ──
+function showSetup() {
+  const config = getConfig();
+  document.getElementById('setup-token').value = config.token || '';
+  document.getElementById('setup-repo').value = config.repo || 'myaiexp/mase.fi';
+  document.getElementById('setup-branch').value = config.branch || 'main';
+  document.getElementById('setup-modal').classList.remove('hidden');
+}
+
+function saveSetup() {
+  const token = document.getElementById('setup-token').value.trim();
+  const repo = document.getElementById('setup-repo').value.trim();
+  const branch = document.getElementById('setup-branch').value.trim();
+  setConfig({ token, repo, branch });
+  document.getElementById('setup-modal').classList.add('hidden');
+  pullFromGitHub().then(() => render());
+}
+
+function skipSetup() {
+  document.getElementById('setup-modal').classList.add('hidden');
+}
+</script>
+</body>
+</html>
