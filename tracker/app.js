@@ -3,7 +3,7 @@ const SUPABASE_URL = 'https://ygryvsfjpmwmbuznfvdn.supabase.co';
 const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inlncnl2c2ZqcG13bWJ1em5mdmRuIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzAzOTE5NTksImV4cCI6MjA4NTk2Nzk1OX0.YDou5E7-8cH4twt9MzT2bV52lr6pbsqcxULmMrMMMbM';
 
 // Initialize Supabase client
-const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
 // State
 let tasks = [];
@@ -85,7 +85,7 @@ function getTodayDate() {
 
 // Supabase API calls
 async function fetchTasks() {
-  const { data, error } = await supabase
+  const { data, error } = await supabaseClient
     .from('tasks')
     .select('*')
     .eq('is_archived', false)
@@ -96,7 +96,7 @@ async function fetchTasks() {
 }
 
 async function createTask(title, type) {
-  const { data, error } = await supabase
+  const { data, error } = await supabaseClient
     .from('tasks')
     .insert([{ title, type, is_archived: false }])
     .select()
@@ -107,7 +107,7 @@ async function createTask(title, type) {
 }
 
 async function updateTask(id, title) {
-  const { data, error } = await supabase
+  const { data, error } = await supabaseClient
     .from('tasks')
     .update({ title })
     .eq('id', id)
@@ -119,7 +119,7 @@ async function updateTask(id, title) {
 }
 
 async function deleteTask(id) {
-  const { error } = await supabase
+  const { error } = await supabaseClient
     .from('tasks')
     .update({ is_archived: true })
     .eq('id', id);
@@ -128,7 +128,7 @@ async function deleteTask(id) {
 }
 
 async function fetchCompletions() {
-  const { data, error } = await supabase
+  const { data, error } = await supabaseClient
     .from('completions')
     .select('*')
     .order('completed_date', { ascending: false })
@@ -139,7 +139,7 @@ async function fetchCompletions() {
 }
 
 async function getCompletionForTaskAndDate(taskId, date) {
-  const { data, error } = await supabase
+  const { data, error } = await supabaseClient
     .from('completions')
     .select('*')
     .eq('task_id', taskId)
@@ -154,7 +154,7 @@ async function markComplete(taskId, date) {
   const existing = await getCompletionForTaskAndDate(taskId, date);
 
   if (existing) {
-    const { data, error } = await supabase
+    const { data, error } = await supabaseClient
       .from('completions')
       .update({ is_completed: true, failure_note: null, updated_at: new Date().toISOString() })
       .eq('id', existing.id)
@@ -164,7 +164,7 @@ async function markComplete(taskId, date) {
     if (error) throw error;
     return data;
   } else {
-    const { data, error } = await supabase
+    const { data, error } = await supabaseClient
       .from('completions')
       .insert([{ task_id: taskId, completed_date: date, is_completed: true }])
       .select()
@@ -179,7 +179,7 @@ async function markIncomplete(taskId, date, failureNote) {
   const existing = await getCompletionForTaskAndDate(taskId, date);
 
   if (existing) {
-    const { data, error } = await supabase
+    const { data, error } = await supabaseClient
       .from('completions')
       .update({ is_completed: false, failure_note: failureNote, updated_at: new Date().toISOString() })
       .eq('id', existing.id)
@@ -189,7 +189,7 @@ async function markIncomplete(taskId, date, failureNote) {
     if (error) throw error;
     return data;
   } else {
-    const { data, error } = await supabase
+    const { data, error } = await supabaseClient
       .from('completions')
       .insert([{ task_id: taskId, completed_date: date, is_completed: false, failure_note: failureNote }])
       .select()
