@@ -16,7 +16,13 @@
         'border', 'border-gray-700', 'hover:border-emerald-600',
         'text-3xl', 'font-bold', 'mb-4', 'text-gray-300', 'mb-8',
         'text-emerald-400', 'hover:text-emerald-300', 'font-medium', 'transition',
-        'text-gray-500', 'italic'
+        'text-gray-500', 'italic',
+        // Updates section
+        'border-l-2', 'border-emerald-600/30', 'pl-8',
+        'overflow-y-auto', 'max-h-56', 'snap-y', 'snap-start', 'scroll-smooth',
+        'overflow-hidden', 'whitespace-nowrap',
+        'bg-emerald-600/20', 'text-emerald-400', 'bg-emerald-900/20',
+        'rounded-xl', 'px-5', 'py-3', 'border-gray-700/50', 'hover:border-emerald-600/40'
       ]
     }
   </script>
@@ -24,6 +30,46 @@
   <script src="https://cdn.jsdelivr.net/npm/particles.js@2.0.0/particles.min.js"></script>
   <style>
     body { font-family: 'Inter', sans-serif; }
+
+    /* ===== UPDATES DISPLAY MODES ===== */
+    @keyframes ticker-scroll {
+      0%   { transform: translateX(0); }
+      100% { transform: translateX(-50%); }
+    }
+    .ticker-track {
+      animation: ticker-scroll 25s linear infinite;
+    }
+    .ticker-track:hover {
+      animation-play-state: paused;
+    }
+
+    @keyframes blink-cursor {
+      0%, 100% { border-color: #10b981; }
+      50%      { border-color: transparent; }
+    }
+    .typewriter-cursor {
+      border-right: 2px solid #10b981;
+      animation: blink-cursor 0.8s step-end infinite;
+    }
+
+    @keyframes fade-in-up {
+      from { opacity: 0; transform: translateY(10px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+    .update-item {
+      animation: fade-in-up 0.35s ease-out both;
+    }
+
+    #updates-container::-webkit-scrollbar {
+      width: 4px;
+    }
+    #updates-container::-webkit-scrollbar-track {
+      background: transparent;
+    }
+    #updates-container::-webkit-scrollbar-thumb {
+      background: rgba(16, 185, 129, 0.3);
+      border-radius: 2px;
+    }
   </style>
 </head>
 
@@ -48,17 +94,30 @@
       </div>
     </div>
 
-    <div class="w-full max-w-xl pb-20 px-6">
-      <div class="space-y-3 text-center">
-        <p class="text-base leading-relaxed text-gray-300 opacity-90">
-          18.01.2026 — Added Shapez 2 Solver
-        </p>
-        <p class="text-sm md:text-base leading-relaxed text-gray-400 opacity-70">
-          15.01.2026 — Added Yatzy game
-        </p>
-        <p class="text-xs md:text-sm leading-relaxed text-gray-500 opacity-50">
-          09.01.2026 — Added admin.mase.fi + switched project cards to dynamic via dashboard
-        </p>
+    <div id="updates-section" class="w-full max-w-2xl pb-20 px-6">
+      <div id="updates-switcher" class="hidden flex justify-center mb-6">
+        <div class="inline-flex items-center gap-1 bg-gray-800/50 backdrop-blur-sm rounded-full p-1 border border-gray-700">
+          <button data-mode="timeline" class="updates-mode-btn px-3 py-1.5 rounded-full text-xs text-gray-400 hover:text-white transition" title="Timeline">
+            <svg class="w-4 h-4" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><line x1="4" y1="2" x2="4" y2="14"/><circle cx="4" cy="4" r="1.5" fill="currentColor"/><circle cx="4" cy="8" r="1.5" fill="currentColor"/><circle cx="4" cy="12" r="1.5" fill="currentColor"/><line x1="7" y1="4" x2="13" y2="4"/><line x1="7" y1="8" x2="13" y2="8"/><line x1="7" y1="12" x2="13" y2="12"/></svg>
+          </button>
+          <button data-mode="cards" class="updates-mode-btn px-3 py-1.5 rounded-full text-xs text-gray-400 hover:text-white transition" title="Cards">
+            <svg class="w-4 h-4" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="1" y="1" width="6" height="6" rx="1"/><rect x="9" y="1" width="6" height="6" rx="1"/><rect x="1" y="9" width="6" height="6" rx="1"/><rect x="9" y="9" width="6" height="6" rx="1"/></svg>
+          </button>
+          <button data-mode="ticker" class="updates-mode-btn px-3 py-1.5 rounded-full text-xs text-gray-400 hover:text-white transition" title="Ticker">
+            <svg class="w-4 h-4" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M1 8h10M8 5l3 3-3 3"/><line x1="14" y1="3" x2="14" y2="13"/></svg>
+          </button>
+          <button data-mode="typewriter" class="updates-mode-btn px-3 py-1.5 rounded-full text-xs text-gray-400 hover:text-white transition" title="Typewriter">
+            <svg class="w-4 h-4" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M2 12h3M1 4h14M1 8h10"/><rect x="12" y="6" width="2" height="6" fill="currentColor" opacity="0.6"/></svg>
+          </button>
+        </div>
+      </div>
+      <div id="updates-container">
+        <!-- Fallback shown until JS loads -->
+        <div class="space-y-3 text-center">
+          <p class="text-base leading-relaxed text-gray-300 opacity-90">18.01.2026 — Added Shapez 2 Solver</p>
+          <p class="text-sm md:text-base leading-relaxed text-gray-400 opacity-70">15.01.2026 — Added Yatzy game</p>
+          <p class="text-xs md:text-sm leading-relaxed text-gray-500 opacity-50">09.01.2026 — Added admin.mase.fi + switched project cards to dynamic via dashboard</p>
+        </div>
       </div>
     </div>
   </section>
@@ -152,6 +211,198 @@
     }
 
     loadProjects();
+
+    // ===== UPDATES SYSTEM =====
+
+    const UPDATES_STORAGE_KEY = 'updates-display-mode';
+    const DEFAULT_MODE = 'timeline';
+    let cachedUpdates = null;
+    let typewriterTimer = null;
+
+    function formatDate(isoDate) {
+      const d = new Date(isoDate);
+      return d.toLocaleDateString('fi-FI');
+    }
+
+    // --- Data fetching ---
+    async function loadUpdates() {
+      const container = document.getElementById('updates-container');
+      const switcher = document.getElementById('updates-switcher');
+      try {
+        const apiUrl = 'https://mase.fi/api/collections/updates/records?perPage=20&sort=-date';
+        const response = await fetch(apiUrl);
+        if (!response.ok) throw new Error(`API error: ${response.status}`);
+        const data = await response.json();
+
+        if (data.items.length === 0) {
+          container.innerHTML = '<p class="text-gray-500 italic text-center">No updates yet.</p>';
+          return;
+        }
+
+        cachedUpdates = data.items;
+        switcher.classList.remove('hidden');
+        const mode = localStorage.getItem(UPDATES_STORAGE_KEY) || DEFAULT_MODE;
+        setActiveButton(mode);
+        renderUpdates(cachedUpdates, mode);
+      } catch (err) {
+        console.error('Updates failed to load:', err);
+        // Fallback is already in the HTML
+      }
+    }
+
+    // --- Mode dispatcher ---
+    function renderUpdates(items, mode) {
+      const container = document.getElementById('updates-container');
+      clearTypewriter();
+      container.innerHTML = '';
+      const renderers = { timeline: renderTimeline, cards: renderCards, ticker: renderTicker, typewriter: renderTypewriter };
+      (renderers[mode] || renderers[DEFAULT_MODE])(items, container);
+    }
+
+    // --- Timeline mode ---
+    function renderTimeline(items, container) {
+      const wrapper = document.createElement('div');
+      wrapper.className = 'relative border-l-2 border-emerald-600/30 ml-4 md:ml-8 space-y-6';
+
+      items.forEach((item, i) => {
+        const opacity = Math.max(0.35, 1 - i * 0.08);
+        const el = document.createElement('div');
+        el.className = 'update-item relative pl-8';
+        el.style.animationDelay = `${i * 0.06}s`;
+
+        el.innerHTML = `
+          <div class="absolute -left-[9px] top-1.5 w-4 h-4 rounded-full bg-gray-900 border-2 border-emerald-500" style="opacity:${opacity}"></div>
+          <span class="text-xs text-emerald-400/70 font-medium">${formatDate(item.date)}</span>
+          <p class="text-sm md:text-base text-gray-300 mt-0.5" style="opacity:${opacity}">
+            ${item.emoji ? item.emoji + ' ' : ''}${item.text}
+          </p>
+        `;
+        wrapper.appendChild(el);
+      });
+      container.appendChild(wrapper);
+    }
+
+    // --- Cards mode ---
+    function renderCards(items, container) {
+      const wrapper = document.createElement('div');
+      wrapper.className = 'space-y-3 max-h-56 overflow-y-auto pr-2 scroll-smooth snap-y';
+
+      items.forEach((item, i) => {
+        const el = document.createElement('div');
+        el.className = 'update-item snap-start bg-gray-800/50 backdrop-blur-sm rounded-xl px-5 py-3 border border-gray-700/50 hover:border-emerald-600/40 transition-all duration-300';
+        el.style.animationDelay = `${i * 0.04}s`;
+
+        el.innerHTML = `
+          <div class="flex items-center justify-between gap-4">
+            <p class="text-sm text-gray-300 flex-1">
+              ${item.emoji ? item.emoji + ' ' : ''}${item.text}
+            </p>
+            <span class="text-xs text-emerald-400/60 whitespace-nowrap bg-emerald-900/20 px-2 py-0.5 rounded-full">${formatDate(item.date)}</span>
+          </div>
+        `;
+        wrapper.appendChild(el);
+      });
+      container.appendChild(wrapper);
+    }
+
+    // --- Ticker mode ---
+    function renderTicker(items, container) {
+      const outer = document.createElement('div');
+      outer.className = 'overflow-hidden rounded-xl bg-gray-800/30 backdrop-blur-sm border border-gray-700/30 py-3 px-2';
+
+      const track = document.createElement('div');
+      track.className = 'ticker-track flex whitespace-nowrap gap-12';
+
+      // Duplicate for seamless loop
+      const allItems = [...items, ...items];
+      allItems.forEach(item => {
+        const el = document.createElement('span');
+        el.className = 'text-sm text-gray-400 flex-shrink-0';
+        el.innerHTML = `<span class="text-emerald-400/60">${formatDate(item.date)}</span> — ${item.emoji ? item.emoji + ' ' : ''}${item.text}`;
+        track.appendChild(el);
+      });
+
+      outer.appendChild(track);
+      container.appendChild(outer);
+    }
+
+    // --- Typewriter mode ---
+    function clearTypewriter() {
+      if (typewriterTimer) {
+        clearTimeout(typewriterTimer);
+        typewriterTimer = null;
+      }
+    }
+
+    function renderTypewriter(items, container) {
+      const wrapper = document.createElement('div');
+      wrapper.className = 'text-center min-h-[3.5rem] flex flex-col items-center justify-center';
+
+      const dateLine = document.createElement('span');
+      dateLine.className = 'text-xs text-emerald-400/60 mb-1 block h-4';
+
+      const textLine = document.createElement('span');
+      textLine.className = 'text-base text-gray-300 typewriter-cursor inline-block pr-1';
+
+      wrapper.appendChild(dateLine);
+      wrapper.appendChild(textLine);
+      container.appendChild(wrapper);
+
+      let currentIndex = 0;
+      let activeInterval = null;
+
+      function typeItem() {
+        if (!document.contains(wrapper)) return;
+        const item = items[currentIndex % items.length];
+        dateLine.textContent = formatDate(item.date);
+        const fullText = (item.emoji ? item.emoji + ' ' : '') + item.text;
+        textLine.textContent = '';
+        let charIndex = 0;
+
+        activeInterval = setInterval(() => {
+          if (!document.contains(wrapper)) { clearInterval(activeInterval); return; }
+          textLine.textContent = fullText.slice(0, ++charIndex);
+          if (charIndex >= fullText.length) {
+            clearInterval(activeInterval);
+            typewriterTimer = setTimeout(() => {
+              // Erase
+              activeInterval = setInterval(() => {
+                if (!document.contains(wrapper)) { clearInterval(activeInterval); return; }
+                textLine.textContent = fullText.slice(0, --charIndex);
+                if (charIndex <= 0) {
+                  clearInterval(activeInterval);
+                  currentIndex++;
+                  typewriterTimer = setTimeout(typeItem, 300);
+                }
+              }, 20);
+            }, 2500);
+          }
+        }, 45);
+      }
+
+      typeItem();
+    }
+
+    // --- Mode switcher ---
+    function setActiveButton(mode) {
+      document.querySelectorAll('.updates-mode-btn').forEach(btn => {
+        const isActive = btn.dataset.mode === mode;
+        btn.classList.toggle('bg-emerald-600/20', isActive);
+        btn.classList.toggle('text-emerald-400', isActive);
+        btn.classList.toggle('text-gray-400', !isActive);
+      });
+    }
+
+    document.querySelectorAll('.updates-mode-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const mode = btn.dataset.mode;
+        localStorage.setItem(UPDATES_STORAGE_KEY, mode);
+        setActiveButton(mode);
+        if (cachedUpdates) renderUpdates(cachedUpdates, mode);
+      });
+    });
+
+    loadUpdates();
   </script>
 </body>
 </html>
