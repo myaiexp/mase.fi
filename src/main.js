@@ -142,11 +142,13 @@ function createUpdateItem(entry, skipAnimation) {
   li.className = 'update-item';
 
   const time = document.createElement('time');
+  time.className = 'update-date';
   time.dateTime = entry.date;
   time.textContent = formatDate(entry.date);
 
   const span = document.createElement('span');
-  span.textContent = entry.title;
+  span.className = 'update-text';
+  span.textContent = entry.text;
 
   li.appendChild(time);
   li.appendChild(span);
