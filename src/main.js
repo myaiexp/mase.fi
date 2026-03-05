@@ -146,12 +146,17 @@ function createUpdateItem(entry, skipAnimation) {
   time.dateTime = entry.date;
   time.textContent = formatDate(entry.date);
 
-  const span = document.createElement('span');
-  span.className = 'update-text';
-  span.textContent = entry.text;
+  const project = document.createElement('span');
+  project.className = 'update-project';
+  project.textContent = entry.project;
+
+  const text = document.createElement('span');
+  text.className = 'update-text';
+  text.textContent = entry.text;
 
   li.appendChild(time);
-  li.appendChild(span);
+  li.appendChild(project);
+  li.appendChild(text);
 
   if (!skipAnimation) {
     li.style.opacity = '0';
