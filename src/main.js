@@ -37,19 +37,6 @@ if (!prefersReducedMotion) {
     }),
   });
 
-  // ===== Update items: scroll-triggered stagger =====
-
-  animate('.update-item', {
-    opacity: [0, 1],
-    translateY: ['1rem', 0],
-    delay: stagger(60),
-    duration: 800,
-    ease: 'outExpo',
-    autoplay: onScroll({
-      enter: 'bottom-=80 top',
-    }),
-  });
-
   // ===== Ambient: Mouse-following glow =====
 
   const glow = document.querySelector('.mouse-glow');
@@ -123,8 +110,107 @@ if (!prefersReducedMotion) {
 
 } else {
   // Immediately show everything for reduced motion
-  document.querySelectorAll('.hero-letter, .hero-tagline, .app-card, .update-item').forEach(el => {
+  document.querySelectorAll('.hero-letter, .hero-tagline, .app-card').forEach(el => {
     el.style.opacity = '1';
     el.style.transform = 'none';
   });
+}
+
+// ===== Updates: fetch, render, tab switching =====
+
+/** Format "YYYY-MM-DD" → "DD.MM.YYYY" */
+function formatDate(isoDate) {
+  const [y, m, d] = isoDate.split('-');
+  return `${d}.${m}.${y}`;
+}
+
+/**
+ * Filter entries by tab (cumulative):
+ * "project" → category === "project"
+ * "feature" → category === "project" || "feature"
+ * "all" → everything
+ */
+function filterEntries(entries, filter) {
+  if (filter === 'project') return entries.filter(e => e.category === 'project');
+  if (filter === 'feature') return entries.filter(e => e.category === 'project' || e.category === 'feature');
+  return entries;
+}
+
+/** Create <li class="update-item"> with <time> and <span>. Sets opacity:0 + translateY if animating. */
+function createUpdateItem(entry, skipAnimation) {
+  const li = document.createElement('li');
+  li.className = 'update-item';
+
+  const time = document.createElement('time');
+  time.dateTime = entry.date;
+  time.textContent = formatDate(entry.date);
+
+  const span = document.createElement('span');
+  span.textContent = entry.title;
+
+  li.appendChild(time);
+  li.appendChild(span);
+
+  if (!skipAnimation) {
+    li.style.opacity = '0';
+    li.style.transform = 'translateY(1rem)';
+  }
+
+  return li;
+}
+
+/** Clear list, insert filtered items, animate them in with stagger. */
+function renderUpdates(entries, list, skipAnimation) {
+  while (list.firstChild) list.removeChild(list.firstChild);
+  const items = entries.map(entry => createUpdateItem(entry, skipAnimation));
+  items.forEach(item => list.appendChild(item));
+
+  if (!skipAnimation && items.length > 0) {
+    animate('.update-item', {
+      opacity: [0, 1],
+      translateY: ['1rem', 0],
+      duration: 400,
+      delay: stagger(40),
+      ease: 'outExpo',
+    });
+  }
+}
+
+// ===== Updates initialization =====
+
+{
+  const list = document.querySelector('.updates-list');
+  const tabs = document.querySelectorAll('.tab-btn');
+
+  if (list && tabs.length > 0) {
+    let allEntries = [];
+    let activeFilter = 'project';
+
+    // Tab click handler
+    tabs.forEach(btn => {
+      btn.addEventListener('click', () => {
+        const filter = btn.dataset.filter;
+        if (filter === activeFilter) return;
+
+        activeFilter = filter;
+        tabs.forEach(t => t.classList.remove('active'));
+        btn.classList.add('active');
+
+        const filtered = filterEntries(allEntries, activeFilter);
+        renderUpdates(filtered, list, prefersReducedMotion);
+      });
+    });
+
+    // Fetch and render default tab
+    fetch('/updates.json')
+      .then(res => res.json())
+      .then(entries => {
+        allEntries = entries;
+        const filtered = filterEntries(allEntries, activeFilter);
+        renderUpdates(filtered, list, prefersReducedMotion);
+      })
+      .catch(() => {
+        // Graceful: list stays empty, tabs still visible
+      });
+  }
 }
