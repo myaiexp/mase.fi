@@ -72,7 +72,7 @@ if (!prefersReducedMotion) {
 
   // ===== Ambient: Click ripples =====
 
-  document.addEventListener('click', (e) => {
+  document.addEventListener('pointerdown', (e) => {
     const ripple = document.createElement('div');
     ripple.className = 'click-ripple';
     ripple.style.left = `${e.clientX}px`;
@@ -84,7 +84,7 @@ if (!prefersReducedMotion) {
   // ===== Card ripple fill =====
 
   document.querySelectorAll('.app-card').forEach(card => {
-    card.addEventListener('mousedown', (e) => {
+    card.addEventListener('pointerdown', (e) => {
       const rect = card.getBoundingClientRect();
       const ripple = document.createElement('div');
       ripple.className = 'card-ripple';
