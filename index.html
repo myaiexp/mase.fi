@@ -19,7 +19,7 @@
       <h1 class="hero-title" aria-label="mase.fi">
         <span class="hero-letter">m</span><span class="hero-letter">a</span><span class="hero-letter">s</span><span class="hero-letter">e</span><span class="hero-letter hero-dot">.</span><span class="hero-letter">f</span><span class="hero-letter">i</span>
       </h1>
-      <p class="hero-tagline">apps, tools, and games I built for myself</p>
+      <p class="hero-tagline">building apps, tools, and games for myself</p>
     </div>
     <div class="scroll-indicator" aria-hidden="true">
       <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
@@ -28,52 +28,17 @@
     </div>
   </section>
 
-  <!-- Apps -->
-  <section class="apps">
-    <div class="apps-grid">
-
-      <a href="https://mase.fi/rss/" class="app-card">
-        <h2 class="app-name">FreshRSS</h2>
-        <p class="app-desc">Self-hosted RSS reader with a custom dark theme</p>
-      </a>
-
-      <a href="https://mase.fi/explorer" class="app-card">
-        <h2 class="app-name">Explorer</h2>
-        <p class="app-desc">Round-trip route planning and place discovery</p>
-      </a>
-
-      <a href="https://mase.fi/tracker" class="app-card">
-        <h2 class="app-name">Personal Tracker</h2>
-        <p class="app-desc">Daily habit tracking with streaks, history, and data export</p>
-      </a>
-
-      <a href="https://mase.fi/shapez" class="app-card">
-        <h2 class="app-name">Shapez 2 Solver</h2>
-        <p class="app-desc">Figure out how to build any shape in Shapez 2</p>
-      </a>
-
-      <a href="https://mase.fi/porssi.html" class="app-card">
-        <h2 class="app-name">Pörssisähkö</h2>
-        <p class="app-desc">Finnish electricity spot prices at a glance</p>
-      </a>
-
-      <a href="https://mase.fi/yatzy.html" class="app-card">
-        <h2 class="app-name">Yatzy</h2>
-        <p class="app-desc">Classic Finnish Yatzy for two players</p>
-      </a>
-
-    </div>
-  </section>
-
   <!-- Updates -->
   <section class="updates">
     <h2 class="updates-heading">Recent updates</h2>
-    <nav class="updates-tabs" aria-label="Update filters">
-      <button class="tab-btn active" data-filter="project">Projects</button>
-      <button class="tab-btn" data-filter="feature">Features</button>
-      <button class="tab-btn" data-filter="all">Everything</button>
-    </nav>
-    <ul class="updates-list"></ul>
+    <div class="updates-controls"></div>
+    <div class="updates-stream"></div>
+  </section>
+
+  <!-- Projects -->
+  <section class="projects">
+    <h2 class="projects-heading">Projects</h2>
+    <div class="projects-grid"></div>
   </section>
 
   <!-- Footer -->
