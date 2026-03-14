@@ -211,7 +211,9 @@ function renderUpdates(entries, list, skipAnimation) {
     // Fetch and render default tab
     fetch('/updates.json')
       .then(res => res.json())
-      .then(entries => {
+      .then(data => {
+        // Compat shim: handle both flat array (old) and {entries} (new) format
+        const entries = Array.isArray(data) ? data : data.entries;
         allEntries = entries;
         const filtered = filterEntries(allEntries, activeFilter);
         renderUpdates(filtered, list, prefersReducedMotion);
