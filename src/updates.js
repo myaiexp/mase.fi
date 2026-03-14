@@ -23,10 +23,18 @@ function filterEntries(entries, filter) {
   return nonLog; // 'all'
 }
 
-/** Get the searchable text for an entry */
+/** Get the searchable text for an entry (project name + text for broader search) */
+function entrySearchText(entry) {
+  const text = entry.text || entry.summary || '';
+  return entry.project ? `${entry.project} ${text}` : text;
+}
+
+/** Get the display text for an entry */
 function entryText(entry) {
   return entry.text || entry.summary || '';
 }
+
+const STREAM_PAGE_SIZE = 25;
 
 /**
  * Build a DOM fragment with highlighted matched substrings using <mark> elements.
@@ -234,18 +242,32 @@ function renderEntry(entry, ranges, haystackStr) {
  * @param {boolean} prefersReducedMotion
  * @param {Map|null} highlightMap - Map of entry index → {ranges, haystack} for search highlights
  */
-function renderStream(entries, container, prefersReducedMotion, highlightMap) {
+function renderStream(entries, container, prefersReducedMotion, highlightMap, limit) {
   while (container.firstChild) container.removeChild(container.firstChild);
 
-  entries.forEach((entry, i) => {
+  const cap = limit || STREAM_PAGE_SIZE;
+  const visible = entries.slice(0, cap);
+  const hasMore = entries.length > cap;
+
+  visible.forEach((entry, i) => {
     const hl = highlightMap?.get(i);
     const node = renderEntry(entry, hl?.ranges ?? null, hl?.haystack ?? null);
     container.appendChild(node);
   });
 
+  if (hasMore) {
+    const showMore = document.createElement('button');
+    showMore.className = 'stream-show-more';
+    showMore.textContent = `Show ${entries.length - cap} more`;
+    showMore.addEventListener('click', () => {
+      renderStream(entries, container, prefersReducedMotion, highlightMap, entries.length);
+    });
+    container.appendChild(showMore);
+  }
+
   scrollReveal('.stream-entry', prefersReducedMotion);
 
-  if (!prefersReducedMotion && !CSS.supports('animation-timeline: view()') && entries.length > 0) {
+  if (!prefersReducedMotion && !CSS.supports('animation-timeline: view()') && visible.length > 0) {
     animate('.stream-entry', {
       opacity: [0, 1],
       translateY: ['1rem', 0],
@@ -285,8 +307,8 @@ export function initUpdates(entries, prefersReducedMotion) {
       return;
     }
 
-    // Build haystack from filtered entries
-    const haystack = filtered.map(e => entryText(e));
+    // Build haystack from filtered entries (includes project name for broader matching)
+    const haystack = filtered.map(e => entrySearchText(e));
     const [idxs, info, order] = uf.search(haystack, searchNeedle, true);
 
     if (!idxs || idxs.length === 0) {
