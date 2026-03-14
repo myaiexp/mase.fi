@@ -1,5 +1,6 @@
 import { animate, stagger } from 'animejs';
 import { scrollReveal } from './animations.js';
+import uFuzzy from '@leeoniya/ufuzzy';
 
 /** Format "YYYY-MM-DD" → "DD.MM.YYYY" */
 function formatDate(isoDate) {
@@ -22,12 +23,53 @@ function filterEntries(entries, filter) {
   return nonLog; // 'all'
 }
 
+/** Get the searchable text for an entry */
+function entryText(entry) {
+  return entry.text || entry.summary || '';
+}
+
+/**
+ * Build a DOM fragment with highlighted matched substrings using <mark> elements.
+ * Safe: creates DOM nodes, no innerHTML.
+ */
+function buildHighlightedFragment(text, ranges) {
+  const frag = document.createDocumentFragment();
+  const mark = (part, matched) => {
+    if (matched) {
+      const el = document.createElement('mark');
+      el.className = 'search-highlight';
+      el.textContent = part;
+      return el;
+    }
+    return document.createTextNode(part);
+  };
+  const append = (accum, node) => { accum.appendChild(node); };
+  uFuzzy.highlight(text, ranges, mark, frag, append);
+  return frag;
+}
+
+/**
+ * Set text content on an element, optionally with search highlights.
+ * @param {HTMLElement} el - Target element
+ * @param {string} text - Plain text
+ * @param {Int32Array|null} ranges - uFuzzy ranges for this entry (null = no highlight)
+ * @param {string} haystackStr - The haystack string that was searched (for highlight alignment)
+ */
+function setTextWithHighlight(el, text, ranges, haystackStr) {
+  if (ranges && haystackStr) {
+    el.textContent = '';
+    el.appendChild(buildHighlightedFragment(haystackStr, ranges));
+  } else {
+    el.textContent = text;
+  }
+}
+
 /**
  * Render a project entry.
  * Full-width block, bg-card, 4px accent left border, display font name (~1.2rem),
  * description, date top-right.
  */
-function renderProjectEntry(entry) {
+function renderProjectEntry(entry, ranges, haystackStr) {
   const node = document.createElement('article');
   node.className = 'stream-entry stream-entry--project';
 
@@ -48,7 +90,7 @@ function renderProjectEntry(entry) {
 
   const text = document.createElement('p');
   text.className = 'stream-entry__text';
-  text.textContent = entry.text || entry.summary || '';
+  setTextWithHighlight(text, entryText(entry), ranges, haystackStr);
 
   node.appendChild(header);
   node.appendChild(text);
@@ -60,7 +102,7 @@ function renderProjectEntry(entry) {
  * Render a feature entry.
  * No background, 2px --accent-dim left bar, badge + inline text.
  */
-function renderFeatureEntry(entry) {
+function renderFeatureEntry(entry, ranges, haystackStr) {
   const node = document.createElement('article');
   node.className = 'stream-entry stream-entry--feature';
 
@@ -70,7 +112,7 @@ function renderFeatureEntry(entry) {
 
   const text = document.createElement('span');
   text.className = 'stream-entry__text';
-  text.textContent = entry.text || entry.summary || '';
+  setTextWithHighlight(text, entryText(entry), ranges, haystackStr);
 
   const date = document.createElement('time');
   date.className = 'stream-entry__date';
@@ -92,7 +134,7 @@ function renderFeatureEntry(entry) {
  * Render a daily entry.
  * Compact row with <details> accordion for commits.
  */
-function renderDailyEntry(entry) {
+function renderDailyEntry(entry, ranges, haystackStr) {
   const supportsInterpolateSize = CSS.supports('interpolate-size', 'allow-keywords');
 
   const node = document.createElement('article');
@@ -115,7 +157,7 @@ function renderDailyEntry(entry) {
 
   const summary = document.createElement('p');
   summary.className = 'stream-entry__summary';
-  summary.textContent = entry.summary || entry.text || '';
+  setTextWithHighlight(summary, entry.summary || entry.text || '', ranges, haystackStr);
 
   node.appendChild(header);
   node.appendChild(summary);
@@ -173,31 +215,36 @@ function renderDailyEntry(entry) {
 }
 
 /**
- * Clear container, append rendered entries, trigger scroll reveals.
+ * Render an entry with the appropriate renderer.
+ * @param {Object} entry
+ * @param {Int32Array|null} ranges - uFuzzy highlight ranges (null = no highlight)
+ * @param {string|null} haystackStr - Haystack string for highlight alignment
  */
-function renderStream(entries, container, prefersReducedMotion) {
-  // Clear existing entries
+function renderEntry(entry, ranges, haystackStr) {
+  if (entry.category === 'project') return renderProjectEntry(entry, ranges, haystackStr);
+  if (entry.category === 'feature') return renderFeatureEntry(entry, ranges, haystackStr);
+  if (entry.category === 'daily') return renderDailyEntry(entry, ranges, haystackStr);
+  return renderFeatureEntry(entry, ranges, haystackStr);
+}
+
+/**
+ * Clear container, append rendered entries, trigger scroll reveals.
+ * @param {Array} entries - Entries to render
+ * @param {HTMLElement} container
+ * @param {boolean} prefersReducedMotion
+ * @param {Map|null} highlightMap - Map of entry index → {ranges, haystack} for search highlights
+ */
+function renderStream(entries, container, prefersReducedMotion, highlightMap) {
   while (container.firstChild) container.removeChild(container.firstChild);
 
-  entries.forEach(entry => {
-    let node;
-    if (entry.category === 'project') {
-      node = renderProjectEntry(entry);
-    } else if (entry.category === 'feature') {
-      node = renderFeatureEntry(entry);
-    } else if (entry.category === 'daily') {
-      node = renderDailyEntry(entry);
-    } else {
-      // Fallback for unknown categories — render as feature-style
-      node = renderFeatureEntry(entry);
-    }
+  entries.forEach((entry, i) => {
+    const hl = highlightMap?.get(i);
+    const node = renderEntry(entry, hl?.ranges ?? null, hl?.haystack ?? null);
     container.appendChild(node);
   });
 
-  // Trigger scroll reveals for new entries
   scrollReveal('.stream-entry', prefersReducedMotion);
 
-  // If not using CSS scroll-driven animations, also do a stagger-in for visible items
   if (!prefersReducedMotion && !CSS.supports('animation-timeline: view()') && entries.length > 0) {
     animate('.stream-entry', {
       opacity: [0, 1],
@@ -210,7 +257,7 @@ function renderStream(entries, container, prefersReducedMotion) {
 }
 
 /**
- * Initialize the updates stream: render pill-bar, render entries, attach filter handlers.
+ * Initialize the updates stream: render pill-bar, search, entries, attach handlers.
  * @param {Array} entries - The entries array from updates.json
  * @param {boolean} prefersReducedMotion - Reduced motion preference
  */
@@ -220,7 +267,67 @@ export function initUpdates(entries, prefersReducedMotion) {
 
   if (!controlsEl || !streamEl) return;
 
-  // Pill bar config: label → filter value
+  const uf = new uFuzzy();
+  let activeFilter = 'all';
+  let searchNeedle = '';
+
+  /** Get pill-filtered entries */
+  function getFiltered() {
+    return filterEntries(entries, activeFilter);
+  }
+
+  /** Apply search within filtered entries, render results */
+  function applySearchAndRender() {
+    const filtered = getFiltered();
+
+    if (!searchNeedle) {
+      renderWithTransition(filtered, streamEl, prefersReducedMotion, null);
+      return;
+    }
+
+    // Build haystack from filtered entries
+    const haystack = filtered.map(e => entryText(e));
+    const [idxs, info, order] = uf.search(haystack, searchNeedle, true);
+
+    if (!idxs || idxs.length === 0) {
+      renderWithTransition([], streamEl, prefersReducedMotion, null);
+      return;
+    }
+
+    // Build ordered result entries with highlight data
+    const resultEntries = [];
+    const highlightMap = new Map();
+
+    if (order) {
+      order.forEach(orderIdx => {
+        const haystackIdx = info.idx[orderIdx];
+        const entry = filtered[haystackIdx];
+        const resultIndex = resultEntries.length;
+        resultEntries.push(entry);
+        highlightMap.set(resultIndex, {
+          ranges: info.ranges[orderIdx],
+          haystack: haystack[haystackIdx],
+        });
+      });
+    } else {
+      idxs.forEach(idx => {
+        resultEntries.push(filtered[idx]);
+      });
+    }
+
+    renderWithTransition(resultEntries, streamEl, prefersReducedMotion, highlightMap);
+  }
+
+  /** Render with View Transitions API if available */
+  function renderWithTransition(entries, container, reducedMotion, highlightMap) {
+    if (document.startViewTransition) {
+      document.startViewTransition(() => renderStream(entries, container, reducedMotion, highlightMap));
+    } else {
+      renderStream(entries, container, reducedMotion, highlightMap);
+    }
+  }
+
+  // ===== Pill bar =====
   const pills = [
     { label: 'All', value: 'all' },
     { label: 'Projects', value: 'project' },
@@ -228,12 +335,9 @@ export function initUpdates(entries, prefersReducedMotion) {
     { label: 'Dev log', value: 'daily' },
   ];
 
-  // Build pill bar
   const pillBar = document.createElement('nav');
   pillBar.className = 'pill-bar';
   pillBar.setAttribute('aria-label', 'Update filters');
-
-  let activeFilter = 'all';
 
   pills.forEach(({ label, value }) => {
     const btn = document.createElement('button');
@@ -243,26 +347,71 @@ export function initUpdates(entries, prefersReducedMotion) {
     btn.addEventListener('click', () => {
       if (value === activeFilter) return;
       activeFilter = value;
-
-      // Update pill active state
       pillBar.querySelectorAll('.pill-btn').forEach(b => b.classList.remove('active'));
       btn.classList.add('active');
-
-      const filtered = filterEntries(entries, activeFilter);
-
-      // View Transitions API for smooth filter swap
-      if (document.startViewTransition) {
-        document.startViewTransition(() => renderStream(filtered, streamEl, prefersReducedMotion));
-      } else {
-        renderStream(filtered, streamEl, prefersReducedMotion);
-      }
+      applySearchAndRender();
     });
     pillBar.appendChild(btn);
   });
 
   controlsEl.appendChild(pillBar);
 
-  // Initial render with default filter
-  const initial = filterEntries(entries, activeFilter);
-  renderStream(initial, streamEl, prefersReducedMotion);
+  // ===== Search =====
+  const searchToggle = document.createElement('button');
+  searchToggle.className = 'search-toggle';
+  searchToggle.setAttribute('aria-label', 'Search updates');
+  // Magnifying glass SVG icon
+  searchToggle.innerHTML = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>';
+
+  const searchInput = document.createElement('input');
+  searchInput.type = 'text';
+  searchInput.className = 'search-input';
+  searchInput.placeholder = 'Search...';
+  searchInput.setAttribute('aria-label', 'Search updates');
+
+  let debounceTimer = null;
+
+  searchToggle.addEventListener('click', () => {
+    searchInput.classList.add('active');
+    searchToggle.classList.add('active');
+    searchInput.focus();
+  });
+
+  searchInput.addEventListener('input', () => {
+    clearTimeout(debounceTimer);
+    debounceTimer = setTimeout(() => {
+      searchNeedle = searchInput.value.trim();
+      applySearchAndRender();
+    }, 100);
+  });
+
+  searchInput.addEventListener('blur', () => {
+    if (!searchInput.value.trim()) {
+      searchInput.classList.remove('active');
+      searchToggle.classList.remove('active');
+      if (searchNeedle) {
+        searchNeedle = '';
+        applySearchAndRender();
+      }
+    }
+  });
+
+  // Escape key clears and collapses search
+  searchInput.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') {
+      searchInput.value = '';
+      searchNeedle = '';
+      searchInput.classList.remove('active');
+      searchToggle.classList.remove('active');
+      searchInput.blur();
+      applySearchAndRender();
+    }
+  });
+
+  controlsEl.appendChild(searchToggle);
+  controlsEl.appendChild(searchInput);
+
+  // ===== Initial render =====
+  const initial = getFiltered();
+  renderStream(initial, streamEl, prefersReducedMotion, null);
 }
