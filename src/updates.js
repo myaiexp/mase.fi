@@ -1,21 +1,18 @@
 import { animate, stagger } from 'animejs';
 import { scrollReveal } from './animations.js';
 import uFuzzy from '@leeoniya/ufuzzy';
-
-/** Format "YYYY-MM-DD" → "DD.MM.YYYY" */
-function formatDate(isoDate) {
-  const [y, m, d] = isoDate.split('-');
-  return `${d}.${m}.${y}`;
-}
+import { formatDate } from './utils.js';
 
 /**
- * Filter entries. Always strips `log` category first, then applies pill filter:
- * 'all'     → all non-log entries
+ * Filter entries by pill selection:
+ * 'all'     → all non-log entries (project, feature, daily)
  * 'project' → category === 'project'
  * 'feature' → category === 'project' || category === 'feature' (cumulative)
  * 'daily'   → category === 'daily'
+ * 'log'     → category === 'log' (commit log, hidden from "all")
  */
 function filterEntries(entries, filter) {
+  if (filter === 'log') return entries.filter(e => e.category === 'log');
   const nonLog = entries.filter(e => e.category !== 'log');
   if (filter === 'project') return nonLog.filter(e => e.category === 'project');
   if (filter === 'feature') return nonLog.filter(e => e.category === 'project' || e.category === 'feature');
@@ -223,6 +220,43 @@ function renderDailyEntry(entry, ranges, haystackStr) {
 }
 
 /**
+ * Render a log entry (GitHub-style commit row).
+ * Timeline dot on left, project badge, commit message, date.
+ */
+function renderLogEntry(entry, ranges, haystackStr) {
+  const node = document.createElement('article');
+  node.className = 'stream-entry stream-entry--log';
+
+  const dot = document.createElement('span');
+  dot.className = 'stream-entry__dot';
+  dot.setAttribute('aria-hidden', 'true');
+
+  const badge = document.createElement('span');
+  badge.className = 'stream-entry__project-badge';
+  badge.textContent = entry.project;
+
+  const text = document.createElement('span');
+  text.className = 'stream-entry__text';
+  setTextWithHighlight(text, entryText(entry), ranges, haystackStr);
+
+  const date = document.createElement('time');
+  date.className = 'stream-entry__date';
+  date.dateTime = entry.date;
+  date.textContent = formatDate(entry.date);
+
+  const body = document.createElement('div');
+  body.className = 'stream-entry__body';
+  body.appendChild(badge);
+  body.appendChild(text);
+
+  node.appendChild(dot);
+  node.appendChild(body);
+  node.appendChild(date);
+
+  return node;
+}
+
+/**
  * Render an entry with the appropriate renderer.
  * @param {Object} entry
  * @param {Int32Array|null} ranges - uFuzzy highlight ranges (null = no highlight)
@@ -232,6 +266,7 @@ function renderEntry(entry, ranges, haystackStr) {
   if (entry.category === 'project') return renderProjectEntry(entry, ranges, haystackStr);
   if (entry.category === 'feature') return renderFeatureEntry(entry, ranges, haystackStr);
   if (entry.category === 'daily') return renderDailyEntry(entry, ranges, haystackStr);
+  if (entry.category === 'log') return renderLogEntry(entry, ranges, haystackStr);
   return renderFeatureEntry(entry, ranges, haystackStr);
 }
 
@@ -342,6 +377,7 @@ export function initUpdates(entries, prefersReducedMotion) {
 
   /** Render with View Transitions API if available */
   function renderWithTransition(entries, container, reducedMotion, highlightMap) {
+    container.classList.toggle('updates-stream--log', activeFilter === 'log');
     if (document.startViewTransition) {
       document.startViewTransition(() => renderStream(entries, container, reducedMotion, highlightMap));
     } else {
@@ -354,7 +390,8 @@ export function initUpdates(entries, prefersReducedMotion) {
     { label: 'All', value: 'all' },
     { label: 'Projects', value: 'project' },
     { label: 'Features', value: 'feature' },
-    { label: 'Dev log', value: 'daily' },
+    { label: 'Summaries', value: 'daily' },
+    { label: 'Commit log', value: 'log' },
   ];
 
   const pillBar = document.createElement('nav');
