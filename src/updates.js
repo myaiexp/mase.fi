@@ -31,7 +31,7 @@ function entryText(entry) {
   return entry.text || entry.summary || '';
 }
 
-const STREAM_PAGE_SIZE = 25;
+const STREAM_PAGE_SIZE = 10;
 
 /**
  * Build a DOM fragment with highlighted matched substrings using <mark> elements.
