@@ -11,9 +11,12 @@ initAnimations(prefersReducedMotion);
 
 // Fetch updates data and initialize modules
 fetch('/updates.json')
-  .then(res => res.json())
+  .then(res => {
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    return res.json();
+  })
   .then(data => {
-    const entries = Array.isArray(data) ? data : (data.entries ?? []);
+    const entries = data.entries ?? [];
     const projects = data.projects ?? [];
 
     initUpdates(entries, prefersReducedMotion);

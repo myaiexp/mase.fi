@@ -7,7 +7,7 @@ import { formatDate } from './utils.js';
  * @param {string} projectName
  * @returns {Array}
  */
-function getProjectEntries(entries, projectName) {
+export function getProjectEntries(entries, projectName) {
   const lower = projectName.toLowerCase();
   return entries.filter(e => e.project && e.project.toLowerCase() === lower);
 }
@@ -19,7 +19,7 @@ function getProjectEntries(entries, projectName) {
  * @param {Array} entries
  * @returns {Array}
  */
-function sortProjects(projects, entries) {
+export function sortProjects(projects, entries) {
   return [...projects].sort((a, b) => {
     const getLatest = (project) => {
       const projectEntries = getProjectEntries(entries, project.name)
@@ -63,15 +63,17 @@ function renderFeedItem(entry) {
 }
 
 /**
- * Render a flagship card: full-width, display font name, description,
- * mini-feed of last 5 non-log entries, expand affordance if more.
+ * Render a project card (flagship or standard variant).
  * @param {Object} project
  * @param {Array} projectEntries - All entries for this project
  * @returns {HTMLElement}
  */
-function renderFlagshipCard(project, projectEntries) {
+function renderProjectCard(project, projectEntries) {
+  const isFlagship = !!project.flagship;
+  const feedLimit = isFlagship ? 5 : 3;
+
   const card = document.createElement('a');
-  card.className = 'project-card project-card--flagship';
+  card.className = `project-card project-card--${isFlagship ? 'flagship' : 'standard'}`;
   card.href = project.url || '#';
   if (project.url) {
     card.target = '_blank';
@@ -81,7 +83,6 @@ function renderFlagshipCard(project, projectEntries) {
   const name = document.createElement('h3');
   name.className = 'project-card__name';
   name.textContent = project.name;
-
   card.appendChild(name);
 
   if (project.desc) {
@@ -91,79 +92,26 @@ function renderFlagshipCard(project, projectEntries) {
     card.appendChild(desc);
   }
 
-  // Mini-feed: last 5 non-log entries, most recent first
-  const feedEntries = projectEntries
+  // Non-log entries sorted by date, computed once
+  const nonLogEntries = projectEntries
     .filter(e => e.category !== 'log')
-    .sort((a, b) => b.date.localeCompare(a.date))
-    .slice(0, 5);
+    .sort((a, b) => b.date.localeCompare(a.date));
+
+  const feedEntries = nonLogEntries.slice(0, feedLimit);
 
   if (feedEntries.length > 0) {
     const feed = document.createElement('ul');
     feed.className = 'project-card__feed';
-
-    feedEntries.forEach(entry => {
-      feed.appendChild(renderFeedItem(entry));
-    });
-
+    feedEntries.forEach(entry => feed.appendChild(renderFeedItem(entry)));
     card.appendChild(feed);
 
-    // Expand affordance if there are more than 5 non-log entries
-    const totalFeedEntries = projectEntries.filter(e => e.category !== 'log').length;
-    if (totalFeedEntries > 5) {
+    // Flagship: expand affordance if more entries exist
+    if (isFlagship && nonLogEntries.length > feedLimit) {
       const more = document.createElement('span');
       more.className = 'project-card__feed-more';
-      more.textContent = `+${totalFeedEntries - 5} more`;
+      more.textContent = `+${nonLogEntries.length - feedLimit} more`;
       card.appendChild(more);
     }
-  }
-
-  return card;
-}
-
-/**
- * Render a standard card: compact, name as link, one-line desc,
- * last 2-3 entries as tight list.
- * @param {Object} project
- * @param {Array} projectEntries - All entries for this project
- * @returns {HTMLElement}
- */
-function renderStandardCard(project, projectEntries) {
-  const card = document.createElement('a');
-  card.className = 'project-card project-card--standard';
-  card.href = project.url || '#';
-  if (project.url) {
-    card.target = '_blank';
-    card.rel = 'noopener noreferrer';
-  }
-
-  const name = document.createElement('h3');
-  name.className = 'project-card__name';
-  name.textContent = project.name;
-
-  card.appendChild(name);
-
-  if (project.desc) {
-    const desc = document.createElement('p');
-    desc.className = 'project-card__desc';
-    desc.textContent = project.desc;
-    card.appendChild(desc);
-  }
-
-  // Mini-feed: last 3 non-log entries, most recent first
-  const feedEntries = projectEntries
-    .filter(e => e.category !== 'log')
-    .sort((a, b) => b.date.localeCompare(a.date))
-    .slice(0, 3);
-
-  if (feedEntries.length > 0) {
-    const feed = document.createElement('ul');
-    feed.className = 'project-card__feed';
-
-    feedEntries.forEach(entry => {
-      feed.appendChild(renderFeedItem(entry));
-    });
-
-    card.appendChild(feed);
   }
 
   return card;
@@ -188,9 +136,7 @@ export function initProjects(entries, projects, prefersReducedMotion) {
 
   sorted.forEach(project => {
     const projectEntries = getProjectEntries(entries, project.name);
-    const card = project.flagship
-      ? renderFlagshipCard(project, projectEntries)
-      : renderStandardCard(project, projectEntries);
+    const card = renderProjectCard(project, projectEntries);
     grid.appendChild(card);
   });
 

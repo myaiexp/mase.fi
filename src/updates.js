@@ -11,7 +11,7 @@ import { formatDate } from './utils.js';
  * 'daily'   → category === 'daily'
  * 'log'     → category === 'log' (commit log, hidden from "all")
  */
-function filterEntries(entries, filter) {
+export function filterEntries(entries, filter) {
   if (filter === 'log') return entries.filter(e => e.category === 'log');
   const nonLog = entries.filter(e => e.category !== 'log');
   if (filter === 'project') return nonLog.filter(e => e.category === 'project');
@@ -69,11 +69,7 @@ function setTextWithHighlight(el, text, ranges, haystackStr) {
   }
 }
 
-/**
- * Render a project entry.
- * Full-width block, bg-card, 4px accent left border, display font name (~1.2rem),
- * description, date top-right.
- */
+/** Render a project entry (full-width block with description and date). */
 function renderProjectEntry(entry, ranges, haystackStr) {
   const node = document.createElement('article');
   node.className = 'stream-entry stream-entry--project';
@@ -103,10 +99,7 @@ function renderProjectEntry(entry, ranges, haystackStr) {
   return node;
 }
 
-/**
- * Render a feature entry.
- * No background, 2px --accent-dim left bar, badge + inline text.
- */
+/** Render a feature entry (badge + inline text with accent border). */
 function renderFeatureEntry(entry, ranges, haystackStr) {
   const node = document.createElement('article');
   node.className = 'stream-entry stream-entry--feature';
@@ -219,10 +212,7 @@ function renderDailyEntry(entry, ranges, haystackStr) {
   return node;
 }
 
-/**
- * Render a log entry (GitHub-style commit row).
- * Timeline dot on left, project badge, commit message, date.
- */
+/** Render a log entry (timeline dot, badge, commit message, date). */
 function renderLogEntry(entry, ranges, haystackStr) {
   const node = document.createElement('article');
   node.className = 'stream-entry stream-entry--log';
@@ -276,11 +266,12 @@ function renderEntry(entry, ranges, haystackStr) {
  * @param {HTMLElement} container
  * @param {boolean} prefersReducedMotion
  * @param {Map|null} highlightMap - Map of entry index → {ranges, haystack} for search highlights
+ * @param {number} [limit] - Max entries to show (defaults to STREAM_PAGE_SIZE)
  */
 function renderStream(entries, container, prefersReducedMotion, highlightMap, limit) {
   while (container.firstChild) container.removeChild(container.firstChild);
 
-  const cap = limit || STREAM_PAGE_SIZE;
+  const cap = limit ?? STREAM_PAGE_SIZE;
   const visible = entries.slice(0, cap);
   const hasMore = entries.length > cap;
 
@@ -328,14 +319,9 @@ export function initUpdates(entries, prefersReducedMotion) {
   let activeFilter = 'all';
   let searchNeedle = '';
 
-  /** Get pill-filtered entries */
-  function getFiltered() {
-    return filterEntries(entries, activeFilter);
-  }
-
   /** Apply search within filtered entries, render results */
   function applySearchAndRender() {
-    const filtered = getFiltered();
+    const filtered = filterEntries(entries, activeFilter);
 
     if (!searchNeedle) {
       renderWithTransition(filtered, streamEl, prefersReducedMotion, null);
@@ -376,12 +362,12 @@ export function initUpdates(entries, prefersReducedMotion) {
   }
 
   /** Render with View Transitions API if available */
-  function renderWithTransition(entries, container, reducedMotion, highlightMap) {
+  function renderWithTransition(entries, container, prefersReducedMotion, highlightMap) {
     container.classList.toggle('updates-stream--log', activeFilter === 'log');
     if (document.startViewTransition) {
-      document.startViewTransition(() => renderStream(entries, container, reducedMotion, highlightMap));
+      document.startViewTransition(() => renderStream(entries, container, prefersReducedMotion, highlightMap));
     } else {
-      renderStream(entries, container, reducedMotion, highlightMap);
+      renderStream(entries, container, prefersReducedMotion, highlightMap);
     }
   }
 
@@ -471,6 +457,6 @@ export function initUpdates(entries, prefersReducedMotion) {
   controlsEl.appendChild(searchInput);
 
   // ===== Initial render =====
-  const initial = getFiltered();
+  const initial = filterEntries(entries, activeFilter);
   renderStream(initial, streamEl, prefersReducedMotion, null);
 }

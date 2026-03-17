@@ -575,7 +575,7 @@ details[open] .stream-entry__chevron {
   outline-offset: 2px;
 }
 
-/* Arrow indicator (top-right, same pattern as old .app-card) */
+/* Arrow indicator (top-right) */
 .project-card::after {
   content: '\2197';
   position: absolute;
