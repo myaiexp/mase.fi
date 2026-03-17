@@ -1,10 +1,5 @@
 import { scrollReveal, initCardRipples } from './animations.js';
-
-/** Format "YYYY-MM-DD" → "DD.MM.YYYY" */
-function formatDate(isoDate) {
-  const [y, m, d] = isoDate.split('-');
-  return `${d}.${m}.${y}`;
-}
+import { formatDate } from './utils.js';
 
 /**
  * Get entries for a specific project (case-insensitive match on entry.project field).
