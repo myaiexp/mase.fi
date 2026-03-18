@@ -23,7 +23,6 @@
 
 | Date | Text | project field | category |
 |------|------|--------------|----------|
-| 2026-03-03 | Deployed FreshRSS with custom dark theme | FreshRSS | project |
 | 2026-03-03 | PoE Crafting engine — mod pool analysis, restart economics, recipe catalog | poe-crafting | project |
 | 2026-03-01 | Launched PoE Trade Hub with cancellable search and rate limiting | poe-proof | project |
 | 2026-03-01 | Central Hub MCP server deployed | central-hub | project |

@@ -71,7 +71,6 @@ const entries = Array.isArray(data) ? data : data.entries;
 - Seed `projects` array:
 ```json
 [
-  {"name": "FreshRSS", "url": "https://mase.fi/rss/", "desc": "Self-hosted RSS reader with a custom dark theme", "flagship": false},
   {"name": "Explorer", "url": "https://mase.fi/explorer", "desc": "Round-trip route planning and place discovery", "flagship": true},
   {"name": "Personal Tracker", "url": "https://mase.fi/tracker", "desc": "Daily habit tracking with streaks, history, and data export", "flagship": false},
   {"name": "Shapez 2 Solver", "url": "https://mase.fi/shapez", "desc": "Figure out how to build any shape in Shapez 2", "flagship": false},
