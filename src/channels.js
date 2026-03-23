@@ -5,7 +5,7 @@
 
 import { shortDate, createNick, createLine, typeText, appendLine } from './terminal.js';
 import { getChannelEntries, getAboutStats } from './data.js';
-import { isBootAnimating, setActiveChannel } from './sidebar.js';
+import { setActiveChannel } from './sidebar.js';
 
 const PAGE_SIZE = 20;
 const STORAGE_KEY = 'mase-fi-channel';
@@ -315,16 +315,12 @@ function setupLazyLoad(feedEl, allEntries, loadedCount, channelId) {
 async function animateFeedLines(lineEls, prefersReducedMotion) {
   if (prefersReducedMotion) return;
 
-  const bootAnimating = isBootAnimating();
-
   for (let i = 0; i < lineEls.length; i++) {
     const el = lineEls[i];
     const textEl = el.querySelector('.feed-line__text');
     if (!textEl) continue;
 
-    const shouldType = bootAnimating || i < 3;
-
-    if (shouldType) {
+    if (i < 3) {
       const original = textEl.textContent;
       textEl.textContent = '';
       await typeText(textEl, original, 15);

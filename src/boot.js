@@ -6,8 +6,9 @@
  */
 
 import { animate } from 'animejs';
-import { typeText, appendLine } from './terminal.js';
-import { initSidebar, setBootAnimating } from './sidebar.js';
+import { typeText, appendLine, createLine, relativeDate } from './terminal.js';
+import { getChannels, getChannelEntries } from './data.js';
+import { initSidebar, setActiveChannel } from './sidebar.js';
 import { navigateTo, resolveInitialChannel } from './channels.js';
 
 const STORAGE_KEY = 'mase-fi-boot-seen';
@@ -203,32 +204,31 @@ async function _runPhase2(overlay, dataPromise, signal) {
   return data;
 }
 
+// ASCII art hero for #home
+const HOME_ASCII = `
+ ███╗   ███╗ █████╗ ███████╗███████╗   ███████╗██╗
+ ████╗ ████║██╔══██╗██╔════╝██╔════╝   ██╔════╝██║
+ ██╔████╔██║███████║███████╗█████╗     █████╗  ██║
+ ██║╚██╔╝██║██╔══██║╚════██║██╔══╝     ██╔══╝  ██║
+ ██║ ╚═╝ ██║██║  ██║███████║███████╗   ██║     ██║
+ ╚═╝     ╚═╝╚═╝  ╚═╝╚══════╝╚══════╝   ╚═╝     ╚═╝`.trimStart();
+
+const HOME_TAGLINE = 'building apps, tools, and games for myself';
+
 async function _runPhase3(overlay, data, _prefersReducedMotion, signal) {
   if (signal.aborted) return;
 
-  // 1. Render real DOM instantly (hidden via setBootAnimating opacity:0)
-  setBootAnimating(true);
-  const channelId = resolveInitialChannel();
-  initSidebar(data);
-  // Render content with reducedMotion=true so it appears instantly (no typing behind overlay)
-  await navigateTo(channelId, data, true);
-
-  if (signal.aborted) { setBootAnimating(false); return; }
-
-  // 2. Hide content elements we'll animate later
-  const pinnedAscii = document.querySelector('.pinned__ascii');
-  const pinnedTagline = document.querySelector('.pinned__tagline');
-  const feedLines = document.querySelectorAll('.feed-line');
+  const sidebar = document.getElementById('sidebar');
+  const pinnedEl = document.getElementById('content-pinned');
+  const feedEl = document.getElementById('content-feed');
   const titlebar = document.querySelector('.terminal__titlebar');
   const inputbar = document.querySelector('.terminal__inputbar');
 
-  if (pinnedAscii) { pinnedAscii.style.opacity = '0'; }
-  if (pinnedTagline) { pinnedTagline.style.opacity = '0'; }
-  if (titlebar) { titlebar.style.opacity = '0'; }
-  if (inputbar) { inputbar.style.opacity = '0'; }
-  feedLines.forEach((el) => { el.style.opacity = '0'; });
+  // Start with everything empty — we'll build it piece by piece
+  if (titlebar) titlebar.style.opacity = '0';
+  if (inputbar) inputbar.style.opacity = '0';
 
-  // 3. Fade out boot overlay
+  // 1. Fade out boot overlay
   await new Promise((resolve) => {
     animate(overlay, {
       opacity: [1, 0],
@@ -240,87 +240,110 @@ async function _runPhase3(overlay, data, _prefersReducedMotion, signal) {
   overlay.classList.remove('active');
   overlay.style.opacity = '';
 
-  if (signal.aborted) { _showAllElements(titlebar, inputbar, pinnedAscii, pinnedTagline, feedLines); setBootAnimating(false); return; }
+  if (signal.aborted) return _finishBoot(data, titlebar, inputbar);
 
-  // 4. Title bar fades in
+  // 2. Title bar fades in
   if (titlebar) {
     titlebar.style.opacity = '';
     animate(titlebar, { opacity: [0, 1], duration: 300, ease: 'outCubic' });
-    await _delay(200, signal);
+    await _delay(150, signal);
   }
+  if (signal.aborted) return _finishBoot(data, titlebar, inputbar);
 
-  if (signal.aborted) { _showAllElements(titlebar, inputbar, pinnedAscii, pinnedTagline, feedLines); setBootAnimating(false); return; }
-
-  // 5. Sidebar group headers type out one by one
-  const headers = document.querySelectorAll('.sidebar__group-header');
-  for (const header of headers) {
+  // 3. Build sidebar — type headers, then add channels one by one
+  const channelGroups = getChannels(data.entries, data.projects);
+  for (const group of channelGroups) {
     if (signal.aborted) break;
-    const text = header.textContent;
-    header.textContent = '';
-    header.style.opacity = '1';
-    await typeText(header, text, 12, signal);
-    await _delay(80, signal);
-  }
 
-  if (signal.aborted) { _showAllElements(titlebar, inputbar, pinnedAscii, pinnedTagline, feedLines); setBootAnimating(false); return; }
+    const groupEl = document.createElement('div');
+    groupEl.className = 'sidebar__group';
+    sidebar.appendChild(groupEl);
 
-  // 6. Channel names appear one by one with stagger
-  const channels = document.querySelectorAll('.sidebar__channel');
-  for (const ch of channels) {
-    if (signal.aborted) break;
-    ch.style.opacity = '1';
-    animate(ch, { opacity: [0, 1], translateX: ['-8px', '0px'], duration: 150, ease: 'outCubic' });
-    await _delay(60, signal);
-  }
-
-  if (signal.aborted) { _showAllElements(titlebar, inputbar, pinnedAscii, pinnedTagline, feedLines); setBootAnimating(false); return; }
-
-  // 7. ASCII hero types in
-  if (pinnedAscii) {
-    const asciiText = pinnedAscii.textContent;
-    pinnedAscii.textContent = '';
-    pinnedAscii.style.opacity = '1';
-    await typeText(pinnedAscii, asciiText, 1, signal);
-  }
-
-  if (signal.aborted) { _showAllElements(titlebar, inputbar, pinnedAscii, pinnedTagline, feedLines); setBootAnimating(false); return; }
-
-  // 8. Tagline types in
-  if (pinnedTagline) {
-    const tagText = pinnedTagline.textContent;
-    pinnedTagline.textContent = '';
-    pinnedTagline.style.opacity = '1';
-    await typeText(pinnedTagline, tagText, 18, signal);
-  }
-
-  if (signal.aborted) { _showAllElements(titlebar, inputbar, pinnedAscii, pinnedTagline, feedLines); setBootAnimating(false); return; }
-
-  // 9. Feed lines stagger in
-  for (let i = 0; i < feedLines.length; i++) {
-    if (signal.aborted) break;
-    feedLines[i].style.opacity = '1';
-    animate(feedLines[i], { opacity: [0, 1], translateY: ['4px', '0px'], duration: 200, ease: 'outCubic' });
+    // Type group header
+    const header = document.createElement('div');
+    header.className = 'sidebar__group-header';
+    groupEl.appendChild(header);
+    await typeText(header, `\u2500\u2500 ${group.group} \u2500\u2500`, 12, signal);
     await _delay(40, signal);
-  }
 
-  // 10. Input bar appears
+    // Add channels one by one
+    for (const ch of group.channels) {
+      if (signal.aborted) break;
+      const link = document.createElement('a');
+      link.className = 'sidebar__channel';
+      link.href = `#/${ch.id}`;
+      if (ch.isNew) link.classList.add('sidebar__channel--new');
+      link.dataset.channelId = ch.id;
+
+      const name = document.createElement('span');
+      name.className = 'sidebar__name';
+      name.textContent = `${ch.isNew ? '\u2605' : ''}${ch.label}`;
+      link.appendChild(name);
+
+      if (ch.lastActivity) {
+        const indicator = document.createElement('span');
+        indicator.className = 'sidebar__indicator';
+        indicator.textContent = relativeDate(ch.lastActivity);
+        link.appendChild(indicator);
+      }
+
+      groupEl.appendChild(link);
+      animate(link, { opacity: [0, 1], translateX: ['-8px', '0px'], duration: 150, ease: 'outCubic' });
+      await _delay(50, signal);
+    }
+  }
+  if (signal.aborted) return _finishBoot(data, titlebar, inputbar);
+
+  // 4. Type ASCII hero into pinned area
+  if (pinnedEl) {
+    const pre = document.createElement('pre');
+    pre.className = 'pinned__ascii';
+    pinnedEl.appendChild(pre);
+    await typeText(pre, HOME_ASCII, 1, signal);
+
+    if (signal.aborted) return _finishBoot(data, titlebar, inputbar);
+
+    const tagline = document.createElement('p');
+    tagline.className = 'pinned__tagline';
+    pinnedEl.appendChild(tagline);
+    await typeText(tagline, HOME_TAGLINE, 18, signal);
+  }
+  if (signal.aborted) return _finishBoot(data, titlebar, inputbar);
+
+  // 5. Add feed lines one by one
+  const entries = getChannelEntries('home', data.entries, data.projects);
+  const batch = entries.slice(Math.max(0, entries.length - 20));
+  if (feedEl) {
+    for (const entry of batch) {
+      if (signal.aborted) break;
+      const text = entry.summary || entry.text || '';
+      const nick = entry.project || 'mase';
+      const line = createLine(entry.date, nick, text);
+      feedEl.appendChild(line);
+      animate(line, { opacity: [0, 1], duration: 150, ease: 'outCubic' });
+      await _delay(30, signal);
+    }
+    feedEl.scrollTop = feedEl.scrollHeight;
+  }
+  if (signal.aborted) return _finishBoot(data, titlebar, inputbar);
+
+  // 6. Input bar appears
   if (inputbar) {
-    inputbar.style.opacity = '1';
+    inputbar.style.opacity = '';
     animate(inputbar, { opacity: [0, 1], duration: 300, ease: 'outCubic' });
   }
 
-  setBootAnimating(false);
+  // 7. Wire up the real modules (sidebar events, router, search) without re-rendering
+  setActiveChannel('home');
 }
 
-/** Force-show all elements (used on abort during Phase 3) */
-function _showAllElements(titlebar, inputbar, ascii, tagline, feedLines) {
+/** Abort handler: instantly render everything via normal init path */
+function _finishBoot(data, titlebar, inputbar) {
   if (titlebar) titlebar.style.opacity = '';
   if (inputbar) inputbar.style.opacity = '';
-  if (ascii) ascii.style.opacity = '';
-  if (tagline) tagline.style.opacity = '';
-  feedLines.forEach((el) => { el.style.opacity = ''; });
-  document.querySelectorAll('.sidebar__group-header').forEach((el) => { el.style.opacity = ''; });
-  document.querySelectorAll('.sidebar__channel').forEach((el) => { el.style.opacity = ''; });
+  // Re-render fully via normal code path
+  initSidebar(data);
+  navigateTo(resolveInitialChannel(), data, true);
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -356,9 +379,6 @@ function _markBootSeen() {
 async function _doInstantBoot(dataPromise, onComplete, overlay) {
   // Hide overlay immediately
   overlay.classList.remove('active');
-
-  // Ensure all sidebar/channel elements are visible
-  setBootAnimating(false);
 
   let data = { entries: [], projects: [] };
   try {

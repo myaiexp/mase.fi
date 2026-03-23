@@ -3,16 +3,6 @@
 import { getChannels } from './data.js';
 import { relativeDate } from './terminal.js';
 
-let _bootAnimating = false;
-
-export function isBootAnimating() {
-  return _bootAnimating;
-}
-
-export function setBootAnimating(value) {
-  _bootAnimating = value;
-}
-
 /** Remove all children from an element. */
 function clearEl(el) {
   while (el.firstChild) el.removeChild(el.firstChild);
@@ -37,7 +27,6 @@ export function initSidebar(data) {
     const header = document.createElement('div');
     header.className = 'sidebar__group-header';
     header.textContent = `\u2500\u2500 ${group.group} \u2500\u2500`;
-    if (_bootAnimating) header.style.opacity = '0';
     groupEl.appendChild(header);
 
     for (const ch of group.channels) {
@@ -46,7 +35,6 @@ export function initSidebar(data) {
       link.href = `#/${ch.id}`;
       if (ch.isNew) link.classList.add('sidebar__channel--new');
       link.dataset.channelId = ch.id;
-      if (_bootAnimating) link.style.opacity = '0';
 
       const name = document.createElement('span');
       name.className = 'sidebar__name';
