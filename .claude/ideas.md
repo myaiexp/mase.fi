@@ -26,6 +26,8 @@
 
 - **`#projects` overview channel**: A channel that shows all projects in a compact list (like `ls -la` output) instead of requiring sidebar navigation. Considered but felt redundant with the sidebar.
 
+- **Backblaze B2 + Cloudflare CDN** — cheap object storage for backups + free-egress CDN for serving files. Two buckets: private `mase-backups` for machine backups, public `mase-cdn` for serving content. Foundation for a self-hosted photo gallery app on mase.fi. Full setup guide: `.claude/references/b2-cloudflare-setup.md`
+
 ## Tech Debt
 
 - **Boot Phase 3 visual construction broken** — The step-by-step UI construction (sidebar typing, channels sliding in) doesn't render visually. Likely anime.js v4 API issues + `initAfterBoot` re-rendering the sidebar. Handoff doc at `.claude/plans/boot-phase3-handoff.md`. Must use Context7 to verify anime.js v4 API before fixing.
