@@ -2,11 +2,17 @@
 
 ## Status
 
-Boot Phases 1-2 work correctly. Phase 3 (UI construction after overlay fades) does NOT work as intended. The visual step-by-step construction is broken.
+Boot Phases 1-2 work correctly. Phase 3 has two problems:
+1. **Visual construction sequence** — not verified to work correctly
+2. **Replay button** — broken, needs end-to-end verification
 
-## What the user currently sees
+The first-visit boot sequence was observed working on a desktop with fresh localStorage, but was never properly verified with rapid sequential screenshots. The replay button (`[▶ boot]`) has never been confirmed working.
+
+## What the user currently sees (from first-visit boot)
 
 > boot init works -> fade -> topbar is visible -> about 2 seconds pass -> everything pops in except hero -> hero types, finishes -> all feed lines pop in -> a few of them retype themselves, maybe like 3, in sequence
+
+**Note:** This was observed on laptop where localStorage `mase-fi-boot-seen` was set. Ctrl+Shift+R clears HTTP cache but NOT localStorage, so the user was likely seeing the skip-boot path (`initApp`) rather than Phase 3. On desktop with fresh localStorage, the boot appeared to work. **The actual state of Phase 3 is uncertain — verify before assuming anything.**
 
 ## What it SHOULD look like (from spec)
 
@@ -21,20 +27,28 @@ After overlay fades:
 
 Each step should be visually distinct and sequential — the user should watch the terminal "build itself."
 
-## Root cause (not yet fully diagnosed)
+## Known issues
 
-The Phase 3 rewrite builds DOM directly (no pre-render + reveal), but something prevents the visual construction from being visible. Likely candidates:
+### anime.js v4 API
 
-1. **anime.js v4 API mismatch** — We already found `onComplete` doesn't exist in v4 (it's thenable instead). There may be OTHER API mismatches in the `animate()` calls used for channel slide-in, feed line stagger, etc. **Use Context7 to verify the full anime.js v4 API before touching anything.**
+We found `onComplete` callback doesn't exist in v4 — `animate()` returns a thenable instead. Fixed to `await animate(...)`. **But no other anime.js v4 API calls have been verified.** The `animate()` calls for channel slide-in, feed line stagger, titlebar fade-in etc. all use parameters that may not match v4's actual API.
 
-2. **`initAfterBoot` re-rendering** — After Phase 3 completes, `onComplete` calls `initAfterBoot` in `main.js` which calls `initSidebar(data)`. This clears the sidebar DOM and re-renders it (wiping out what Phase 3 just built). This might cause the "everything pops in" effect. The "3 feed lines retyping" is likely `animateFeedLines` being triggered somehow.
+**CRITICAL: Use Context7 to look up the anime.js v4 API before touching any code.**
 
-3. **CSS visibility** — The sidebar container, content areas, or their children might have CSS that hides them during construction. Check computed styles on `.sidebar`, `.content`, `.content__pinned`, `.content__feed` during Phase 3.
+### `initAfterBoot` re-rendering
+
+After Phase 3 completes, `onComplete` calls `initAfterBoot` in `main.js` which calls `initSidebar(data)`. This **clears the sidebar DOM and re-renders it**, wiping what Phase 3 just built. This causes the "everything pops in" effect for the sidebar.
+
+The "3 feed lines retyping" is `animateFeedLines` in `channels.js` — it types the first 3 feed lines on every `navigateTo` call. If `navigateTo` gets called after boot (via `initApp` or hashchange), it would retype them.
+
+### Replay button
+
+The replay handler has `e.stopPropagation()` to prevent the boot's click-to-skip handler from firing. But the full replay flow (clear overlay → re-run boot → Phase 3 → wire up) has never been verified end-to-end.
 
 ## Key files
 
-- `src/boot.js` — Phase 3 implementation (lines ~206-320), `_finishBoot` abort handler
-- `src/main.js` — `initAfterBoot` (called after boot completes, may re-render)
+- `src/boot.js` — Phase 3 implementation, `_finishBoot` abort handler, `initReplayButton`
+- `src/main.js` — `initApp` (full init), `initAfterBoot` (post-boot wiring)
 - `src/sidebar.js` — `initSidebar` clears and re-renders sidebar DOM
 - `src/channels.js` — `navigateTo`, `animateFeedLines` (types first 3 lines on channel switch)
 - `src/terminal.js` — `typeText`, `createLine`, `relativeDate`
@@ -59,16 +73,18 @@ Then `onComplete` (`initAfterBoot` in main.js) calls:
 
 ## What to do
 
-1. **Context7 first** — Look up anime.js v4 API. Verify `animate()` signature, return value, how to await completion, how to animate DOM elements.
+1. **Context7 first** — Look up anime.js v4 API. Verify `animate()` signature, return value, available parameters, how to await completion.
 
-2. **Verify the overlay fade actually works** — Add `console.log` before/after the `await animate(...)` call, or test in browser devtools. If it hangs, the thenable approach may also be wrong.
+2. **Verify what actually works** — Test with rapid screenshots or browser devtools console logs. Don't assume.
 
 3. **Fix the re-render problem** — `initAfterBoot` calling `initSidebar` wipes the sidebar Phase 3 built. Options:
-   - Don't call `initSidebar` after boot (but then mobile dropdown and sidebar event wiring is missing)
+   - Don't call `initSidebar` after boot (but then mobile dropdown wiring is missing)
    - Add a `wireOnly` mode to `initSidebar` that wires events without re-rendering
-   - Have Phase 3 call `initSidebar` itself at the end (accepting the visual pop) and remove it from `initAfterBoot`
+   - Have Phase 3 call `initSidebar` at the end and skip it in `initAfterBoot`
 
-4. **Test with rapid screenshots** — Use agent-browser to take screenshots at 500ms intervals during boot to verify visual sequence.
+4. **Fix replay button** — Verify the full replay flow works end-to-end.
+
+5. **Test properly** — Use agent-browser with rapid screenshots at 500ms intervals during boot, or add temporary console.log timestamps to each Phase 3 step.
 
 ## Entry data format
 
