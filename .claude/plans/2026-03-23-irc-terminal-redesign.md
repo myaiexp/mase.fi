@@ -112,6 +112,14 @@ The UI IS the final output of the boot process — one continuous rendering, not
 
 `prefers-reduced-motion`: boot skipped, content appears instantly, cursor still blinks.
 
+## Scroll Model
+
+All channel content uses a chat-style scroll model:
+- **Newest entries at the bottom**, oldest at the top (natural chat/terminal order)
+- **Scroll up to load more**: lazy-loads older entries when scrolling near the top
+- **Two horizontal panes**: each channel has a pinned top section (hero on `#home`, project header on project channels, neofetch block on `#about`) and a scrollable feed below it. The pinned section stays visible while the feed scrolls.
+- Initial load shows the most recent batch, scrolled to the bottom
+
 ## Content Mapping
 
 | Content type     | Source                         | Channel      |
@@ -133,7 +141,7 @@ The UI IS the final output of the boot process — one continuous rendering, not
 [22.03] c-monitor    Remove worktrees, fix runner resume/targeting
 ```
 
-Timestamps in Finnish DD.MM format. Project name as colored "nick." Sorted by date descending. Terminal-style `-- more --` prompt at bottom for pagination.
+Timestamps in Finnish DD.MM format. Project name as colored "nick." Newest at bottom (natural chat order). Scrolling up lazy-loads older entries. The hero area is a pinned top pane; the feed scrolls independently below it.
 
 ### Project channels (e.g. `#explorer`)
 
@@ -148,25 +156,27 @@ Timestamps in Finnish DD.MM format. Project name as colored "nick." Sorted by da
 
 The `→ Open explorer` is a clickable link (opens in new tab) styled as cyan terminal text.
 
-**Feature feed** below:
+**Feature feed** below (pinned header, scrollable feed):
 
 ```
-[22.03] Added offline route caching
-[18.03] Dark mode support for map tiles
 [15.03] Export routes as GPX files
+[18.03] Dark mode support for map tiles
+[22.03] Added offline route caching           ← newest at bottom
 ```
+
+Same scroll model as `#home`: header pinned, feed scrolls, scroll up to lazy-load older entries.
 
 ### `#activity`
 
-Dense git commit timeline:
+Dense git commit timeline, newest at bottom:
 
 ```
-[22.03] c-monitor    Mobile UI: hide sidebars, stack kanban columns
-[22.03] c-monitor    Fix runner launch: send project name, not path
 [22.03] piclaw       docs: add mobile + button to image support doc
+[22.03] c-monitor    Fix runner launch: send project name, not path
+[22.03] c-monitor    Mobile UI: hide sidebars, stack kanban columns
 ```
 
-Muted/monochrome. Raw feed.
+Muted/monochrome. Raw feed. Scroll up to lazy-load older commits.
 
 ### `#about`
 
