@@ -10,6 +10,7 @@ const dataPromise = fetch('/updates.json')
   .then((r) => r.json())
   .catch(() => ({ entries: [], projects: [] }));
 
+/** Full init — used for skip-boot path and replay */
 function initApp(data) {
   initSidebar(data);
   initRouter(data, prefersReducedMotion);
@@ -19,10 +20,20 @@ function initApp(data) {
   navigateTo(channelId, data, prefersReducedMotion);
 }
 
+/** After boot: wire up functional modules without re-rendering content.
+ *  Boot Phase 3 already built the sidebar DOM and #home content visually.
+ *  We just need initSidebar for mobile dropdown + event wiring,
+ *  then router + search. No navigateTo — content is already there. */
+function initAfterBoot(data) {
+  initSidebar(data);
+  initRouter(data, prefersReducedMotion);
+  initSearch(data);
+}
+
 if (shouldSkipBoot(prefersReducedMotion)) {
   dataPromise.then(initApp);
 } else {
-  runBoot(dataPromise, initApp);
+  runBoot(dataPromise, initAfterBoot);
 }
 
 initReplayButton(
