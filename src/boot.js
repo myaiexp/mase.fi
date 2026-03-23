@@ -5,8 +5,8 @@
  * Phase 3: Overlay fade + sidebar/channel animation
  */
 
-import { animate, stagger } from 'animejs';
-import { appendLine } from './terminal.js';
+import { animate } from 'animejs';
+import { typeText, appendLine } from './terminal.js';
 import { initSidebar, setBootAnimating } from './sidebar.js';
 import { navigateTo, resolveInitialChannel } from './channels.js';
 
@@ -158,64 +158,77 @@ async function _runPhase2(overlay, dataPromise, signal) {
     ),
   ]);
 
-  // Service lines — these play while fetch is in flight
-  const serviceLines = [
-    { text: '[  OK  ] Starting project registry...', cls: 'boot-line boot-line--ok' },
-    { text: '[  OK  ] Connecting to github.com/myaiexp', cls: 'boot-line boot-line--ok' },
-    { text: '[ .... ] Loading activity feed', cls: 'boot-line boot-line--pending', id: 'boot-feed-line' },
-    { text: '[ .... ] Establishing channels', cls: 'boot-line boot-line--pending' },
-  ];
+  // Service lines — first two play immediately, last two wait on fetch
+  appendLine(overlay, '[  OK  ] Starting project registry...', 'boot-line boot-line--ok');
+  await _delay(_randBetween(100, 200), signal);
+  if (signal.aborted) return null;
 
-  let feedLineEl = null;
+  appendLine(overlay, '[  OK  ] Connecting to github.com/myaiexp', 'boot-line boot-line--ok');
+  await _delay(_randBetween(100, 200), signal);
+  if (signal.aborted) return null;
 
-  for (const svc of serviceLines) {
-    if (signal.aborted) return null;
-    const el = appendLine(overlay, svc.text, svc.cls);
-    if (svc.id) feedLineEl = el;
-    await _delay(_randBetween(100, 200), signal);
-  }
+  const feedLineEl = appendLine(overlay, '[ .... ] Loading activity feed', 'boot-line boot-line--pending');
+  await _delay(_randBetween(100, 200), signal);
+  if (signal.aborted) return null;
 
-  // Now block until fetch resolves (or timeout)
+  const channelLineEl = appendLine(overlay, '[ .... ] Establishing channels', 'boot-line boot-line--pending');
+  await _delay(_randBetween(100, 200), signal);
+  if (signal.aborted) return null;
+
+  // Block until fetch resolves (or timeout)
   try {
     data = await fetchWithTimeout;
     const count = data?.entries?.length ?? 0;
-    if (feedLineEl) {
-      feedLineEl.textContent = `[  OK  ] Loading activity feed (${count} entries)`;
-      feedLineEl.className = 'boot-line boot-line--ok';
-    }
+    feedLineEl.textContent = `[  OK  ] Loading activity feed (${count} entries)`;
+    feedLineEl.className = 'boot-line boot-line--ok';
   } catch {
     fetchOk = false;
-    if (feedLineEl) {
-      feedLineEl.textContent = '[FAIL  ] Loading activity feed — timeout';
-      feedLineEl.className = 'boot-line boot-line--fail';
-    }
-    // Fallback data
+    feedLineEl.textContent = '[FAIL  ] Loading activity feed — timeout';
+    feedLineEl.className = 'boot-line boot-line--fail';
     data = { entries: [], projects: [] };
   }
+  await _delay(150, signal);
 
-  if (!fetchOk) {
-    appendLine(overlay, '[FAIL  ] Using fallback data', 'boot-line boot-line--fail');
+  // Resolve "Establishing channels"
+  if (fetchOk) {
+    const channelCount = data?.projects?.length ?? 0;
+    channelLineEl.textContent = `[  OK  ] Establishing channels (${channelCount} linked)`;
+    channelLineEl.className = 'boot-line boot-line--ok';
+  } else {
+    channelLineEl.textContent = '[FAIL  ] Establishing channels';
+    channelLineEl.className = 'boot-line boot-line--fail';
   }
 
-  await _delay(300, signal);
+  await _delay(400, signal);
   return data;
 }
 
-async function _runPhase3(overlay, data, prefersReducedMotion, signal) {
+async function _runPhase3(overlay, data, _prefersReducedMotion, signal) {
   if (signal.aborted) return;
 
-  // Render real DOM (elements hidden via setBootAnimating)
+  // 1. Render real DOM instantly (hidden via setBootAnimating opacity:0)
   setBootAnimating(true);
   const channelId = resolveInitialChannel();
   initSidebar(data);
-  await navigateTo(channelId, data, prefersReducedMotion);
+  // Render content with reducedMotion=true so it appears instantly (no typing behind overlay)
+  await navigateTo(channelId, data, true);
 
-  if (signal.aborted) {
-    setBootAnimating(false);
-    return;
-  }
+  if (signal.aborted) { setBootAnimating(false); return; }
 
-  // Fade out overlay (~400ms)
+  // 2. Hide content elements we'll animate later
+  const pinnedAscii = document.querySelector('.pinned__ascii');
+  const pinnedTagline = document.querySelector('.pinned__tagline');
+  const feedLines = document.querySelectorAll('.feed-line');
+  const titlebar = document.querySelector('.terminal__titlebar');
+  const inputbar = document.querySelector('.terminal__inputbar');
+
+  if (pinnedAscii) { pinnedAscii.style.opacity = '0'; }
+  if (pinnedTagline) { pinnedTagline.style.opacity = '0'; }
+  if (titlebar) { titlebar.style.opacity = '0'; }
+  if (inputbar) { inputbar.style.opacity = '0'; }
+  feedLines.forEach((el) => { el.style.opacity = '0'; });
+
+  // 3. Fade out boot overlay
   await new Promise((resolve) => {
     animate(overlay, {
       opacity: [1, 0],
@@ -224,56 +237,90 @@ async function _runPhase3(overlay, data, prefersReducedMotion, signal) {
       onComplete: resolve,
     });
   });
-
   overlay.classList.remove('active');
   overlay.style.opacity = '';
 
-  if (signal.aborted) {
-    setBootAnimating(false);
-    return;
+  if (signal.aborted) { _showAllElements(titlebar, inputbar, pinnedAscii, pinnedTagline, feedLines); setBootAnimating(false); return; }
+
+  // 4. Title bar fades in
+  if (titlebar) {
+    titlebar.style.opacity = '';
+    animate(titlebar, { opacity: [0, 1], duration: 300, ease: 'outCubic' });
+    await _delay(200, signal);
   }
 
-  // Animate sidebar: headers type out, channels stagger in
+  if (signal.aborted) { _showAllElements(titlebar, inputbar, pinnedAscii, pinnedTagline, feedLines); setBootAnimating(false); return; }
+
+  // 5. Sidebar group headers type out one by one
   const headers = document.querySelectorAll('.sidebar__group-header');
-  const channels = document.querySelectorAll('.sidebar__channel');
-
-  animate(headers, {
-    opacity: [0, 1],
-    duration: 200,
-    delay: stagger(60),
-    ease: 'outCubic',
-  });
-
-  animate(channels, {
-    opacity: [0, 1],
-    duration: 200,
-    delay: stagger(30, { start: headers.length * 60 }),
-    ease: 'outCubic',
-  });
-
-  // Wait for sidebar animation to finish
-  const totalSidebarDelay = headers.length * 60 + channels.length * 30 + 200;
-  await _delay(totalSidebarDelay, signal);
-
-  if (signal.aborted) {
-    setBootAnimating(false);
-    return;
+  for (const header of headers) {
+    if (signal.aborted) break;
+    const text = header.textContent;
+    header.textContent = '';
+    header.style.opacity = '1';
+    await typeText(header, text, 12, signal);
+    await _delay(80, signal);
   }
 
-  // Animate content: feed lines appear
-  const feedLines = document.querySelectorAll('.feed-line');
-  if (feedLines.length > 0) {
-    animate(feedLines, {
-      opacity: [0, 1],
-      translateY: ['4px', '0px'],
-      duration: 250,
-      delay: stagger(20),
-      ease: 'outCubic',
-    });
-    await _delay(feedLines.length * 20 + 250, signal);
+  if (signal.aborted) { _showAllElements(titlebar, inputbar, pinnedAscii, pinnedTagline, feedLines); setBootAnimating(false); return; }
+
+  // 6. Channel names appear one by one with stagger
+  const channels = document.querySelectorAll('.sidebar__channel');
+  for (const ch of channels) {
+    if (signal.aborted) break;
+    ch.style.opacity = '1';
+    animate(ch, { opacity: [0, 1], translateX: ['-8px', '0px'], duration: 150, ease: 'outCubic' });
+    await _delay(60, signal);
+  }
+
+  if (signal.aborted) { _showAllElements(titlebar, inputbar, pinnedAscii, pinnedTagline, feedLines); setBootAnimating(false); return; }
+
+  // 7. ASCII hero types in
+  if (pinnedAscii) {
+    const asciiText = pinnedAscii.textContent;
+    pinnedAscii.textContent = '';
+    pinnedAscii.style.opacity = '1';
+    await typeText(pinnedAscii, asciiText, 1, signal);
+  }
+
+  if (signal.aborted) { _showAllElements(titlebar, inputbar, pinnedAscii, pinnedTagline, feedLines); setBootAnimating(false); return; }
+
+  // 8. Tagline types in
+  if (pinnedTagline) {
+    const tagText = pinnedTagline.textContent;
+    pinnedTagline.textContent = '';
+    pinnedTagline.style.opacity = '1';
+    await typeText(pinnedTagline, tagText, 18, signal);
+  }
+
+  if (signal.aborted) { _showAllElements(titlebar, inputbar, pinnedAscii, pinnedTagline, feedLines); setBootAnimating(false); return; }
+
+  // 9. Feed lines stagger in
+  for (let i = 0; i < feedLines.length; i++) {
+    if (signal.aborted) break;
+    feedLines[i].style.opacity = '1';
+    animate(feedLines[i], { opacity: [0, 1], translateY: ['4px', '0px'], duration: 200, ease: 'outCubic' });
+    await _delay(40, signal);
+  }
+
+  // 10. Input bar appears
+  if (inputbar) {
+    inputbar.style.opacity = '1';
+    animate(inputbar, { opacity: [0, 1], duration: 300, ease: 'outCubic' });
   }
 
   setBootAnimating(false);
+}
+
+/** Force-show all elements (used on abort during Phase 3) */
+function _showAllElements(titlebar, inputbar, ascii, tagline, feedLines) {
+  if (titlebar) titlebar.style.opacity = '';
+  if (inputbar) inputbar.style.opacity = '';
+  if (ascii) ascii.style.opacity = '';
+  if (tagline) tagline.style.opacity = '';
+  feedLines.forEach((el) => { el.style.opacity = ''; });
+  document.querySelectorAll('.sidebar__group-header').forEach((el) => { el.style.opacity = ''; });
+  document.querySelectorAll('.sidebar__channel').forEach((el) => { el.style.opacity = ''; });
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
