@@ -81,15 +81,14 @@ async function renderHomePinned(pinnedEl, prefersReducedMotion) {
   pinnedEl.appendChild(pre);
   pinnedEl.appendChild(tagline);
 
-  if (!prefersReducedMotion && !isBootAnimating()) {
-    await typeText(pre, HOME_ASCII, 2);
-    await typeText(tagline, HOME_TAGLINE, 15);
-  } else if (isBootAnimating()) {
-    await typeText(pre, HOME_ASCII, 2);
-    await typeText(tagline, HOME_TAGLINE, 15);
-  } else {
+  if (prefersReducedMotion) {
+    // Instant — also used by boot Phase 3 to render behind overlay without blocking
     pre.textContent = HOME_ASCII;
     tagline.textContent = HOME_TAGLINE;
+  } else {
+    // Normal navigation or boot-controlled typing (boot Phase 3 handles its own animation)
+    await typeText(pre, HOME_ASCII, 2);
+    await typeText(tagline, HOME_TAGLINE, 15);
   }
 }
 
