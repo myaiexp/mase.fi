@@ -112,7 +112,10 @@ export function initReplayButton(getDataPromise, onComplete) {
   const btn = document.getElementById('boot-replay');
   if (!btn) return;
 
-  btn.addEventListener('click', () => {
+  btn.addEventListener('click', (e) => {
+    // Stop propagation — runBoot adds a document click listener to skip boot,
+    // and this click would bubble up and immediately trigger it
+    e.stopPropagation();
     const overlay = document.getElementById('boot-overlay');
     if (!overlay) return;
 
