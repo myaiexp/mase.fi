@@ -37,7 +37,7 @@ describe('channel name matching', () => {
   });
 
   it('matches about channel', () => {
-    const results = matchChannels(CHANNEL_IDS, 'abt');
+    matchChannels(CHANNEL_IDS, 'abt');
     // uFuzzy may not match 'abt' -> 'about' depending on strictness; test softer match
     const results2 = matchChannels(CHANNEL_IDS, 'abou');
     expect(results2).toContain('about');
