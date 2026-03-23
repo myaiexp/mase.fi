@@ -406,6 +406,26 @@ export async function navigateTo(channelId, data, prefersReducedMotion) {
 export function initRouter(data, prefersReducedMotion) {
   window.addEventListener('hashchange', () => {
     const channelId = parseHash(location.hash) || 'home';
-    navigateTo(channelId, data, prefersReducedMotion);
+    const doNav = () => navigateTo(channelId, data, prefersReducedMotion);
+
+    // Use View Transitions API if available for smooth channel switches
+    if (document.startViewTransition && !prefersReducedMotion) {
+      document.startViewTransition(doNav);
+    } else {
+      doNav();
+    }
+  });
+
+  // `/` key focuses the command input with `/` prefix
+  document.addEventListener('keydown', (e) => {
+    if (e.key === '/' && document.activeElement?.id !== 'command-input') {
+      e.preventDefault();
+      const input = document.getElementById('command-input');
+      if (input) {
+        input.value = '/';
+        input.focus();
+        input.dispatchEvent(new Event('input'));
+      }
+    }
   });
 }

@@ -21,6 +21,7 @@ export default [
         AbortController: 'readonly',
         MutationObserver: 'readonly',
         DOMException: 'readonly',
+        Event: 'readonly',
       },
     },
   },
