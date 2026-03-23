@@ -1,63 +1,69 @@
 # mase.fi
 
-> Personal homepage and project showcase at https://mase.fi
+> Personal homepage as an IRC/terminal hybrid client at https://mase.fi
 
 ## Stack
 
 - **Build:** Vite 7 (vanilla JS, no framework)
 - **Animations:** anime.js 4
-- **Search:** uFuzzy (fuzzy search in updates stream)
-- **Testing:** Vitest 4
+- **Search:** uFuzzy (fuzzy search + channel autocomplete)
+- **Testing:** Vitest 4 (jsdom environment for DOM tests)
 - **Linting:** ESLint (flat config)
-- **Fonts:** Bricolage Grotesque (display), DM Sans (body)
+- **Font:** JetBrains Mono (self-hosted woff2, Regular + Bold)
 - **Styling:** Custom CSS with variables — no Tailwind, no utility classes
 
 ## Structure
 
 ```
-index.html          — the entire site (hero, updates, projects, footer)
-src/main.js         — thin orchestrator: single fetch, passes data to modules
-src/animations.js   — hero animations, mouse glow, click ripples, scrollReveal()
-src/updates.js      — weighted stream (4 entry types), pill-bar, fuzzy search
-src/projects.js     — data-driven project cards (flagship/standard), mini-feeds
-src/utils.js        — shared helpers (formatDate)
-src/style.css       — all styles, CSS variables for colors/spacing/typography
-src/*.test.js       — Vitest unit tests for modules
-eslint.config.js    — ESLint flat config
+index.html          — terminal shell: boot overlay, sidebar, content, input bar
+src/main.js         — orchestrator: fetch, boot-or-skip, init all modules
+src/boot.js         — 3-phase TTY boot sequence, skip/replay, localStorage TTL
+src/sidebar.js      — channel groups, activity indicators, mobile dropdown
+src/channels.js     — hash-based router, channel renderers, lazy loading
+src/terminal.js     — shared primitives: dates, nicks, lines, typing effect
+src/data.js         — project maps, channel lists, entry filtering
+src/search.js       — dual-mode input: fuzzy search + /channel navigation
+src/style.css       — all styles, CSS variables, responsive, boot/feed/sidebar
+src/fonts/          — JetBrains Mono woff2 (Regular, Bold)
+src/*.test.js       — Vitest unit tests (68 tests across 5 files)
+eslint.config.js    — ESLint flat config with browser globals
 ```
+
+## Architecture
+
+- **Layout:** Two-pane terminal — fixed sidebar (200px) + scrollable content area
+- **Routing:** Hash-based (`#/home`, `#/explorer`, `#/about`), browser back/forward, localStorage last-channel
+- **Channels:** `#home` (daily summaries), project channels (feature feed), `#activity` (commit log), `#about` (neofetch stats)
+- **Boot:** 3-phase TTY animation on first visit (7-day localStorage TTL), skip on click/key, `[▶ boot]` replay
+- **Search:** Plain text fuzzy-highlights feed lines, `/` prefix navigates to channels with autocomplete
+- **Mobile (<640px):** Sidebar hidden, top bar with dropdown channel picker
+- **Scroll model:** Chat-style (newest at bottom), IntersectionObserver lazy loads older entries on scroll-up
 
 ## Content Management
 
-- **Projects:** Data-driven from `updates.json` `.projects` array — rendered as flagship (full-width) or standard (half-width) cards with per-project mini-feeds. Sorted by most recent activity.
-- **Updates:** Weighted activity stream from `updates.json` `.entries` array. Four visual weights: project (heaviest, bg-card), feature (medium, accent border), daily (lightest, accordion), log (GitHub-style commit timeline). Pill-bar filtering (All/Projects/Features/Summaries/Commit log). Log entries hidden from "All" tab. Fuzzy search via uFuzzy with `<mark>` highlighting.
-- **Auto-generated entries:** `git deployboth` appends commit titles as `log` category entries to `.entries`. Manual `project`/`feature` entries via `mase-fi-update` (adds `sticky: true`, enforces capacity: 2 project, 3 feature).
-- **Daily summaries:** Systemd timer runs daily at 23:55 Finnish time. Consumes `log` entries, groups by project, summarizes via Claude Haiku (single commits used as-is), creates `daily` entries with `{date, category, project, summary, commits[]}`.
+- **Projects:** Data-driven from `updates.json` `.projects` array with `channel` field for routing (e.g. `"channel": "explorer"`)
+- **Updates:** Activity entries from `updates.json` `.entries` array, routed to channels by category: `daily` → `#home`, `log` → `#activity`, `feature`/`project` → per-project channel
+- **Auto-generated entries:** `git deployboth` appends commit titles as `log` category entries. Manual `project`/`feature` entries via `mase-fi-update`.
+- **Daily summaries:** Systemd timer at 23:55 Finnish time. Consumes `log` entries, creates `daily` entries.
 - **JSON format:** `{"entries": [...], "projects": [...]}` — single fetch provides both arrays
-- Dates use Finnish format: `DD.MM.YYYY` (stored as ISO in JSON, formatted client-side)
+- Dates: ISO in JSON, Finnish DD.MM format client-side
 
 ### Project Visibility Rule
 
-Only list projects that have either a **public GitHub repo** or a **live public deployment**. Private repos and internal tools stay off the homepage — they can still appear in updates as dev log entries.
+Only list projects with a **public GitHub repo** or **live public deployment**. Internal tools appear only in update entries.
 
 ## Demo Convention
 
-Apps that require login or personal data (e.g., Tracker, Mindmap) should support a `?demo` query param:
-
-- Bypasses authentication
-- Loads hardcoded mock data instead of real data source
-- Read-only or sandboxed — no writes to production
-- mase.fi links to demos via the project card URL (e.g., `mase.fi/tracker?demo`)
-
-This is implemented per-app, not centrally. Each app owns its own demo experience.
+Apps requiring login support `?demo` query param (per-app, not centrally).
 
 ## Design
 
 - **Background:** `#09090b` (near-black)
 - **Accent:** `#e8a308` (golden-orange)
-- **Text:** `#fafafa` (off-white)
-- **Borders:** `#27272a`, hover `#3f3f46`
-- **Layout:** max-width 64rem, 2-column grid (1 on mobile)
-- **Effects:** gradient mesh background, mouse-following glow, click ripples, scroll-triggered reveals
+- **Text:** `#fafafa` (off-white), dim `#a1a1aa`, muted `#52525b`
+- **Terminal colors:** green `#22c55e`, red `#ef4444`, cyan `#06b6d4`
+- **Nick colors:** 8-color palette, deterministic by name hash
+- **Effects:** Boot animation, typing effects, View Transitions for channel switches, blinking cursor
 
 ## Deployment
 
@@ -70,16 +76,17 @@ This is implemented per-app, not centrally. Each app owns its own demo experienc
 
 ## Current Phase
 
-**No active phase.** Living portfolio redesign complete.
+**No active phase.** IRC terminal redesign complete.
 
 ### Decisions from previous phases
 
-- **Module architecture:** `main.js` is a thin orchestrator — each feature domain owns its module (`animations.js`, `updates.js`, `projects.js`)
-- **JSON shape:** `{entries: [], projects: []}` — single fetch, dual arrays. Scripts use `.entries` path for jq operations.
-- **Sticky capacity:** `mase-fi-update` enforces limits (2 project, 3 feature) server-side via jq. Client-side just reads the flag.
-- **Scroll reveals:** CSS `animation-timeline: view()` with anime.js `onScroll()` fallback, detected via `CSS.supports()`
-- **Accordions:** `<details>` with CSS `interpolate-size: allow-keywords`, anime.js height fallback
-- **View Transitions:** Used for filter swaps with direct-render fallback
+- **Module architecture:** `main.js` orchestrates boot/skip decision, each domain owns its module
+- **JSON shape:** `{entries: [], projects: []}` — single fetch, dual arrays. Projects have `channel` field for routing.
+- **Sticky capacity:** `mase-fi-update` enforces limits (2 project, 3 feature) server-side via jq
+- **Channel mapping:** `entry.project` matched case-insensitively against `project.name`, routed via `project.channel`
+- **Scroll model:** Chat-style (newest at bottom), lazy-loads older entries via IntersectionObserver sentinel
+- **Boot skip logic:** `prefers-reduced-motion` or `mase-fi-boot-seen` localStorage within 7 days
+- **View Transitions:** Used for channel switches with direct-render fallback
 
 ---
 
@@ -89,15 +96,15 @@ This project splits documentation to minimize context usage. Follow these rules:
 
 ### File layout
 
-| File                         | Purpose                                                        | When to read                              |
-| ---------------------------- | -------------------------------------------------------------- | ----------------------------------------- |
-| `CLAUDE.md` (this file)      | Project identity, structure, patterns, current phase pointer   | Auto-loaded every session                 |
-| `.claude/phases/current.md`  | Symlink → active phase file                                    | Read when starting phase work             |
-| `.claude/phases/NNN-name.md` | Phase files (active via symlink, completed ones local-only)    | Only if you need historical context       |
-| `.claude/ideas.md`           | Future feature ideas, tech debt, and enhancements              | When planning next phase or brainstorming |
-| `.claude/plans/`             | Design docs and implementation plans from brainstorming        | When implementing or reviewing designs    |
-| `.claude/references/`        | Domain reference material (specs, external docs, data sources) | When you need domain knowledge            |
-| `.claude/[freeform].md`      | Project-specific context docs (architecture, deployment, etc.) | As referenced from this file              |
+| File                         | Purpose                                                      | When to read                              |
+| ---------------------------- | ------------------------------------------------------------ | ----------------------------------------- |
+| `CLAUDE.md` (this file)      | Project identity, structure, patterns, current phase pointer | Auto-loaded every session                 |
+| `.claude/phases/current.md`  | Symlink → active phase file                                  | Read when starting phase work             |
+| `.claude/phases/NNN-name.md` | Phase files (active via symlink, completed ones local-only)  | Only if you need historical context       |
+| `.claude/ideas.md`           | Future feature ideas, tech debt, and enhancements            | When planning next phase or brainstorming |
+| `.claude/plans/`             | Design docs and implementation plans from brainstorming      | When implementing or reviewing designs    |
+| `.claude/references/`        | Domain reference material (specs, external docs, data sources) | When you need domain knowledge          |
+| `.claude/[freeform].md`      | Project-specific context docs (architecture, deployment, etc.) | As referenced from this file            |
 
 ### Phase transitions
 
