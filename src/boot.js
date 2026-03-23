@@ -229,14 +229,7 @@ async function _runPhase3(overlay, data, _prefersReducedMotion, signal) {
   if (inputbar) inputbar.style.opacity = '0';
 
   // 1. Fade out boot overlay
-  await new Promise((resolve) => {
-    animate(overlay, {
-      opacity: [1, 0],
-      duration: 400,
-      ease: 'outCubic',
-      onComplete: resolve,
-    });
-  });
+  await animate(overlay, { opacity: [1, 0], duration: 400, ease: 'outCubic' });
   overlay.classList.remove('active');
   overlay.style.opacity = '';
 
