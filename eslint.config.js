@@ -20,6 +20,7 @@ export default [
         IntersectionObserver: 'readonly',
         AbortController: 'readonly',
         MutationObserver: 'readonly',
+        DOMException: 'readonly',
       },
     },
   },
