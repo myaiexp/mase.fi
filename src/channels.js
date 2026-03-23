@@ -200,7 +200,7 @@ function createActivityLine(entry) {
 
   const textEl = document.createElement('span');
   textEl.className = 'feed-line__text';
-  textEl.textContent = entry.description || entry.summary || '';
+  textEl.textContent = entry.text || entry.summary || '';
 
   div.append(timeEl, nickEl, textEl);
   return div;
@@ -226,7 +226,7 @@ function renderEntryBatch(feedEl, entries, channelId, prepend = false) {
     if (isActivity) {
       line = createActivityLine(entry);
     } else {
-      const text = entry.summary || entry.description || '';
+      const text = entry.summary || entry.text || '';
       const nick = entry.project || 'mase';
       line = createLine(entry.date, nick, text);
     }

@@ -11,13 +11,13 @@ const projects = [
 const entries = [
   { date: '2026-03-22', category: 'daily', project: 'explorer', summary: 'Added offline caching' },
   { date: '2026-03-21', category: 'daily', project: 'Personal Tracker', summary: 'Fixed streak logic' },
-  { date: '2026-03-20', category: 'feature', project: 'Explorer', description: 'Offline route caching' },
-  { date: '2026-03-18', category: 'feature', project: 'Explorer', description: 'Dark mode map tiles' },
-  { date: '2026-03-15', category: 'project', project: 'Yatzy', description: 'Multiplayer Yatzy game' },
-  { date: '2026-03-22', category: 'log', project: 'explorer', description: 'fix: offline cache cleanup' },
-  { date: '2026-03-21', category: 'log', project: 'Personal Tracker', description: 'refactor: streak calculation' },
-  { date: '2026-03-19', category: 'log', project: 'c-monitor', description: 'fix: runner resume' },
-  { date: '2026-03-10', category: 'feature', project: 'Personal Tracker', description: 'Data export' },
+  { date: '2026-03-20', category: 'feature', project: 'Explorer', text: 'Offline route caching' },
+  { date: '2026-03-18', category: 'feature', project: 'Explorer', text: 'Dark mode map tiles' },
+  { date: '2026-03-15', category: 'project', project: 'Yatzy', text: 'Multiplayer Yatzy game' },
+  { date: '2026-03-22', category: 'log', project: 'explorer', text: 'fix: offline cache cleanup' },
+  { date: '2026-03-21', category: 'log', project: 'Personal Tracker', text: 'refactor: streak calculation' },
+  { date: '2026-03-19', category: 'log', project: 'c-monitor', text: 'fix: runner resume' },
+  { date: '2026-03-10', category: 'feature', project: 'Personal Tracker', text: 'Data export' },
 ];
 
 describe('buildProjectMap', () => {
@@ -116,7 +116,7 @@ describe('getChannelEntries', () => {
   it('project channel matches case-insensitively', () => {
     const result = getChannelEntries('tracker', entries, projects);
     expect(result.length).toBe(1);
-    expect(result[0].description).toBe('Data export');
+    expect(result[0].text).toBe('Data export');
   });
 
   it('about: returns empty array', () => {
