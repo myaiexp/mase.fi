@@ -28,4 +28,6 @@
 
 ## Tech Debt
 
-<!-- Fragile patterns, latent bugs, things that work but could be better -->
+- **Boot Phase 3 visual construction broken** — The step-by-step UI construction (sidebar typing, channels sliding in) doesn't render visually. Likely anime.js v4 API issues + `initAfterBoot` re-rendering the sidebar. Handoff doc at `.claude/plans/boot-phase3-handoff.md`. Must use Context7 to verify anime.js v4 API before fixing.
+
+- **Stale `production` git remote** — `/var/repo/homepage.git` doesn't exist on VPS. Deployment works via `origin`. Should remove: `git remote remove production`
