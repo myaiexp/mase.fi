@@ -120,18 +120,20 @@ export function initReplayButton(getDataPromise, onComplete) {
     const overlay = document.getElementById('boot-overlay');
     if (!overlay) return;
 
-    // Clear overlay content using safe DOM method
+    // Clear overlay content for fresh boot lines
     while (overlay.firstChild) overlay.removeChild(overlay.firstChild);
     overlay.classList.add('active');
 
-    // Hide terminal content behind overlay
-    const terminal = document.querySelector('.terminal__body');
-    if (terminal) terminal.style.visibility = 'hidden';
+    // Clear terminal content so Phase 3 builds fresh under the overlay
+    for (const id of ['sidebar', 'content-pinned', 'content-feed']) {
+      const el = document.getElementById(id);
+      if (el) while (el.firstChild) el.removeChild(el.firstChild);
+    }
 
-    runBoot(getDataPromise(), (data) => {
-      if (terminal) terminal.style.visibility = '';
-      onComplete(data);
-    });
+    // Reset boot-seen so the skip mechanism is fully reset
+    try { localStorage.removeItem(STORAGE_KEY); } catch {}
+
+    runBoot(getDataPromise(), onComplete);
   });
 }
 

@@ -1,6 +1,6 @@
 /** Orchestrator: fetch data, boot or direct load, init all modules. */
 import { shouldSkipBoot, runBoot, initReplayButton } from './boot.js';
-import { initSidebar } from './sidebar.js';
+import { initSidebar, setActiveChannel } from './sidebar.js';
 import { initRouter, navigateTo, resolveInitialChannel } from './channels.js';
 import { initSearch } from './search.js';
 import './style.css';
@@ -38,5 +38,5 @@ if (shouldSkipBoot(prefersReducedMotion)) {
 
 initReplayButton(
   () => fetch('/updates.json').then((r) => r.json()),
-  initApp,
+  (data) => { initSidebar(data); setActiveChannel('home'); },
 );
