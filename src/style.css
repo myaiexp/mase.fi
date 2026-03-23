@@ -474,6 +474,29 @@ input {
   white-space: pre;
 }
 
+/* ===== Boot Lines ===== */
+
+/* Individual text lines inside the boot overlay */
+.boot-line {
+  white-space: pre;
+  line-height: 1.6;
+}
+
+/* [ OK ] prefix — green */
+.boot-line--ok {
+  color: var(--green);
+}
+
+/* [ .... ] prefix — dim, waiting */
+.boot-line--pending {
+  color: var(--text-muted);
+}
+
+/* [FAIL] prefix — red */
+.boot-line--fail {
+  color: var(--red);
+}
+
 /* ===== Accessibility ===== */
 
 @media (prefers-reduced-motion: reduce) {
@@ -482,4 +505,72 @@ input {
     animation-iteration-count: 1 !important;
     transition-duration: 0.01ms !important;
   }
+}
+
+/* ===== Search & Autocomplete ===== */
+
+/* Autocomplete dropdown — absolutely positioned above input bar */
+.autocomplete {
+  position: absolute;
+  bottom: 100%;
+  left: 0;
+  right: 0;
+  background: var(--bg-surface);
+  border: 1px solid var(--border);
+  border-bottom: none;
+  max-height: 200px;
+  overflow-y: auto;
+  z-index: 10;
+  display: none;
+}
+
+.autocomplete--visible {
+  display: block;
+}
+
+.autocomplete__item {
+  padding: 0.3rem 0.75rem;
+  font-family: var(--font-mono);
+  color: var(--text-dim);
+  cursor: pointer;
+  transition: background 80ms, color 80ms;
+  white-space: nowrap;
+}
+
+.autocomplete__item:hover {
+  background: var(--bg-content);
+  color: var(--text);
+}
+
+.autocomplete__item--active {
+  background: var(--accent-glow);
+  color: var(--accent);
+}
+
+/* Search highlight — accent glow background on matched characters */
+mark.search-highlight {
+  background: var(--accent-glow);
+  color: var(--accent);
+  border-radius: 2px;
+  padding: 0 1px;
+}
+
+/* Inline "channel not found" message */
+.terminal__inline-msg {
+  color: var(--red);
+  font-size: 12px;
+  margin-left: 0.5rem;
+  opacity: 1;
+  animation: fade-out 2s ease forwards;
+}
+
+@keyframes fade-out {
+  0%   { opacity: 1; }
+  70%  { opacity: 1; }
+  100% { opacity: 0; }
+}
+
+/* Input bar needs position:relative for autocomplete to anchor to */
+.terminal__inputbar {
+  position: relative;
 }
