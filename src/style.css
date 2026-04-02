@@ -148,6 +148,7 @@ input {
   height: 100dvh;
   max-height: 100vh;
   max-height: 100dvh;
+  position: relative;
 }
 
 /* Title bar */
@@ -171,7 +172,6 @@ input {
   color: var(--text-muted);
   padding: 0.125rem 0.5rem;
   border: 1px solid var(--border);
-  border-radius: 3px;
   transition: color 0.1s, border-color 0.1s;
 }
 
@@ -201,6 +201,10 @@ input {
   flex-shrink: 0;
   padding: 0.75rem 1rem;
   border-bottom: 1px solid var(--border);
+}
+
+.content__pinned:empty {
+  display: none;
 }
 
 .content__feed {
@@ -408,6 +412,8 @@ input {
 .nick {
   flex-shrink: 0;
   font-weight: 700;
+  min-width: 9ch;
+  text-align: right;
 }
 
 .feed-line__text {
@@ -469,7 +475,6 @@ input {
 .pinned__project-name {
   color: var(--text);
   font-weight: 700;
-  font-size: 14px;
 }
 
 .pinned__project-desc {
