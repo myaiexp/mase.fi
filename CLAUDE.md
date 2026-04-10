@@ -37,10 +37,21 @@ Apps requiring login support `?demo` query param (per-app, not centrally).
 - **Nick colors:** 8-color palette, deterministic by name hash
 - **Effects:** Boot animation, typing effects, View Transitions for channel switches, blinking cursor
 
+## Base Components
+
+Shared web components library built from `src/components/` via Vite library mode.
+
+- **Build:** `npm run build:components` → `dist/base-components.js` (IIFE)
+- **URL:** `https://mase.fi/base-components.js`
+- **Components:** `<base-badge>`, `<base-modal>`, `<base-tabs>`/`<base-tab>`, `<base-dropdown>`/`<base-dropdown-item>`/`<base-dropdown-divider>`
+- **Toast:** `window.BaseToast.show(message, type, duration)` — no HTML tag, static API
+- **Theming:** Shadow DOM with `base.css` custom properties (`--bg-raised`, `--accent`, `--green`, etc.)
+
 ## Deploy
 
 - `git push production main` then `git push origin main` (keep GitHub in sync)
 - Post-receive hook: `npm install` → `vite build` → copies `dist/` to webroot
+- **Components:** `npm run build:components` must run separately (or use `build:all`). Post-receive hook needs updating to include this.
 
 ## Decisions from previous phases
 
