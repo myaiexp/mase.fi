@@ -3,9 +3,10 @@
 // --- base-option ─────────────────────────────────────────────────────────────
 
 class BaseOption extends HTMLElement {
-  static observedAttributes = ['value', 'disabled'];
+  static observedAttributes = ['value', 'disabled', 'action'];
   get value() { return this.getAttribute('value') ?? ''; }
   get disabled() { return this.hasAttribute('disabled'); }
+  get action() { return this.hasAttribute('action'); }
   get label() { return this.textContent.trim(); }
 }
 
@@ -101,6 +102,29 @@ style.textContent = `
   }
   .option.disabled:hover {
     background: transparent;
+  }
+  .option .action-btn {
+    display: none;
+    background: none;
+    border: none;
+    color: var(--text-muted, #71717a);
+    cursor: pointer;
+    padding: 0 4px;
+    font-size: 11px;
+    line-height: 1;
+    margin-left: auto;
+    flex-shrink: 0;
+  }
+  .option:hover .action-btn {
+    display: inline-block;
+  }
+  .option .action-btn:hover {
+    color: var(--text, #fafafa);
+  }
+  .option.has-action {
+    display: flex;
+    align-items: center;
+    gap: 4px;
   }
   .group-header {
     padding: 4px 12px;
@@ -304,10 +328,31 @@ class BaseSelect extends HTMLElement {
     const div = document.createElement('div');
     div.className = 'option';
     div.dataset.value = opt.value;
-    div.textContent = opt.label;
     div.setAttribute('tabindex', '-1');
     if (opt.disabled) div.classList.add('disabled');
     if (groupLabel) div.dataset.group = groupLabel;
+
+    if (opt.action) {
+      div.classList.add('has-action');
+      const label = document.createElement('span');
+      label.textContent = opt.label;
+      div.appendChild(label);
+      const btn = document.createElement('button');
+      btn.className = 'action-btn';
+      btn.type = 'button';
+      btn.textContent = '...';
+      btn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        this.dispatchEvent(new CustomEvent('option-action', {
+          bubbles: true,
+          detail: { value: opt.value, label: opt.label, anchor: btn }
+        }));
+      });
+      div.appendChild(btn);
+    } else {
+      div.textContent = opt.label;
+    }
+
     div.addEventListener('click', () => this._selectOption(div));
     return div;
   }
