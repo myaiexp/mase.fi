@@ -165,7 +165,7 @@ class BaseSelect extends HTMLElement {
 
   constructor() {
     super();
-    this.attachShadow({ mode: 'open' });
+    this.attachShadow({ mode: 'open', delegatesFocus: true });
     this.shadowRoot.appendChild(selectTemplate.content.cloneNode(true));
     this._menu = this.shadowRoot.querySelector('[part="menu"]');
     this._triggerWrap = this.shadowRoot.querySelector('[part="trigger-wrap"]');
