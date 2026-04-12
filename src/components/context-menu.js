@@ -164,7 +164,7 @@ class BaseContextMenu extends HTMLElement {
       if (!matched) continue;
 
       const selection = window.getSelection().toString();
-      const result = zone.items(matched, selection);
+      const result = zone.items(e.target, selection);
       if (result && result.length > 0) {
         e.preventDefault();
         this.show(e.clientX, e.clientY, result);

@@ -78,22 +78,25 @@ describe('base-context-menu', () => {
     expect(items2).toHaveBeenCalled();
   });
 
-  // 3. contextmenu on matching element calls items builder with matched el and selection text
-  it('contextmenu on matching element calls items builder with matched el and selection', () => {
+  // 3. contextmenu passes e.target (actual click target) and selection text to items builder
+  it('contextmenu passes e.target and selection text to items builder', () => {
     const cm = createMenu();
     const items = vi.fn(() => [{ label: 'A', action: () => {} }]);
     cm.register('test', { selector: '.zone', items });
 
     const zone = document.createElement('div');
     zone.className = 'zone';
+    const child = document.createElement('span');
+    zone.appendChild(child);
     document.body.appendChild(zone);
 
     // Mock getSelection
     const origGetSelection = window.getSelection;
     window.getSelection = () => ({ toString: () => 'selected text' });
 
-    fireContextMenu(zone);
-    expect(items).toHaveBeenCalledWith(zone, 'selected text');
+    // Fire on child — items builder should receive the child (e.target), not the zone
+    fireContextMenu(child);
+    expect(items).toHaveBeenCalledWith(child, 'selected text');
 
     window.getSelection = origGetSelection;
   });
