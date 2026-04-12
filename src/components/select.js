@@ -104,7 +104,7 @@ style.textContent = `
     background: transparent;
   }
   .option .action-btn {
-    display: none;
+    visibility: hidden;
     background: none;
     border: none;
     color: var(--text-muted, #71717a);
@@ -112,11 +112,10 @@ style.textContent = `
     padding: 0 4px;
     font-size: 11px;
     line-height: 1;
-    margin-left: auto;
     flex-shrink: 0;
   }
   .option:hover .action-btn {
-    display: inline-block;
+    visibility: visible;
   }
   .option .action-btn:hover {
     color: var(--text, #fafafa);
