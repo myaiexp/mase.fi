@@ -112,6 +112,7 @@ style.textContent = `
     right: 8px;
     top: 50%;
     transform: translateY(-50%);
+    width: auto;
     background: none;
     border: none;
     color: var(--text-muted, #71717a);
