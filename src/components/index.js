@@ -5,3 +5,4 @@ import './modal.js';
 import './tabs.js';
 import './dropdown.js';
 import './select.js';
+import './text-fit.js';
