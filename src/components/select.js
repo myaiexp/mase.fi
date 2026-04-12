@@ -103,8 +103,15 @@ style.textContent = `
   .option.disabled:hover {
     background: transparent;
   }
+  .option.has-action {
+    position: relative;
+  }
   .option .action-btn {
-    visibility: hidden;
+    display: none;
+    position: absolute;
+    right: 8px;
+    top: 50%;
+    transform: translateY(-50%);
     background: none;
     border: none;
     color: var(--text-muted, #71717a);
@@ -112,22 +119,12 @@ style.textContent = `
     padding: 0 4px;
     font-size: 11px;
     line-height: 1;
-    flex-shrink: 0;
   }
   .option:hover .action-btn {
-    visibility: visible;
+    display: inline-block;
   }
   .option .action-btn:hover {
     color: var(--text, #fafafa);
-  }
-  .option.has-action {
-    display: flex;
-    align-items: center;
-    gap: 4px;
-  }
-  .option.has-action > span {
-    flex: 1;
-    min-width: 0;
   }
   .group-header {
     padding: 4px 12px;
