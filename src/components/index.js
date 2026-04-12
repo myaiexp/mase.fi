@@ -6,3 +6,4 @@ import './tabs.js';
 import './dropdown.js';
 import './select.js';
 import './text-fit.js';
+import './context-menu.js';
