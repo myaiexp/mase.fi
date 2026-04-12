@@ -126,6 +126,10 @@ style.textContent = `
     align-items: center;
     gap: 4px;
   }
+  .option.has-action > span {
+    flex: 1;
+    min-width: 0;
+  }
   .group-header {
     padding: 4px 12px;
     font-size: 11px;
