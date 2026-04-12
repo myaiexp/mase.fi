@@ -9,6 +9,7 @@ template.innerHTML = [
   '  :host { display: block; min-width: 0; max-width: 100%; overflow: hidden; }',
   '  #text { font: inherit; white-space: pre-wrap; overflow-wrap: break-word; }',
   '  :host([mode="fit"]) #text, :host(:not([mode])) #text { white-space: nowrap; }',
+  '  .jl { display: block; white-space: nowrap; }',
   '</style>',
   '<span id="text"></span>',
 ].join('\n');
@@ -127,16 +128,70 @@ class BaseTextFit extends HTMLElement {
     const lines = Number.isFinite(maxLines) ? maxLines : 1;
     const mode = this.getAttribute('mode') || 'fit';
 
-    if (lines === 0) {
+    if (lines === 0 && mode !== 'justify') {
       this.#textEl.textContent = this.#fullText;
       return;
     }
 
-    if (mode === 'wrap') {
+    if (mode === 'justify') {
+      this.#renderJustified(maxWidth, lines);
+    } else if (mode === 'wrap') {
       this.#textEl.textContent = BaseTextFit.wrapOptimal(this.#prepared, maxWidth, lines, lineHeight);
     } else {
       this.#textEl.textContent = BaseTextFit.truncate(this.#prepared, maxWidth, lines);
     }
+  }
+
+  #renderJustified(maxWidth, maxLines) {
+    const lines = BaseTextFit.justifyLines(this.#prepared, maxWidth, maxLines);
+    this.#textEl.textContent = '';
+    for (const line of lines) {
+      const span = document.createElement('span');
+      span.className = 'jl';
+      span.textContent = line.text;
+      if (line.wordSpacing !== undefined) {
+        span.style.setProperty('word-spacing', `${line.wordSpacing}px`);
+      }
+      this.#textEl.appendChild(span);
+    }
+  }
+
+  static justifyLines(prepared, maxWidth, maxLines) {
+    if (!prepared) return [];
+    const segments = prepared.segments;
+    if (!segments || segments.length === 0) return [];
+    const fullText = segments.join('');
+    if (!fullText) return [];
+
+    const allLines = [];
+    walkLineRanges(prepared, maxWidth, (range) => {
+      allLines.push(materializeLineRange(prepared, range).text);
+    });
+
+    const linesToShow = maxLines > 0 ? allLines.slice(0, maxLines) : allLines;
+    const isOverflow = maxLines > 0 && allLines.length > maxLines;
+    const font = getFont(prepared);
+
+    const result = [];
+    for (let i = 0; i < linesToShow.length; i++) {
+      const text = linesToShow[i];
+      const isLast = i === linesToShow.length - 1;
+
+      if (isLast && isOverflow) {
+        result.push({ text: truncateLastLine(text, maxWidth, '\u2026', font) });
+      } else if (isLast) {
+        result.push({ text });
+      } else {
+        const naturalWidth = measureNaturalWidth(doPrepare(text, font));
+        const spaceCount = (text.match(/ /g) || []).length;
+        if (spaceCount > 0 && naturalWidth < maxWidth) {
+          result.push({ text, wordSpacing: (maxWidth - naturalWidth) / spaceCount });
+        } else {
+          result.push({ text });
+        }
+      }
+    }
+    return result;
   }
 
   static truncate(prepared, maxWidth, maxLines, ellipsis = '\u2026') {
