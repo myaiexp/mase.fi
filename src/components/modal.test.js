@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { describe, it, expect, beforeAll, beforeEach, afterEach, vi } from 'vitest';
+import { describe, it, expect, beforeAll, afterEach, vi } from 'vitest';
 
 beforeAll(async () => {
   await import('./modal.js');
@@ -112,11 +112,6 @@ describe('base-modal', () => {
 
     // Place focus on last element, then dispatch Tab — should wrap to first
     focusable[focusable.length - 1].focus();
-    const tabForward = new KeyboardEvent('keydown', {
-      key: 'Tab',
-      shiftKey: false,
-      bubbles: true,
-    });
     // Manually simulate: component checks document.activeElement === last
     // Since jsdom shadow focus is tricky, call _handleKeyDown directly
     // with a stubbed activeElement matching last

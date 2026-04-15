@@ -131,7 +131,7 @@ export function initReplayButton(getDataPromise, onComplete) {
     }
 
     // Reset boot-seen so the skip mechanism is fully reset
-    try { localStorage.removeItem(STORAGE_KEY); } catch {}
+    try { localStorage.removeItem(STORAGE_KEY); } catch { /* private browsing */ }
 
     runBoot(getDataPromise(), onComplete);
   });

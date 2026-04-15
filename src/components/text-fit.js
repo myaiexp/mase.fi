@@ -110,9 +110,6 @@ class BaseTextFit extends HTMLElement {
 
     const cs = getComputedStyle(this);
     const font = cs.font || DEFAULT_FONT;
-    const lhRaw = parseFloat(cs.lineHeight);
-    const lineHeight = Number.isFinite(lhRaw) ? lhRaw : (parseFloat(cs.fontSize) || 13) * 1.2;
-
     if (font !== this.#cachedFont || !this.#prepared) {
       this.#cachedFont = font;
       this.#prepared = doPrepare(this.#fullText, font);
@@ -136,7 +133,7 @@ class BaseTextFit extends HTMLElement {
     if (mode === 'justify') {
       this.#renderJustified(maxWidth, lines);
     } else if (mode === 'wrap') {
-      this.#textEl.textContent = BaseTextFit.wrapOptimal(this.#prepared, maxWidth, lines, lineHeight);
+      this.#textEl.textContent = BaseTextFit.wrapOptimal(this.#prepared, maxWidth, lines);
     } else {
       this.#textEl.textContent = BaseTextFit.truncate(this.#prepared, maxWidth, lines);
     }
@@ -222,7 +219,7 @@ class BaseTextFit extends HTMLElement {
     return maxLines > 1 ? lines.join('\n') : lines.join('');
   }
 
-  static wrapOptimal(prepared, maxWidth, maxLines, lineHeight) {
+  static wrapOptimal(prepared, maxWidth, maxLines) {
     if (!prepared) return '';
     const segments = prepared.segments;
     if (!segments || segments.length === 0) return '';

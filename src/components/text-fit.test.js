@@ -27,7 +27,7 @@ beforeAll(() => {
 // Import AFTER mocks are installed
 let BaseTextFit;
 beforeAll(async () => {
-  const mod = await import('./text-fit.js');
+  await import('./text-fit.js');
   BaseTextFit = customElements.get('base-text-fit');
 });
 

@@ -9,10 +9,12 @@
     "preview": "vite preview",
     "test": "vitest run",
     "build:components": "vite build --config vite.components.config.js",
-    "build:all": "vite build && npm run build:components"
+    "build:all": "vite build && npm run build:components",
+    "lint": "eslint src/"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
+    "eslint": "^10.2.0",
     "jsdom": "^29.0.1",
     "vite": "^7.3.1",
     "vitest": "^4.1.0"
