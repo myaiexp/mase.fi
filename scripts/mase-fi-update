@@ -1,0 +1,62 @@
+#!/usr/bin/env bash
+set -e
+
+usage() {
+  echo "Usage: mase-fi-update <category> <project> <text> [date]"
+  echo ""
+  echo "  category:  project | feature"
+  echo "  project:   project name (e.g., tracker, explorer)"
+  echo "  text:      update description"
+  echo "  date:      optional, YYYY-MM-DD (defaults to today)"
+  exit 1
+}
+
+if [ $# -lt 3 ]; then
+  usage
+fi
+
+CATEGORY="$1"
+PROJECT="$2"
+TEXT="$3"
+DATE="${4:-$(date +%Y-%m-%d)}"
+UPDATES_FILE="/var/www/html/updates.json"
+
+if [ "$CATEGORY" != "project" ] && [ "$CATEGORY" != "feature" ]; then
+  echo "Error: category must be 'project' or 'feature' (got '$CATEGORY')"
+  exit 1
+fi
+
+if [ "$CATEGORY" = "project" ]; then
+  STICKY_LIMIT=2
+else
+  STICKY_LIMIT=3
+fi
+
+if [ ! -f "$UPDATES_FILE" ]; then
+  echo '{"entries":[],"projects":[]}' > "$UPDATES_FILE"
+fi
+
+jq --arg date "$DATE" \
+   --arg project "$PROJECT" \
+   --arg text "$TEXT" \
+   --arg category "$CATEGORY" \
+   --argjson limit "$STICKY_LIMIT" \
+   '
+   .entries = [{date: $date, project: $project, text: $text, category: $category, sticky: true}] + .entries
+   | .entries = (
+       [ .entries | to_entries[] | select(.value.category == $category and .value.sticky == true) | .key ] as $sticky_indices
+       | if ($sticky_indices | length) > $limit then
+           ($sticky_indices[$limit:]) as $demote
+           | .entries | to_entries | map(
+               if (.key | IN($demote[])) then .value.sticky = false | .value else .value end
+             )
+         else
+           .entries
+         end
+     )
+   ' \
+   "$UPDATES_FILE" > /tmp/updates.json.tmp \
+&& cp /tmp/updates.json.tmp "$UPDATES_FILE" \
+&& rm /tmp/updates.json.tmp
+
+echo "Added $CATEGORY entry: [$PROJECT] $TEXT ($DATE)"

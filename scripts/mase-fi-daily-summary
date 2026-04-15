@@ -1,0 +1,114 @@
+#!/usr/bin/env bash
+# Generate daily summary entries from today's log entries in updates.json
+set -euo pipefail
+
+UPDATES_FILE="/var/www/html/updates.json"
+TODAY=$(TZ="Europe/Helsinki" date +%Y-%m-%d)
+CREDS_FILE="${HOME}/.claude/.credentials.json"
+
+if [[ ! -f "$UPDATES_FILE" ]]; then
+    echo "No updates.json found"
+    exit 0
+fi
+
+# Skip if daily entries already exist for today (idempotency)
+DAILY_EXISTS=$(jq --arg date "$TODAY" '[.entries[] | select(.category == "daily" and .date == $date)] | length' "$UPDATES_FILE")
+if [[ "$DAILY_EXISTS" -gt 0 ]]; then
+    echo "Daily entries already exist for $TODAY — skipping"
+    exit 0
+fi
+
+# Count today's log entries
+LOG_COUNT=$(jq --arg date "$TODAY" '[.entries[] | select(.category == "log" and .date == $date)] | length' "$UPDATES_FILE")
+
+if [[ "$LOG_COUNT" -eq 0 ]]; then
+    echo "No log entries for $TODAY — skipping"
+    exit 0
+fi
+
+# Generate AI summary from a list of commit messages via Haiku
+# Falls back to "project: N commits" on failure
+generate_summary() {
+    local project="$1"
+    local commits_text="$2"
+    local count="$3"
+    local fallback="${project}: ${count} commits"
+
+    local token
+    token=$(jq -r '.claudeAiOauth.accessToken // empty' "$CREDS_FILE" 2>/dev/null)
+    if [[ -z "$token" ]]; then
+        echo "$fallback"
+        return
+    fi
+
+    local prompt
+    prompt="Summarize these git commits into a terse comma-separated list of highlights. Max 80 characters. No project name prefix. Lowercase. Example output: kanban board, multiline prompts, UI fixes
+
+Commits:
+${commits_text}"
+
+    local payload
+    payload=$(jq -n --arg prompt "$prompt" '{
+        model: "claude-haiku-4-5-20251001",
+        max_tokens: 60,
+        messages: [{role: "user", content: $prompt}]
+    }')
+
+    local response
+    response=$(curl -s --max-time 10 \
+        -H "Authorization: Bearer ${token}" \
+        -H "anthropic-version: 2023-06-01" \
+        -H "anthropic-beta: oauth-2025-04-20" \
+        -H "content-type: application/json" \
+        -d "$payload" \
+        "https://api.anthropic.com/v1/messages" 2>/dev/null)
+
+    local summary
+    summary=$(echo "$response" | jq -r '.content[0].text // empty' 2>/dev/null)
+
+    if [[ -n "$summary" ]]; then
+        echo "$summary"
+    else
+        echo "$fallback"
+    fi
+}
+
+# Group log entries by project, extract per-project data
+jq --arg date "$TODAY" '
+  [.entries[] | select(.category == "log" and .date == $date)] | group_by(.project) |
+  map({project: .[0].project, commits: [.[].text]})
+' "$UPDATES_FILE" > /tmp/daily_groups.json
+
+# Build daily entries with AI summaries
+echo '[]' > /tmp/daily_entries.json
+
+for i in $(jq -r 'range(length)' /tmp/daily_groups.json); do
+    project=$(jq -r ".[$i].project" /tmp/daily_groups.json)
+    count=$(jq -r ".[$i].commits | length" /tmp/daily_groups.json)
+    commits_json=$(jq -c ".[$i].commits" /tmp/daily_groups.json)
+
+    if [[ "$count" -eq 1 ]]; then
+        summary=$(jq -r ".[$i].commits[0]" /tmp/daily_groups.json)
+    else
+        commits_text=$(jq -r ".[$i].commits[]" /tmp/daily_groups.json)
+        summary=$(generate_summary "$project" "$commits_text" "$count")
+    fi
+
+    jq --arg date "$TODAY" --arg project "$project" --arg summary "$summary" \
+       --argjson commits "$commits_json" \
+       '. + [{date: $date, category: "daily", project: $project, summary: $summary, commits: $commits}]' \
+       /tmp/daily_entries.json > /tmp/daily_entries.json.tmp \
+    && mv /tmp/daily_entries.json.tmp /tmp/daily_entries.json
+done
+
+rm -f /tmp/daily_groups.json
+
+# Prepend daily entries to the entries array
+jq --slurpfile daily /tmp/daily_entries.json '
+  .entries = ($daily[0] + .entries)
+' "$UPDATES_FILE" > /tmp/updates.json.tmp \
+&& cp /tmp/updates.json.tmp "$UPDATES_FILE" \
+&& rm /tmp/updates.json.tmp /tmp/daily_entries.json
+
+DAILY_COUNT=$(jq --arg date "$TODAY" '[.entries[] | select(.category == "daily" and .date == $date)] | length' "$UPDATES_FILE")
+echo "Created $DAILY_COUNT daily summary entries for $TODAY"
