@@ -3,21 +3,21 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { buildProjectMap, getChannels, getChannelEntries, getAboutStats } from './data.js';
 
 const projects = [
-  { name: 'Explorer', channel: 'explorer', url: 'https://mase.fi/explorer', desc: 'Route planning' },
-  { name: 'Personal Tracker', channel: 'tracker', url: 'https://mase.fi/tracker', desc: 'Habit tracking' },
-  { name: 'Yatzy', channel: 'yatzy', url: 'https://mase.fi/yatzy', desc: 'Finnish Yatzy' },
+  { name: 'Explorer', channel: 'explorer', slug: 'explorer', url: 'https://mase.fi/explorer', desc: 'Route planning' },
+  { name: 'Personal Tracker', channel: 'tracker', slug: 'tracker', url: 'https://mase.fi/tracker', desc: 'Habit tracking' },
+  { name: 'Yatzy', channel: 'yatzy', slug: 'yatzy', url: 'https://mase.fi/yatzy', desc: 'Finnish Yatzy' },
 ];
 
 const entries = [
   { date: '2026-03-22', category: 'daily', project: 'explorer', summary: 'Added offline caching' },
-  { date: '2026-03-21', category: 'daily', project: 'Personal Tracker', summary: 'Fixed streak logic' },
+  { date: '2026-03-21', category: 'daily', project: 'tracker', summary: 'Fixed streak logic' },
   { date: '2026-03-20', category: 'feature', project: 'Explorer', text: 'Offline route caching' },
-  { date: '2026-03-18', category: 'feature', project: 'Explorer', text: 'Dark mode map tiles' },
-  { date: '2026-03-15', category: 'project', project: 'Yatzy', text: 'Multiplayer Yatzy game' },
+  { date: '2026-03-18', category: 'feature', project: 'explorer', text: 'Dark mode map tiles' },
+  { date: '2026-03-15', category: 'project', project: 'yatzy', text: 'Multiplayer Yatzy game' },
   { date: '2026-03-22', category: 'log', project: 'explorer', text: 'fix: offline cache cleanup' },
-  { date: '2026-03-21', category: 'log', project: 'Personal Tracker', text: 'refactor: streak calculation' },
+  { date: '2026-03-21', category: 'log', project: 'tracker', text: 'refactor: streak calculation' },
   { date: '2026-03-19', category: 'log', project: 'c-monitor', text: 'fix: runner resume' },
-  { date: '2026-03-10', category: 'feature', project: 'Personal Tracker', text: 'Data export' },
+  { date: '2026-03-10', category: 'feature', project: 'tracker', text: 'Data export' },
 ];
 
 describe('buildProjectMap', () => {
@@ -113,10 +113,12 @@ describe('getChannelEntries', () => {
     expect(result[1].date).toBe('2026-03-20');
   });
 
-  it('project channel matches case-insensitively', () => {
-    const result = getChannelEntries('tracker', entries, projects);
-    expect(result.length).toBe(1);
-    expect(result[0].text).toBe('Data export');
+  it('project channel matches entry.project case-insensitively', () => {
+    // Entry has project: 'Explorer' (capitalized), project slug is 'explorer'
+    const result = getChannelEntries('explorer', entries, projects);
+    expect(result.length).toBe(2);
+    expect(result[0].text).toBe('Dark mode map tiles');
+    expect(result[1].text).toBe('Offline route caching');
   });
 
   it('about: returns empty array', () => {

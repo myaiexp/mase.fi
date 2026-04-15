@@ -29,14 +29,16 @@ export function matchChannels(channelIds, needle) {
  * Apply <mark class="search-highlight"> to characters matching ranges in a text node.
  * Returns an array of nodes (text + mark) to replace the original text node.
  * @param {string} text
- * @param {number[][]} ranges - array of [start, end] pairs (end exclusive)
+ * @param {number[]} ranges - flat array of [start0, end0, start1, end1, ...] pairs
  * @returns {Node[]}
  */
 function applyRanges(text, ranges) {
   const nodes = [];
   let cursor = 0;
 
-  for (const [start, end] of ranges) {
+  for (let i = 0; i < ranges.length; i += 2) {
+    const start = ranges[i];
+    const end = ranges[i + 1];
     if (start > cursor) {
       nodes.push(document.createTextNode(text.slice(cursor, start)));
     }
@@ -93,7 +95,7 @@ function applyHighlights(lineEls, needle) {
   if (idxs && info && order) {
     for (let rank = 0; rank < order.length; rank++) {
       const idx = idxs[order[rank]];
-      const ranges = info.ranges[rank]; // [start, end] pairs
+      const ranges = info.ranges[rank]; // flat [start0, end0, start1, end1, ...]
       rangeMap.set(idx, ranges);
     }
   }

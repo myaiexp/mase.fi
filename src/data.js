@@ -16,14 +16,14 @@ export function buildProjectMap(projects) {
 }
 
 /**
- * Get the most recent entry date for a project (by channel id).
- * Matches entry.project case-insensitively against project names.
+ * Get the most recent entry date for a project.
+ * Matches entry.project against project.slug (falls back to channel).
  */
 function getLastActivity(entries, project) {
-  const name = project.name.toLowerCase();
+  const slug = (project.slug || project.channel).toLowerCase();
   let latest = null;
   for (const e of entries) {
-    if (e.project?.toLowerCase() === name) {
+    if (e.project?.toLowerCase() === slug) {
       if (!latest || e.date > latest) latest = e.date;
     }
   }
@@ -34,7 +34,7 @@ function getLastActivity(entries, project) {
  * Check if a project has a category=project entry within the last 14 days.
  */
 function isNewProject(entries, project) {
-  const name = project.name.toLowerCase();
+  const slug = (project.slug || project.channel).toLowerCase();
   const cutoff = new Date();
   cutoff.setDate(cutoff.getDate() - 14);
   const cutoffISO = cutoff.toISOString().slice(0, 10);
@@ -42,7 +42,7 @@ function isNewProject(entries, project) {
   return entries.some(
     (e) =>
       e.category === 'project' &&
-      e.project?.toLowerCase() === name &&
+      e.project?.toLowerCase() === slug &&
       e.date >= cutoffISO,
   );
 }
@@ -102,11 +102,11 @@ export function getChannelEntries(channelId, entries, projects) {
     const project = projects.find((p) => p.channel === channelId);
     if (!project) return [];
 
-    const name = project.name.toLowerCase();
+    const slug = (project.slug || project.channel).toLowerCase();
     filtered = entries.filter(
       (e) =>
         (e.category === 'feature' || e.category === 'project') &&
-        e.project?.toLowerCase() === name,
+        e.project?.toLowerCase() === slug,
     );
   }
 

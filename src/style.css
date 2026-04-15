@@ -556,6 +556,7 @@ input {
     background: var(--bg-surface);
     border-bottom: 1px solid var(--border);
     order: -1;
+    position: relative;
   }
 
   .mobile-topbar__channel {
