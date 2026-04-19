@@ -20,16 +20,54 @@ describe('base-badge', () => {
     expect(slot).toBeTruthy();
   });
 
-  it('applies variant class for styling', () => {
-    const el = createBadge({ variant: 'success' });
+  it('defaults to tag (no dot)', () => {
+    const el = createBadge({ variant: 'feature' });
     const span = el.shadowRoot.querySelector('span');
-    expect(span.classList.contains('success')).toBe(true);
+    expect(span.classList.contains('dot')).toBe(false);
   });
 
-  it('custom color attribute overrides variant', () => {
-    const el = createBadge({ variant: 'success', color: '#e8a308' });
+  it('type="status" renders a dot', () => {
+    const el = createBadge({ type: 'status', variant: 'running' });
     const span = el.shadowRoot.querySelector('span');
-    expect(span.style.backgroundColor).toBe('rgb(232, 163, 8)');
+    expect(span.classList.contains('dot')).toBe(true);
+  });
+
+  it('type="tag" omits the dot', () => {
+    const el = createBadge({ type: 'tag', variant: 'feature' });
+    const span = el.shadowRoot.querySelector('span');
+    expect(span.classList.contains('dot')).toBe(false);
+  });
+
+  it('status variant sets --bb-color and 8% --bb-tint', () => {
+    const el = createBadge({ type: 'status', variant: 'running' });
+    expect(el.style.getPropertyValue('--bb-color')).toBe('var(--green)');
+    expect(el.style.getPropertyValue('--bb-tint')).toBe('8%');
+  });
+
+  it('tag variant resolves via the tag map', () => {
+    const el = createBadge({ type: 'tag', variant: 'feature' });
+    expect(el.style.getPropertyValue('--bb-color')).toBe('var(--blue)');
+    expect(el.style.getPropertyValue('--bb-tint')).toBe('8%');
+  });
+
+  it('idle uses 4% tint', () => {
+    const el = createBadge({ type: 'status', variant: 'idle' });
+    expect(el.style.getPropertyValue('--bb-tint')).toBe('4%');
+  });
+
+  it('chore uses 4% tint', () => {
+    const el = createBadge({ type: 'tag', variant: 'chore' });
+    expect(el.style.getPropertyValue('--bb-tint')).toBe('4%');
+  });
+
+  it('color attribute overrides variant and drives --bb-color', () => {
+    const el = createBadge({ variant: 'feature', color: '#e8a308' });
+    expect(el.style.getPropertyValue('--bb-color')).toBe('#e8a308');
+  });
+
+  it('unknown variant leaves badge uncolored', () => {
+    const el = createBadge({ variant: 'bogus' });
+    expect(el.style.getPropertyValue('--bb-color')).toBe('');
   });
 
   it('size="sm" applies smaller styling', () => {
@@ -38,12 +76,13 @@ describe('base-badge', () => {
     expect(span.classList.contains('sm')).toBe(true);
   });
 
-  it('variant change updates styling reactively', () => {
-    const el = createBadge({ variant: 'success' });
+  it('type change toggles the dot reactively', () => {
+    const el = createBadge({ type: 'tag', variant: 'feature' });
     const span = el.shadowRoot.querySelector('span');
-    expect(span.classList.contains('success')).toBe(true);
-    el.setAttribute('variant', 'danger');
-    expect(span.classList.contains('danger')).toBe(true);
-    expect(span.classList.contains('success')).toBe(false);
+    expect(span.classList.contains('dot')).toBe(false);
+    el.setAttribute('type', 'status');
+    el.setAttribute('variant', 'running');
+    expect(span.classList.contains('dot')).toBe(true);
+    expect(el.style.getPropertyValue('--bb-color')).toBe('var(--green)');
   });
 });
