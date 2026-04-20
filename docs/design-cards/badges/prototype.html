@@ -1,0 +1,282 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>badges · prototype</title>
+<link rel="stylesheet" href="src/base.css">
+<script type="module" src="src/components/badge.js"></script>
+<style>
+  body {
+    padding: 24px 28px 48px;
+    max-width: 760px;
+    color: var(--text);
+  }
+
+  h1 {
+    font-size: var(--text-md);
+    color: var(--text-dim);
+    font-weight: 500;
+    letter-spacing: 0.02em;
+    margin-bottom: 4px;
+  }
+
+  .lede {
+    color: var(--text-muted);
+    font-size: var(--text-sm);
+    margin-bottom: 32px;
+  }
+
+  section {
+    margin-bottom: 32px;
+  }
+
+  .recipe {
+    font-size: var(--text-xs);
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    margin-bottom: 8px;
+  }
+
+  h2 {
+    font-size: var(--text-base);
+    font-weight: 500;
+    color: var(--text);
+    margin-bottom: 2px;
+  }
+
+  .note {
+    color: var(--text-muted);
+    font-size: var(--text-sm);
+    margin-bottom: 14px;
+  }
+
+  .row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    align-items: center;
+    padding: 10px 0;
+  }
+
+  .row + .row {
+    border-top: 1px solid var(--border);
+  }
+
+  .row-label {
+    color: var(--text-muted);
+    font-size: var(--text-xs);
+    width: 72px;
+    flex-shrink: 0;
+  }
+
+  /* ===== Recipe C demo: card with metadata strip ===== */
+
+  .card {
+    background: var(--bg-surface);
+    padding: 10px 12px;
+    margin-bottom: 6px;
+  }
+
+  .card-title {
+    font-size: var(--text-base);
+    color: var(--text);
+    margin-bottom: 4px;
+  }
+
+  .card-meta {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-size: var(--text-sm);
+    color: var(--text-dim);
+  }
+
+  .card-meta .sep {
+    color: var(--text-muted);
+  }
+
+  /* Recipe C — inline dots on arbitrary parent. Same 6×6 square. */
+  .card-meta .running,
+  .card-meta .idle,
+  .card-meta .queued,
+  .card-meta .error {
+    display: inline-flex;
+    align-items: center;
+  }
+  .card-meta .running::before,
+  .card-meta .idle::before,
+  .card-meta .queued::before,
+  .card-meta .error::before {
+    content: "";
+    width: 6px;
+    height: 6px;
+    display: inline-block;
+    margin-right: 6px;
+  }
+  .card-meta .running::before { background: var(--green); }
+  .card-meta .idle::before    { background: var(--text-dim); }
+  .card-meta .queued::before  { background: var(--orange); }
+  .card-meta .error::before   { background: var(--red); }
+
+  .card-meta .running { color: var(--green); }
+  .card-meta .error   { color: var(--red); }
+  .card-meta .queued  { color: var(--orange); }
+</style>
+</head>
+<body>
+
+<h1>base-badge</h1>
+<p class="lede">Three recipes. Status (dot + tint), tag (tint), inline (dot on a row). Pick by role — don't mix.</p>
+
+<section>
+  <div class="recipe">Recipe A</div>
+  <h2>Status — live state</h2>
+  <p class="note">Dot carries the "changing" semantic. 8% tint on color (4% on neutral idle).</p>
+
+  <div class="row">
+    <span class="row-label">default</span>
+    <base-badge type="status" variant="running">running</base-badge>
+    <base-badge type="status" variant="idle">idle</base-badge>
+    <base-badge type="status" variant="queued">queued</base-badge>
+    <base-badge type="status" variant="error">failed</base-badge>
+  </div>
+
+  <div class="row">
+    <span class="row-label">size=sm</span>
+    <base-badge type="status" variant="running" size="sm">running</base-badge>
+    <base-badge type="status" variant="idle" size="sm">idle</base-badge>
+    <base-badge type="status" variant="queued" size="sm">queued</base-badge>
+    <base-badge type="status" variant="error" size="sm">failed</base-badge>
+  </div>
+
+  <div class="row">
+    <span class="row-label">in copy</span>
+    <span style="color: var(--text-dim); font-size: var(--text-sm);">
+      deploy finished —
+      <base-badge type="status" variant="running">running</base-badge>
+      on
+      <span style="color: var(--text);">helm</span>
+    </span>
+  </div>
+</section>
+
+<section>
+  <div class="recipe">Recipe B</div>
+  <h2>Tag — classification</h2>
+  <p class="note">No dot. Dots on static labels read as "something is happening" and mislead.</p>
+
+  <div class="row">
+    <span class="row-label">default</span>
+    <base-badge type="tag" variant="feature">feature</base-badge>
+    <base-badge type="tag" variant="security">security</base-badge>
+    <base-badge type="tag" variant="chore">chore</base-badge>
+  </div>
+
+  <div class="row">
+    <span class="row-label">size=sm</span>
+    <base-badge type="tag" variant="feature" size="sm">feature</base-badge>
+    <base-badge type="tag" variant="security" size="sm">security</base-badge>
+    <base-badge type="tag" variant="chore" size="sm">chore</base-badge>
+  </div>
+
+  <div class="row">
+    <span class="row-label">color=</span>
+    <base-badge type="tag" color="var(--accent)">accent</base-badge>
+    <base-badge type="tag" color="var(--cyan)">cyan</base-badge>
+    <base-badge type="tag" color="var(--purple)">purple</base-badge>
+    <base-badge type="tag" color="#e8a308">custom hex</base-badge>
+  </div>
+</section>
+
+<section>
+  <div class="recipe">Recipe C</div>
+  <h2>Inline — metadata strip</h2>
+  <p class="note">No chip. A 6×6 dot stuck into a row of dense metadata. Lives on arbitrary parents (<code>.card-meta</code>, etc.) — that's why it's not the <code>&lt;base-badge&gt;</code> element.</p>
+
+  <div class="card">
+    <div class="card-title">deploy helm / master</div>
+    <div class="card-meta">
+      <span>helm</span>
+      <span class="sep">·</span>
+      <span>02c0935</span>
+      <span class="sep">·</span>
+      <span class="running">running</span>
+      <span class="sep">·</span>
+      <span>17s</span>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-title">nightly summary</div>
+    <div class="card-meta">
+      <span>mase.fi</span>
+      <span class="sep">·</span>
+      <span>7d2e11a</span>
+      <span class="sep">·</span>
+      <span class="idle">idle</span>
+      <span class="sep">·</span>
+      <span>42m ago</span>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-title">audit · base-components</div>
+    <div class="card-meta">
+      <span>helm</span>
+      <span class="sep">·</span>
+      <span>a1b4c77</span>
+      <span class="sep">·</span>
+      <span class="error">error</span>
+      <span class="sep">·</span>
+      <span>exit 1</span>
+    </div>
+  </div>
+</section>
+
+<section>
+  <div class="recipe">Rules</div>
+  <h2>What not to do</h2>
+  <p class="note">These render so the contrast reads — each is wrong for a specific reason.</p>
+
+  <div class="row">
+    <span class="row-label">❌ border</span>
+    <span style="
+      display: inline-flex; align-items: center; height: 16px; padding: 0 6px;
+      font-size: var(--text-sm); font-weight: 500; color: var(--green);
+      border: 1px solid color-mix(in srgb, var(--green) 40%, transparent);
+      background: color-mix(in srgb, var(--green) 15%, transparent);
+    ">running</span>
+    <span style="color: var(--text-muted); font-size: var(--text-sm);">— competes with buttons</span>
+  </div>
+
+  <div class="row">
+    <span class="row-label">❌ dot on tag</span>
+    <base-badge type="status" variant="feature">feature</base-badge>
+    <span style="color: var(--text-muted); font-size: var(--text-sm);">— reads as live state</span>
+  </div>
+
+  <div class="row">
+    <span class="row-label">❌ weight 600</span>
+    <span style="
+      display: inline-flex; align-items: center; height: 16px; padding: 0 6px;
+      font-size: var(--text-sm); font-weight: 600; color: var(--blue);
+      background: color-mix(in srgb, var(--blue) 8%, transparent);
+    ">feature</span>
+    <span style="color: var(--text-muted); font-size: var(--text-sm);">— too heavy on a 16px chip</span>
+  </div>
+
+  <div class="row">
+    <span class="row-label">❌ radius</span>
+    <span style="
+      display: inline-flex; align-items: center; height: 16px; padding: 0 6px;
+      font-size: var(--text-sm); font-weight: 500; color: var(--blue);
+      background: color-mix(in srgb, var(--blue) 8%, transparent);
+      border-radius: 999px;
+    ">feature</span>
+    <span style="color: var(--text-muted); font-size: var(--text-sm);">— system is square</span>
+  </div>
+</section>
+
+</body>
+</html>
