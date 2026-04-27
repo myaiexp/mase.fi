@@ -1,0 +1,344 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>inputs · prototype</title>
+<link rel="stylesheet" href="src/base.css">
+<style>
+  /* ===== Spec implementation — what ships ===== */
+
+  /* Override base.css `.label` (which is a chip) for form-label role per spec. */
+  .label {
+    display: block;
+    padding: 0;
+    background: transparent;
+    font-size: var(--text-xs);
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: var(--text-muted);
+    margin-bottom: 4px;
+  }
+
+  .input {
+    display: block;
+    width: 100%;
+    height: 22px;
+    padding: 0 8px;
+    border: 1px solid var(--border);
+    background: var(--bg-raised);
+    color: var(--text);
+    font-family: var(--font);
+    font-size: var(--text-base);
+    line-height: 1;
+    outline: none;
+    transition: border-color var(--transition);
+  }
+  .input:focus { border-color: var(--accent); }
+  .input::placeholder { color: var(--text-muted); }
+  .input[disabled] { opacity: 0.5; cursor: not-allowed; }
+  .input[aria-invalid="true"] { border-color: var(--red); }
+
+  .textarea {
+    height: auto;
+    min-height: 60px;
+    padding: 6px 8px;
+    line-height: 1.4;
+    resize: vertical;
+  }
+
+  .helper {
+    font-size: var(--text-sm);
+    color: var(--text-muted);
+    margin-top: 4px;
+  }
+  .helper-error { color: var(--red); }
+
+  /* ===== Prototype chrome ===== */
+
+  body {
+    padding: 24px 28px 48px;
+    max-width: 760px;
+    color: var(--text);
+  }
+
+  h1 {
+    font-size: var(--text-md);
+    color: var(--text-dim);
+    font-weight: 500;
+    letter-spacing: 0.02em;
+    margin-bottom: 4px;
+  }
+
+  .lede {
+    color: var(--text-muted);
+    font-size: var(--text-sm);
+    margin-bottom: 32px;
+  }
+
+  section {
+    margin-bottom: 32px;
+  }
+
+  .section-tag {
+    font-size: var(--text-xs);
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    margin-bottom: 8px;
+  }
+
+  h2 {
+    font-size: var(--text-base);
+    font-weight: 500;
+    color: var(--text);
+    margin-bottom: 2px;
+  }
+
+  .note {
+    color: var(--text-muted);
+    font-size: var(--text-sm);
+    margin-bottom: 14px;
+  }
+
+  /* Field grid — labelled rows, two columns on wide */
+  .grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 16px 20px;
+  }
+  .grid-1 { grid-template-columns: 1fr; }
+
+  .field {
+    min-width: 0;
+  }
+
+  /* Inline row — input + button at matching 22px height */
+  .row {
+    display: flex;
+    align-items: stretch;
+    gap: 6px;
+  }
+  .row .input { flex: 1; }
+  .row .btn   { height: 22px; }
+
+  /* Anatomy callout — pin labels to the side */
+  .anatomy {
+    display: grid;
+    grid-template-columns: 90px 1fr;
+    gap: 10px 14px;
+    align-items: center;
+    padding: 14px 16px;
+    background: var(--bg-surface);
+    border: 1px solid var(--border);
+  }
+  .anatomy .row-label {
+    font-size: var(--text-xs);
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+  }
+
+  /* "What not to do" overrides — render the bad version inline */
+  .bad-glow {
+    box-shadow: 0 0 0 3px rgba(232, 163, 8, 0.25);
+    border-color: var(--accent) !important;
+  }
+  .bad-bg-error {
+    background: rgba(239, 68, 68, 0.12) !important;
+    border-color: var(--red) !important;
+  }
+  .bad-tall {
+    height: 32px !important;
+  }
+  .bad-rounded {
+    border-radius: 4px !important;
+  }
+
+  .bad-row {
+    display: grid;
+    grid-template-columns: 90px 1fr 1fr;
+    gap: 8px 14px;
+    align-items: center;
+    padding: 10px 0;
+  }
+  .bad-row + .bad-row { border-top: 1px solid var(--border); }
+  .bad-row .row-label {
+    color: var(--text-muted);
+    font-size: var(--text-xs);
+  }
+  .bad-row .why {
+    color: var(--text-muted);
+    font-size: var(--text-sm);
+  }
+</style>
+</head>
+<body>
+
+<h1>inputs &amp; labels</h1>
+<p class="lede">Single text input with three states. Height matches buttons (22px) so forms align in one row.</p>
+
+<section>
+  <div class="section-tag">Anatomy</div>
+  <h2>Label · input · helper</h2>
+  <p class="note">Three pieces, stacked. Label is micro-caps. Helper only appears when needed.</p>
+
+  <div class="anatomy">
+    <span class="row-label">label</span>
+    <label class="label" for="anat-1">Branch</label>
+
+    <span class="row-label">input</span>
+    <input class="input" id="anat-1" value="helm/new-feature">
+
+    <span class="row-label">helper</span>
+    <div class="helper">Used as the working tree branch name.</div>
+  </div>
+</section>
+
+<section>
+  <div class="section-tag">States</div>
+  <h2>Empty · filled · focus · disabled · invalid</h2>
+  <p class="note">Border carries every state. No glow, no bg shift, no shake.</p>
+
+  <div class="grid">
+    <div class="field">
+      <label class="label" for="s-empty">Empty</label>
+      <input class="input" id="s-empty" placeholder="branch name">
+    </div>
+
+    <div class="field">
+      <label class="label" for="s-filled">Filled</label>
+      <input class="input" id="s-filled" value="helm/design-inputs">
+    </div>
+
+    <div class="field">
+      <label class="label" for="s-focus">Focus (click in)</label>
+      <input class="input" id="s-focus" value="helm/design-inputs" autofocus>
+    </div>
+
+    <div class="field">
+      <label class="label" for="s-disabled">Disabled</label>
+      <input class="input" id="s-disabled" value="readonly value" disabled>
+    </div>
+
+    <div class="field" style="grid-column: 1 / -1;">
+      <label class="label" for="s-invalid">Invalid</label>
+      <input class="input" id="s-invalid" value="not-a-real-project" aria-invalid="true">
+      <div class="helper helper-error">Project does not exist.</div>
+    </div>
+  </div>
+</section>
+
+<section>
+  <div class="section-tag">Textarea</div>
+  <h2>Multi-line variant</h2>
+  <p class="note">Same border, same focus rule. Auto height, vertical resize, 1.4 line-height for readability.</p>
+
+  <div class="grid grid-1">
+    <div class="field">
+      <label class="label" for="ta-prompt">Prompt</label>
+      <textarea class="input textarea" id="ta-prompt">Investigate the failing test in src/components/select.test.js — it passes locally but fails in CI on the merge from helm/design-inputs.</textarea>
+      <div class="helper">Sent verbatim to the agent. Markdown is rendered.</div>
+    </div>
+  </div>
+</section>
+
+<section>
+  <div class="section-tag">Composition</div>
+  <h2>Inline with buttons</h2>
+  <p class="note">Input + button in one row — both 22px, no jump, no baseline drift. This is the reason for the height rule.</p>
+
+  <div class="grid grid-1" style="max-width: 480px;">
+    <div class="field">
+      <label class="label" for="row-branch">Create worktree</label>
+      <div class="row">
+        <input class="input" id="row-branch" value="helm/design-inputs">
+        <button class="btn">Create</button>
+      </div>
+    </div>
+
+    <div class="field">
+      <label class="label" for="row-name">Project name</label>
+      <div class="row">
+        <input class="input" id="row-name" placeholder="my-app">
+        <button class="btn btn-primary">Add</button>
+        <button class="btn">Cancel</button>
+      </div>
+      <div class="helper">Lowercase, hyphenated. Becomes the channel slug.</div>
+    </div>
+  </div>
+</section>
+
+<section>
+  <div class="section-tag">Form</div>
+  <h2>Full example</h2>
+  <p class="note">Realistic field stack — labels, helper text, one error.</p>
+
+  <div style="padding: 16px 18px; background: var(--bg-surface); border: 1px solid var(--border); max-width: 480px;">
+    <div class="field" style="margin-bottom: 14px;">
+      <label class="label" for="f-name">Project name</label>
+      <input class="input" id="f-name" value="kelo">
+    </div>
+
+    <div class="field" style="margin-bottom: 14px;">
+      <label class="label" for="f-channel">Channel slug</label>
+      <input class="input" id="f-channel" value="kelo">
+      <div class="helper">Used in the URL hash, e.g. <code>#/kelo</code>.</div>
+    </div>
+
+    <div class="field" style="margin-bottom: 14px;">
+      <label class="label" for="f-repo">Repo URL</label>
+      <input class="input" id="f-repo" value="https://github.com/mase/not-a-real-project" aria-invalid="true">
+      <div class="helper helper-error">Repository not reachable (404).</div>
+    </div>
+
+    <div class="field" style="margin-bottom: 16px;">
+      <label class="label" for="f-desc">Description</label>
+      <textarea class="input textarea" id="f-desc">Persistent AI agent — semantic memory, health monitoring, autonomous dispatch.</textarea>
+    </div>
+
+    <div class="row" style="justify-content: flex-end;">
+      <button class="btn">Cancel</button>
+      <button class="btn btn-primary">Save project</button>
+    </div>
+  </div>
+</section>
+
+<section>
+  <div class="section-tag">Rules</div>
+  <h2>What not to do</h2>
+  <p class="note">Each example renders the wrong version next to the rule it violates.</p>
+
+  <div class="bad-row">
+    <span class="row-label">❌ glow</span>
+    <input class="input bad-glow" value="helm/new-feature">
+    <span class="why">Border shift is enough. Glow competes with focus rings elsewhere.</span>
+  </div>
+
+  <div class="bad-row">
+    <span class="row-label">❌ red bg</span>
+    <input class="input bad-bg-error" value="not-a-real-project">
+    <span class="why">Invalid is a border + helper. Tinted bg reads like a destructive action.</span>
+  </div>
+
+  <div class="bad-row">
+    <span class="row-label">❌ tall</span>
+    <input class="input bad-tall" value="helm/new-feature">
+    <span class="why">32px breaks alignment with 22px buttons in the same row.</span>
+  </div>
+
+  <div class="bad-row">
+    <span class="row-label">❌ rounded</span>
+    <input class="input bad-rounded" value="helm/new-feature">
+    <span class="why">System is square. Rounded corners read as "from another design system."</span>
+  </div>
+
+  <div class="bad-row">
+    <span class="row-label">❌ no label</span>
+    <input class="input" placeholder="Branch">
+    <span class="why">Placeholder ≠ label. It vanishes the moment a value is typed.</span>
+  </div>
+</section>
+
+</body>
+</html>
