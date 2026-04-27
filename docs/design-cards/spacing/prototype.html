@@ -1,0 +1,537 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>spacing · prototype</title>
+<link rel="stylesheet" href="src/base.css">
+<style>
+  body {
+    padding: var(--space-6) 28px 48px;
+    max-width: 760px;
+    color: var(--text);
+  }
+
+  h1 {
+    font-size: var(--text-md);
+    color: var(--text-dim);
+    font-weight: 500;
+    letter-spacing: 0.02em;
+    margin-bottom: var(--space-2);
+  }
+
+  .lede {
+    color: var(--text-muted);
+    font-size: var(--text-sm);
+    margin-bottom: 32px;
+  }
+  .lede code {
+    background: transparent;
+    color: var(--text-dim);
+    padding: 0;
+  }
+
+  section {
+    margin-bottom: 32px;
+  }
+
+  .eyebrow {
+    font-size: var(--text-xs);
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    margin-bottom: var(--space-3);
+  }
+
+  h2 {
+    font-size: var(--text-base);
+    font-weight: 500;
+    color: var(--text);
+    margin-bottom: var(--space-1);
+  }
+
+  .note {
+    color: var(--text-muted);
+    font-size: var(--text-sm);
+    margin-bottom: 14px;
+  }
+
+  /* ========== The scale ========== */
+
+  .scale {
+    display: grid;
+    grid-template-columns: 90px 40px auto 1fr;
+    align-items: center;
+    row-gap: var(--space-3);
+    column-gap: var(--space-4);
+    font-size: var(--text-sm);
+  }
+  .scale .token {
+    color: var(--accent);
+    font-size: var(--text-xs);
+  }
+  .scale .px {
+    color: var(--text);
+    font-variant-numeric: tabular-nums;
+  }
+  .scale .bar {
+    height: 14px;
+    background: color-mix(in srgb, var(--accent) 50%, transparent);
+    border-right: 1px solid var(--accent);
+  }
+  .scale .use {
+    color: var(--text-dim);
+    font-size: var(--text-xs);
+  }
+
+  /* ========== Each step in context ========== */
+
+  .uses {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-5);
+  }
+  .use-row {
+    display: grid;
+    grid-template-columns: 90px 1fr;
+    column-gap: var(--space-4);
+    align-items: start;
+  }
+  .use-meta {
+    font-size: var(--text-xs);
+    color: var(--text-muted);
+    line-height: 1.5;
+  }
+  .use-meta .step {
+    display: block;
+    color: var(--accent);
+    font-size: var(--text-md);
+    font-weight: 500;
+    line-height: 1.1;
+    margin-bottom: var(--space-1);
+  }
+  .use-meta .tok {
+    display: block;
+    color: var(--text-dim);
+    font-size: var(--text-xs);
+  }
+  .use-meta .why {
+    display: block;
+    margin-top: var(--space-2);
+    color: var(--text-muted);
+  }
+  .use-demo {
+    background: var(--bg-surface);
+    padding: var(--space-4);
+    position: relative;
+  }
+  .flag {
+    display: inline-block;
+    background: color-mix(in srgb, var(--accent) 14%, transparent);
+    color: var(--accent);
+    padding: 0 var(--space-2);
+    font-size: var(--text-xs);
+    margin-left: var(--space-2);
+    vertical-align: middle;
+  }
+
+  /* 2px — intra-row */
+  .demo-card-title {
+    font-size: var(--text-base);
+    color: var(--text);
+  }
+  .demo-card-meta {
+    margin-top: var(--space-1);
+    font-size: var(--text-sm);
+    color: var(--text-dim);
+  }
+
+  /* 4px — inline siblings */
+  .demo-inline {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--space-2);
+    font-size: var(--text-sm);
+    color: var(--text-dim);
+  }
+  .demo-inline .sep { color: var(--text-muted); }
+  .demo-inline .dot {
+    width: 6px; height: 6px;
+    background: var(--green);
+    display: inline-block;
+  }
+  .demo-inline .running { color: var(--green); }
+
+  /* 8px — compact row padding */
+  .demo-list {
+    display: flex;
+    flex-direction: column;
+    gap: 1px;
+    background: var(--border);
+  }
+  .demo-list .item {
+    background: var(--bg-raised);
+    padding: var(--space-3);
+    font-size: var(--text-sm);
+    color: var(--text-dim);
+    display: flex;
+    justify-content: space-between;
+  }
+  .demo-list .item code {
+    background: transparent;
+    color: var(--text-muted);
+    padding: 0;
+  }
+
+  /* 12px — section padding */
+  .demo-panel {
+    background: var(--bg-raised);
+    padding: var(--space-4);
+  }
+  .demo-panel-title {
+    font-size: var(--text-xs);
+    text-transform: uppercase;
+    color: var(--text-muted);
+    letter-spacing: 0.04em;
+    margin-bottom: var(--space-2);
+  }
+  .demo-panel-body {
+    font-size: var(--text-sm);
+    color: var(--text-dim);
+  }
+
+  /* 16px — pane padding & between groups */
+  .demo-pane {
+    background: var(--bg-raised);
+    padding: var(--space-5);
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-5);
+  }
+  .demo-pane .group {
+    font-size: var(--text-sm);
+    color: var(--text-dim);
+  }
+  .demo-pane .group .h {
+    color: var(--text-muted);
+    text-transform: uppercase;
+    font-size: var(--text-xs);
+    letter-spacing: 0.04em;
+    margin-bottom: var(--space-2);
+  }
+
+  /* 24px — landmarks */
+  .demo-landmarks {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-6);
+    background: var(--bg-surface);
+    padding: var(--space-4);
+  }
+  .demo-landmarks .land h4 {
+    font-size: var(--text-base);
+    color: var(--text);
+    font-weight: 500;
+    margin-bottom: var(--space-2);
+  }
+  .demo-landmarks .land p {
+    font-size: var(--text-sm);
+    color: var(--text-dim);
+  }
+
+  /* ========== Rules ========== */
+
+  .rule {
+    margin-bottom: var(--space-4);
+  }
+  .rule-pair {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: var(--space-4);
+  }
+  .rule-pair > div {
+    background: var(--bg-surface);
+    padding: var(--space-4);
+  }
+  .rule-pair .head {
+    display: block;
+    font-size: var(--text-xs);
+    margin-bottom: var(--space-3);
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+  }
+  .rule-pair .ok .head { color: var(--green); }
+  .rule-pair .bad .head { color: var(--red); }
+  .rule-pair .caption {
+    margin-top: var(--space-3);
+    font-size: var(--text-xs);
+    color: var(--text-muted);
+  }
+
+  .stack-gap {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-3);
+  }
+  .stack-margin > div {
+    margin-bottom: var(--space-3);
+  }
+  .stack-item {
+    background: var(--bg-raised);
+    padding: var(--space-2) var(--space-3);
+    font-size: var(--text-sm);
+    color: var(--text-dim);
+  }
+
+  .swatches {
+    display: flex;
+    align-items: flex-end;
+    gap: var(--space-3);
+  }
+  .sw {
+    background: var(--bg-raised);
+    text-align: center;
+    font-size: var(--text-xs);
+    color: var(--text);
+    padding-top: var(--space-1);
+    font-variant-numeric: tabular-nums;
+  }
+  .sw.invalid {
+    background: color-mix(in srgb, var(--red) 18%, var(--bg-raised));
+    color: var(--red);
+  }
+</style>
+</head>
+<body>
+
+<h1>spacing</h1>
+<p class="lede">Six steps. 2 → 4 → 8 → 12 → 16 → 24. Use tokens, not raw px. Use <code>gap</code>, not <code>margin</code>.</p>
+
+<section>
+  <div class="eyebrow">The scale</div>
+  <h2>Six steps</h2>
+  <p class="note">Doubling at the small end (2 / 4 / 8) for compact details. Tighter at the layout end (12 / 16 / 24) for density.</p>
+
+  <div class="scale">
+    <span class="token">--space-1</span>
+    <span class="px">2px</span>
+    <span class="bar" style="width: 2px;"></span>
+    <span class="use">intra-row</span>
+
+    <span class="token">--space-2</span>
+    <span class="px">4px</span>
+    <span class="bar" style="width: 4px;"></span>
+    <span class="use">siblings</span>
+
+    <span class="token">--space-3</span>
+    <span class="px">8px</span>
+    <span class="bar" style="width: 8px;"></span>
+    <span class="use">compact padding</span>
+
+    <span class="token">--space-4</span>
+    <span class="px">12px</span>
+    <span class="bar" style="width: 12px;"></span>
+    <span class="use">section padding</span>
+
+    <span class="token">--space-5</span>
+    <span class="px">16px</span>
+    <span class="bar" style="width: 16px;"></span>
+    <span class="use">pane padding</span>
+
+    <span class="token">--space-6</span>
+    <span class="px">24px</span>
+    <span class="bar" style="width: 24px;"></span>
+    <span class="use">landmarks</span>
+  </div>
+</section>
+
+<section>
+  <div class="eyebrow">Each step in context</div>
+  <h2>Where each step belongs</h2>
+  <p class="note">One vignette per step, demonstrating the use case it documents. The amber tag marks where the gap lives.</p>
+
+  <div class="uses">
+
+    <div class="use-row">
+      <div class="use-meta">
+        <span class="step">2px</span>
+        <span class="tok">--space-1</span>
+        <span class="why">title → meta inside a card</span>
+      </div>
+      <div class="use-demo">
+        <div class="demo-card-title">deploy helm / master <span class="flag">↓ 2px</span></div>
+        <div class="demo-card-meta">02c0935 · 17s</div>
+      </div>
+    </div>
+
+    <div class="use-row">
+      <div class="use-meta">
+        <span class="step">4px</span>
+        <span class="tok">--space-2</span>
+        <span class="why">inline siblings on a row</span>
+      </div>
+      <div class="use-demo">
+        <span class="demo-inline">
+          <span class="dot"></span>
+          <span class="running">running</span>
+          <span class="sep">·</span>
+          <span>helm</span>
+          <span class="sep">·</span>
+          <span>02c0935</span>
+          <span class="sep">·</span>
+          <span>17s</span>
+        </span>
+        <span class="flag">↔ 4px</span>
+      </div>
+    </div>
+
+    <div class="use-row">
+      <div class="use-meta">
+        <span class="step">8px</span>
+        <span class="tok">--space-3</span>
+        <span class="why">compact row padding</span>
+      </div>
+      <div class="use-demo">
+        <div class="demo-list">
+          <div class="item"><span>nightly summary</span><code>42m</code></div>
+          <div class="item"><span>audit · base-components</span><code>1h</code></div>
+          <div class="item"><span>deploy helm / master</span><code>17s</code></div>
+        </div>
+        <div style="margin-top: var(--space-2); font-size: var(--text-xs); color: var(--text-muted);">8px on every side of each row <span class="flag">⛶ 8px</span></div>
+      </div>
+    </div>
+
+    <div class="use-row">
+      <div class="use-meta">
+        <span class="step">12px</span>
+        <span class="tok">--space-4</span>
+        <span class="why">section padding inside a panel</span>
+      </div>
+      <div class="use-demo">
+        <div class="demo-panel">
+          <div class="demo-panel-title">recent</div>
+          <div class="demo-panel-body">modal body, card grid section, panel block <span class="flag">⛶ 12px</span></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="use-row">
+      <div class="use-meta">
+        <span class="step">16px</span>
+        <span class="tok">--space-5</span>
+        <span class="why">pane padding · between grouped lists</span>
+      </div>
+      <div class="use-demo">
+        <div class="demo-pane">
+          <div class="group">
+            <div class="h">activity</div>
+            <div>commit · commit · commit</div>
+          </div>
+          <div class="group">
+            <div class="h">deploys</div>
+            <div>mase.fi · helm</div>
+          </div>
+        </div>
+        <div style="margin-top: var(--space-2); font-size: var(--text-xs); color: var(--text-muted);">⛶ 16px pane padding · ↕ 16px between groups</div>
+      </div>
+    </div>
+
+    <div class="use-row">
+      <div class="use-meta">
+        <span class="step">24px</span>
+        <span class="tok">--space-6</span>
+        <span class="why">between top-level landmarks</span>
+      </div>
+      <div class="use-demo">
+        <div class="demo-landmarks">
+          <div class="land">
+            <h4>spacing</h4>
+            <p>Six-step scale. Doubling with a 2px seed.</p>
+          </div>
+          <div class="land">
+            <h4>scale</h4>
+            <p>2 → 4 → 8 → 12 → 16 → 24</p>
+          </div>
+        </div>
+        <div style="margin-top: var(--space-2); font-size: var(--text-xs); color: var(--text-muted);">↕ 24px between header group and content group</div>
+      </div>
+    </div>
+
+  </div>
+</section>
+
+<section>
+  <div class="eyebrow">Rules in action</div>
+  <h2>Three contrasts</h2>
+  <p class="note">The scale is opinionated. These are the most common ways it gets broken.</p>
+
+  <div class="rule">
+    <div class="rule-pair">
+      <div class="ok">
+        <span class="head">✓ gap</span>
+        <div class="stack-gap">
+          <div class="stack-item">item</div>
+          <div class="stack-item">item</div>
+          <div class="stack-item">item</div>
+        </div>
+        <p class="caption">Composable. Predictable. One source of truth on the parent.</p>
+      </div>
+      <div class="bad">
+        <span class="head">✗ margin</span>
+        <div class="stack-margin">
+          <div class="stack-item">item</div>
+          <div class="stack-item">item</div>
+          <div class="stack-item">item</div>
+        </div>
+        <p class="caption">Last item leaves trailing space. Margins collapse unpredictably.</p>
+      </div>
+    </div>
+  </div>
+
+  <div class="rule">
+    <div class="rule-pair">
+      <div class="ok">
+        <span class="head">✓ pick a side</span>
+        <div class="swatches">
+          <div class="sw" style="width: 16px; height: 36px;">16</div>
+          <div class="sw" style="width: 24px; height: 36px;">24</div>
+        </div>
+        <p class="caption">No values between 16 and 24. The gap is the choice.</p>
+      </div>
+      <div class="bad">
+        <span class="head">✗ 20 in the middle</span>
+        <div class="swatches">
+          <div class="sw" style="width: 16px; height: 36px;">16</div>
+          <div class="sw invalid" style="width: 20px; height: 36px;">20</div>
+          <div class="sw" style="width: 24px; height: 36px;">24</div>
+        </div>
+        <p class="caption">If 20 looks right, you're over-padding one element. Restructure.</p>
+      </div>
+    </div>
+  </div>
+
+  <div class="rule">
+    <div class="rule-pair">
+      <div class="ok">
+        <span class="head">✓ adjacent steps</span>
+        <div class="swatches">
+          <div class="sw" style="width: 4px; height: 36px;">4</div>
+          <div class="sw" style="width: 8px; height: 36px;">8</div>
+        </div>
+        <p class="caption">One step per jump. The scale handles the rhythm.</p>
+      </div>
+      <div class="bad">
+        <span class="head">✗ inventing in-between</span>
+        <div class="swatches">
+          <div class="sw" style="width: 4px; height: 36px;">4</div>
+          <div class="sw invalid" style="width: 6px; height: 36px;">6</div>
+          <div class="sw" style="width: 8px; height: 36px;">8</div>
+        </div>
+        <p class="caption">"Too tight at 4, too loose at 8" → fix layout, not the gap.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+</body>
+</html>
