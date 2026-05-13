@@ -48,7 +48,15 @@
   }
   .sidebar { display: none; }
   .tabbar { display: flex; }
-  .pane { grid-column: 1; grid-row: 1; }
+  .pane {
+    grid-column: 1; grid-row: 1;
+    /* Pin the pane's implicit single column to the grid cell width.
+       Without this, the column defaults to `auto` and sizes to the
+       max-content of its descendants — at narrow widths a nowrap
+       topic-bar or a long feed-row .msg pushes the column past the
+       viewport, taking the feed with it. */
+    grid-template-columns: minmax(0, 1fr);
+  }
   .statusbar {
     grid-column: 1;
     grid-row: 2;
@@ -56,7 +64,26 @@
   }
   .statusbar-who { display: none; }
   .pinned { padding: 10px 12px 4px; }
-  .topic-bar { padding: 10px 14px; }
+
+  /* Topic bar: keep it to a single row. The description truncates with
+     an ellipsis, the msg count stays right-aligned, and the read-only
+     pill is dropped — at 390px the channel hash + topic are what matter. */
+  .topic-bar {
+    padding: 10px 14px;
+    flex-wrap: nowrap;
+    gap: 8px;
+  }
+  .topic-bar > * { min-width: 0; }
+  .topic-hash, .topic-sep, .topic-meta { flex: 0 0 auto; white-space: nowrap; }
+  .topic-text {
+    flex: 1 1 auto;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .topic-spacer { display: none; }
+  .topic-meta .mode { display: none; }
+
   .feed { padding: 6px 14px 14px; }
   .cmd { padding: 10px 14px; }
   .feed-row, .feed-day {
