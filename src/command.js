@@ -144,33 +144,61 @@ function lastActivity(id) {
   return Math.round(mins / 1440) + 'd';
 }
 
+// Walk text nodes inside an element and wrap substring matches with <mark>.
+// Operates per text node so we never touch element boundaries (pretext line
+// spans, .proj-pill, .star). Cross-line matches simply won't highlight — both
+// pretext and word search break at word boundaries, so this is rare.
+function highlightTextNodes(root, needle) {
+  const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
+  const targets = [];
+  for (let n = walker.nextNode(); n; n = walker.nextNode()) {
+    if (n.nodeValue.toLowerCase().includes(needle)) targets.push(n);
+  }
+  for (const node of targets) {
+    const text = node.nodeValue;
+    const lc = text.toLowerCase();
+    const frag = document.createDocumentFragment();
+    let i = 0;
+    while (i < text.length) {
+      const hit = lc.indexOf(needle, i);
+      if (hit < 0) { frag.appendChild(document.createTextNode(text.slice(i))); break; }
+      if (hit > i) frag.appendChild(document.createTextNode(text.slice(i, hit)));
+      const m = document.createElement('mark');
+      m.textContent = text.slice(hit, hit + needle.length);
+      frag.appendChild(m);
+      i = hit + needle.length;
+    }
+    node.parentNode.replaceChild(frag, node);
+  }
+}
+
+// Remove any <mark> wrappers and merge their text back into adjacent nodes.
+function clearMarks(root) {
+  const marks = root.querySelectorAll('mark');
+  for (const m of marks) {
+    const text = document.createTextNode(m.textContent);
+    m.parentNode.replaceChild(text, m);
+  }
+  // Normalize merges adjacent text nodes so future searches see one node per run.
+  root.normalize();
+}
+
 function applySearch(q) {
   searchTerm = q.toLowerCase();
+  const needle = searchTerm;
   $feed.querySelectorAll('.feed-row').forEach(row => {
     const msg = row.querySelector('.msg');
-    if (!msg) return; // defensive: skip rows without .msg
-    const raw = msg.dataset.raw || (msg.dataset.raw = msg.textContent);
-    if (!q) {
-      msg.innerHTML = msg.dataset.html || escapeHtml(raw);
+    if (!msg) return;
+    clearMarks(msg);
+    if (!needle) {
       row.classList.remove('search-dim');
       return;
     }
-    if (!msg.dataset.html) msg.dataset.html = msg.innerHTML;
-    const lc = raw.toLowerCase();
-    if (lc.includes(searchTerm)) {
-      const parts = [];
-      let i = 0;
-      while (i < raw.length) {
-        const hit = lc.indexOf(searchTerm, i);
-        if (hit < 0) { parts.push(escapeHtml(raw.slice(i))); break; }
-        parts.push(escapeHtml(raw.slice(i, hit)));
-        parts.push(`<mark>${escapeHtml(raw.slice(hit, hit + searchTerm.length))}</mark>`);
-        i = hit + searchTerm.length;
-      }
-      msg.innerHTML = parts.join('');
+    const raw = (row.dataset.raw || '').toLowerCase();
+    if (raw.includes(needle)) {
+      highlightTextNodes(msg, needle);
       row.classList.remove('search-dim');
     } else {
-      msg.innerHTML = msg.dataset.html;
       row.classList.add('search-dim');
     }
   });
@@ -196,6 +224,12 @@ export function initCommand(data) {
   $cmdHint   = document.getElementById('cmd-hint');
   $cmdCC     = document.getElementById('cmd-complete');
   $feed      = document.getElementById('feed');
+
+  // Feed re-lays itself out on resize or channel switch; if a search is
+  // active, the highlights are gone from the freshly-laid DOM, so re-apply.
+  $feed.addEventListener('feed:relayout', () => {
+    if (searchTerm) applySearch(searchTerm);
+  });
 
   $cmdInput.addEventListener('input', updateMode);
   $cmdInput.addEventListener('keydown', e => {

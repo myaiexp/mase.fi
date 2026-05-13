@@ -75,16 +75,17 @@
 .feed-row .nick::after  { content: ">"; color: var(--faint); font-weight: 400; }
 .feed-row .msg {
   color: var(--text);
-  text-wrap: pretty;
   min-width: 0;
+  /* Pretext lays out lines manually as <span class="line"> children;
+     overflow: hidden guards against sub-pixel measurement rounding
+     that could push a line past the column edge by ≤1px. */
+  overflow: hidden;
 }
+.feed-row .msg .line { display: block; white-space: nowrap; }
+.feed-row .star { color: var(--accent); }
 .feed-row.cat-log .msg    { color: var(--dim); }
 .feed-row.cat-daily .msg  { color: var(--text); }
 .feed-row.cat-feature .msg { color: var(--text); }
-.feed-row.cat-feature .msg::before {
-  content: "★ ";
-  color: var(--accent);
-}
 .feed-row .proj-pill {
   color: var(--ch-accent);
   border-bottom: 1px dashed color-mix(in oklab, var(--ch-accent) 40%, transparent);

@@ -1,15 +1,16 @@
 // Feed rendering — day separators, IRC-style rows, with modem-jitter arrival
 import { entriesFor } from './data.js';
 import { playJitter, clearJitter } from './jitter.js';
+import { relayoutAll } from './feed-layout.js';
 
 export { clearJitter };
 
 const MAX_JITTER = 14;
 
-// Local duplicate (avoids a util module for one tiny function)
-function escapeHtml(s) {
-  return String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
-}
+// Track ResizeObserver so we only attach it once across re-renders.
+let _resizeObs = null;
+let _resizeRaf = 0;
+let _lastMsgWidth = 0;
 
 function nickColor(nick) {
   const palette = ['#e8a308', '#ffbe2a', '#f59e0b', '#eab308', '#a16207', '#fcd34d', '#fbbf24'];
@@ -29,15 +30,25 @@ function dayLabel(date) {
   return d;
 }
 
-function feedRowHTML(e, ch) {
+function populateRow(row, e, ch) {
   const time = e.date.slice(11, 16);
   const nickC = nickColor(e.nick);
-  const projPill = ch === 'activity' && e.project
-    ? '<span class="proj-pill">#' + e.project + '</span>'
-    : '';
-  return '<div class="ts">' + time + '</div>' +
-    '<div class="nick" style="--nick-color:' + nickC + '">' + e.nick + '</div>' +
-    '<div class="msg">' + projPill + escapeHtml(e.text) + '</div>';
+
+  const ts = document.createElement('div');
+  ts.className = 'ts';
+  ts.textContent = time;
+
+  const nick = document.createElement('div');
+  nick.className = 'nick';
+  nick.style.setProperty('--nick-color', nickC);
+  nick.textContent = e.nick;
+
+  const msg = document.createElement('div');
+  msg.className = 'msg';
+
+  row.replaceChildren(ts, nick, msg);
+  row.dataset.raw = e.text;
+  if (ch === 'activity' && e.project) row.dataset.project = e.project;
 }
 
 /** Render the feed for the given channel. Replaces #feed content. */
@@ -62,16 +73,46 @@ export function renderFeed(id, data, { immediate = false } = {}) {
     }
     const row = document.createElement('div');
     row.className = 'feed-row cat-' + e.cat;
-    // feedRowHTML returns HTML with user text escaped via escapeHtml
-    row.innerHTML = feedRowHTML(e, id);
+    populateRow(row, e, id);
     frag.appendChild(row);
     rowEls.push({ row, entry: e });
   });
-  $feed.innerHTML = '';
-  $feed.appendChild(frag);
+  $feed.replaceChildren(frag);
+
+  // Pretext lays out each .msg into <span class="line"> children.
+  // Must run after rows are in the DOM so .msg has a measurable width.
+  relayoutAll($feed);
+  ensureResizeObserver($feed);
+  $feed.dispatchEvent(new CustomEvent('feed:relayout'));
+
   $feed.scrollTop = $feed.scrollHeight;
 
   if (immediate || matchMedia('(prefers-reduced-motion: reduce)').matches) return;
   const tail = rowEls.slice(-MAX_JITTER);
   playJitter(tail);
+}
+
+// Re-lay out feed rows when the available .msg column width changes (e.g. the
+// pane reflowed on viewport resize). One observer per feed element — installed
+// lazily on first render. rAF-debounced so we don't thrash during drag-resize.
+function ensureResizeObserver($feed) {
+  if (_resizeObs) return;
+  // Seed with the post-initial-layout width so the observer's first auto-fire
+  // doesn't trigger a redundant relayout right after renderFeed finishes.
+  const seedProbe = $feed.querySelector('.feed-row .msg');
+  _lastMsgWidth = seedProbe ? seedProbe.getBoundingClientRect().width : 0;
+  _resizeObs = new ResizeObserver(() => {
+    if (_resizeRaf) return;
+    _resizeRaf = requestAnimationFrame(() => {
+      _resizeRaf = 0;
+      const probe = $feed.querySelector('.feed-row .msg');
+      const w = probe ? probe.getBoundingClientRect().width : 0;
+      if (!w || w === _lastMsgWidth) return;
+      _lastMsgWidth = w;
+      relayoutAll($feed);
+      // Notify listeners (e.g. command.js search) so they can re-decorate.
+      $feed.dispatchEvent(new CustomEvent('feed:relayout'));
+    });
+  });
+  _resizeObs.observe($feed);
 }

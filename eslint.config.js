@@ -36,6 +36,7 @@ export default [
         CustomEvent: 'readonly',
         customElements: 'readonly',
         HTMLHRElement: 'readonly',
+        NodeFilter: 'readonly',
       },
     },
   },

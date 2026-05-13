@@ -20,7 +20,7 @@
     "vitest": "^4.1.0"
   },
   "dependencies": {
-    "@chenglou/pretext": "^0.0.5",
+    "@chenglou/pretext": "^0.0.7",
     "@leeoniya/ufuzzy": "^1.0.19",
     "animejs": "^4.3.6"
   }
