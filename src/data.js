@@ -31,17 +31,20 @@ export async function fetchData() {
     if (slug) slugToChannel.set(slug, p.channel);
   }
 
-  // last-30d counts for heat
+  // last-30d counts for heat, and per-project most-recent activity timestamp
+  // for the sidebar's recency sort.
   const now = Date.now();
   const cutoff = now - 30 * 86400000;
   const counts = new Map();
+  const lastActivity = new Map();
   for (const e of rawEntries) {
     if (!e.project) continue;
     if (e.category !== 'log' && e.category !== 'feature') continue;
     const t = Date.parse(e.date);
-    if (!Number.isFinite(t) || t < cutoff) continue;
+    if (!Number.isFinite(t)) continue;
     const slug = e.project.toLowerCase();
-    counts.set(slug, (counts.get(slug) || 0) + 1);
+    if (t >= cutoff) counts.set(slug, (counts.get(slug) || 0) + 1);
+    if (t > (lastActivity.get(slug) || 0)) lastActivity.set(slug, t);
   }
   const maxCount = Math.max(1, ...counts.values());
 
@@ -66,8 +69,13 @@ export async function fetchData() {
       url: p.url || '',
       links,
       heat,
+      lastActivity: lastActivity.get(slug) || 0,
     };
   });
+  // Sort by most-recently-active first. The sidebar projects group, the
+  // mobile tabbar's "first 4", and any other order-sensitive consumer all
+  // see the same recency order.
+  projects.sort((a, b) => b.lastActivity - a.lastActivity);
 
   const entries = rawEntries
     .map((e) => {
