@@ -2,6 +2,7 @@
 import { entriesFor } from './data.js';
 import { playJitter, clearJitter } from './jitter.js';
 import { relayoutAll } from './feed-layout.js';
+import { navigate } from './channels.js';
 
 export { clearJitter };
 
@@ -11,6 +12,7 @@ const MAX_JITTER = 14;
 let _resizeObs = null;
 let _resizeRaf = 0;
 let _lastMsgWidth = 0;
+let _chipNavWired = false;
 
 function nickColor(nick) {
   const palette = ['#e8a308', '#ffbe2a', '#f59e0b', '#eab308', '#a16207', '#fcd34d', '#fbbf24'];
@@ -48,7 +50,13 @@ function populateRow(row, e, ch) {
 
   row.replaceChildren(ts, nick, msg);
   row.dataset.raw = e.text;
-  if (ch === 'activity' && e.project) row.dataset.project = e.project;
+  if (ch === 'activity' && e.project) {
+    row.dataset.project = e.project;
+    // Mapped chips are real links into the sidebar's channel list; unmapped
+    // chips (slugs without a sidebar channel) render as labels. feed-layout
+    // reads this to pick the right styling and click affordance.
+    if (e.mappedChannel) row.dataset.target = e.mappedChannel;
+  }
 }
 
 /** Render the feed for the given channel. Replaces #feed content. */
@@ -83,6 +91,7 @@ export function renderFeed(id, data, { immediate = false } = {}) {
   // Must run after rows are in the DOM so .msg has a measurable width.
   relayoutAll($feed);
   ensureResizeObserver($feed);
+  ensureChipNav($feed);
   $feed.dispatchEvent(new CustomEvent('feed:relayout'));
 
   $feed.scrollTop = $feed.scrollHeight;
@@ -95,6 +104,20 @@ export function renderFeed(id, data, { immediate = false } = {}) {
 // Re-lay out feed rows when the available .msg column width changes (e.g. the
 // pane reflowed on viewport resize). One observer per feed element — installed
 // lazily on first render. rAF-debounced so we don't thrash during drag-resize.
+// Click-delegate proj-pill chips that carry a data-target — those are the
+// chips whose slug resolves to a sidebar channel. Unmapped chips have no
+// data-target and fall through to no-op.
+function ensureChipNav($feed) {
+  if (_chipNavWired) return;
+  _chipNavWired = true;
+  $feed.addEventListener('click', (e) => {
+    const chip = e.target.closest('.proj-pill[data-target]');
+    if (!chip || !$feed.contains(chip)) return;
+    e.preventDefault();
+    navigate(chip.dataset.target);
+  });
+}
+
 function ensureResizeObserver($feed) {
   if (_resizeObs) return;
   // Seed with the post-initial-layout width so the observer's first auto-fire

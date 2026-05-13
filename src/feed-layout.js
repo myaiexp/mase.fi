@@ -28,13 +28,14 @@ function buildItems(row, font) {
 // Render one fragment of a laid-out line into a child span/text-node tree.
 // `frag.gapBefore` carries inter-item whitespace pretext normalized out of
 // item text (e.g. the space after "★ "), so we materialize it as margin-left.
-function renderFragment(parent, frag, items, isFeature) {
+function renderFragment(parent, frag, items, isFeature, chipTarget) {
   const item = items[frag.itemIndex];
   let el;
   if (item.break === 'never' && item.text.startsWith('#')) {
     el = document.createElement('span');
     el.className = 'proj-pill';
     el.textContent = frag.text;
+    if (chipTarget) el.dataset.target = chipTarget;
   } else if (isFeature && item.text === '★ ') {
     el = document.createElement('span');
     el.className = 'star';
@@ -59,6 +60,7 @@ function renderFallback(msg, row, isFeature) {
     const pill = document.createElement('span');
     pill.className = 'proj-pill';
     pill.textContent = '#' + row.dataset.project;
+    if (row.dataset.target) pill.dataset.target = row.dataset.target;
     msg.appendChild(pill);
   }
   if (isFeature) {
@@ -95,12 +97,13 @@ export function layoutRow(row, msgWidth, font) {
     return;
   }
 
+  const chipTarget = row.dataset.target || null;
   const frag = document.createDocumentFragment();
   walkRichInlineLineRanges(prepared, msgWidth, (range) => {
     const line = materializeRichInlineLineRange(prepared, range);
     const lineEl = document.createElement('span');
     lineEl.className = 'line';
-    for (const f of line.fragments) renderFragment(lineEl, f, items, isFeature);
+    for (const f of line.fragments) renderFragment(lineEl, f, items, isFeature, chipTarget);
     frag.appendChild(lineEl);
   });
   msg.replaceChildren(frag);

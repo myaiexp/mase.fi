@@ -80,7 +80,8 @@ export async function fetchData() {
   const entries = rawEntries
     .map((e) => {
       const slug = (e.project || '').toLowerCase();
-      const ch = slugToChannel.get(slug)
+      const mappedChannel = slugToChannel.get(slug);
+      const ch = mappedChannel
         || (e.category === 'daily' ? 'home' : e.category === 'log' ? 'activity' : null);
       if (!ch) return null;
       const date = normalizeDate(e.date);
@@ -93,6 +94,7 @@ export async function fetchData() {
         nick,
         text,
         project: slug || undefined,
+        mappedChannel,
         sticky: !!e.sticky,
       };
     })

@@ -87,10 +87,19 @@
 .feed-row.cat-daily .msg  { color: var(--text); }
 .feed-row.cat-feature .msg { color: var(--text); }
 .feed-row .proj-pill {
+  /* Default styling — labels for unmapped slugs (project not in the
+     sidebar's channel list). Same accent color, but no link affordance. */
   color: var(--ch-accent);
-  border-bottom: 1px dashed color-mix(in oklab, var(--ch-accent) 40%, transparent);
   margin-right: 4px;
   font-weight: 500;
+}
+/* Mapped chips resolve to a sidebar channel — they navigate on click. */
+.feed-row .proj-pill[data-target] {
+  border-bottom: 1px dashed color-mix(in oklab, var(--ch-accent) 40%, transparent);
+  cursor: pointer;
+}
+.feed-row .proj-pill[data-target]:hover {
+  border-bottom-color: var(--ch-accent);
 }
 
 .feed-row mark {
