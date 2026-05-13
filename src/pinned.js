@@ -1,6 +1,7 @@
 // Pinned hero card renderers — one per channel kind
 import { LOGO, PROJECT_ART, sparkbar } from './ascii.js';
 import { totalLogCount, dailyLogBuckets, lastLog } from './data.js';
+import { mountBeam } from './beam.js';
 // Local duplicate (avoids a util module for one tiny function)
 function escapeHtml(s) {
   return String(s).replace(/[&<>"']/g, c => (
@@ -140,5 +141,13 @@ export function renderPinned(id, data) {
   else if (id === 'activity') html = pinnedActivity(data);
   else if (project) html = pinnedProject(project, data);
   // html is built from escapeHtml-sanitized data; static markup only elsewhere
-  document.getElementById('pinned').innerHTML = html;
+  const pinnedEl = document.getElementById('pinned');
+  pinnedEl.innerHTML = html;
+  // Home channel only: instrument the LOGO <pre> with the pretext-measured
+  // beam destruction effect. `mountBeam` no-ops on reduced-motion / hidden hosts
+  // and self-cleans the previous mount via its activeCleanup tracking.
+  if (id === 'home') {
+    const asciiEl = pinnedEl.querySelector('.ascii');
+    if (asciiEl) mountBeam(asciiEl, LOGO);
+  }
 }
