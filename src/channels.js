@@ -1,6 +1,6 @@
 // Channel registry + hash-routed navigation orchestrator
 import { entriesFor } from './data.js';
-import { renderPinned } from './pinned.js';
+import { renderPinned, renderHeroLine } from './pinned.js';
 import { renderFeed } from './feed.js';
 import { playSwitchTransition } from './transition.js';
 import { setActiveChannel } from './sidebar.js';
@@ -61,10 +61,12 @@ export function navigate(id, { fromHash = false } = {}) {
   setTopicMeta(id);
 
   if (prevId == null) {
+    renderHeroLine(id, _data);
     renderPinned(id, _data);
     renderFeed(id, _data, { immediate: false });
   } else {
     playSwitchTransition(() => {
+      renderHeroLine(id, _data);
       renderPinned(id, _data);
       renderFeed(id, _data);
     });

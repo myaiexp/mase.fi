@@ -104,6 +104,34 @@ function pinnedActivity(data) {
     '</div>';
 }
 
+/** Replace #hero-line content with a mobile-only quick-access row. */
+export function renderHeroLine(id, data) {
+  const project = data.projects.find(p => p.channel === id);
+  let html = '';
+  if (id === 'home') {
+    html =
+      '<span class="arr">→</span> ' +
+      '<a href="#/activity">activity</a> ' +
+      '<span class="sep">\xb7</span> ' +
+      '<a href="https://github.com/myaiexp">github</a>';
+  } else if (project) {
+    const statusText = project.heat > 0.6 ? 'shipping' : project.heat > 0.3 ? 'steady' : 'idle';
+    if (project.links && project.links.length > 0) {
+      html =
+        '<span class="arr">→</span> ' +
+        '<a href="' + escapeHtml(project.links[0].href) + '">' + escapeHtml(project.links[0].label) + '</a> ' +
+        '<span class="sep">\xb7</span> ' +
+        '<span class="status">' + statusText + '</span>';
+    } else {
+      html =
+        '<span class="arr">→</span> ' +
+        '<span class="status">' + statusText + '</span>';
+    }
+  }
+  // activity and unmatched channels: empty string — CSS :empty hides the element
+  document.getElementById('hero-line').innerHTML = html;
+}
+
 /** Replace #pinned content with the channel-appropriate card. */
 export function renderPinned(id, data) {
   const project = data.projects.find(p => p.channel === id);

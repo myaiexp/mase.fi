@@ -63,7 +63,27 @@
     grid-template-columns: 1fr;
   }
   .statusbar-who { display: none; }
-  .pinned { padding: 10px 12px 4px; }
+  .pinned { display: none; }
+
+  .hero-line {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 7px 14px;
+    box-shadow: inset 0 -1px 0 var(--line);
+    background: var(--bg-2);
+    font-size: 11.5px;
+    color: var(--dim);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .hero-line:empty { display: none; }
+  .hero-line .arr { color: var(--faint); }
+  .hero-line .sep { color: var(--faint); }
+  .hero-line a { color: var(--ch-accent); border-bottom: 1px dashed color-mix(in oklab, var(--ch-accent) 50%, transparent); }
+  .hero-line a:hover { text-decoration: none; border-bottom-color: var(--ch-accent); }
+  .hero-line .status { color: var(--muted); text-transform: lowercase; }
 
   /* Topic bar: keep it to a single row. The description truncates with
      an ellipsis, the msg count stays right-aligned, and the read-only
