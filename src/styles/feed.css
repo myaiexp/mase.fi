@@ -1,0 +1,170 @@
+/* Feed: scroll container, IRC row grid, day separators, jitter/arrive animations, scan overlay */
+/* feed */
+.feed-wrap { position: relative; min-height: 0; overflow: hidden; }
+.feed {
+  height: 100%;
+  overflow-y: auto;
+  padding: 8px 20px 18px;
+  scrollbar-width: thin;
+  scrollbar-color: var(--line) transparent;
+  scroll-behavior: auto; /* we manage it */
+}
+.feed::-webkit-scrollbar { width: 8px; }
+.feed::-webkit-scrollbar-thumb { background: var(--line); border-radius: 4px; }
+.feed::-webkit-scrollbar-thumb:hover { background: #3a3a42; }
+
+/* shared IRC-style column grid: timestamp | nick | message.
+   `auto auto 1fr` — columns hug content, msg takes the rest.
+   Keep in one place so feed rows and day separators stay aligned. */
+.feed-row {
+  display: grid;
+  grid-template-columns: auto auto 1fr;
+  column-gap: 12px;
+  line-height: var(--line-h);
+}
+
+/* Day separator: rendered as a single flex row whose label carries its own
+   horizontal rule via an inset box-shadow. No 1px-tall sub-element — the
+   shadow lives inside an element that already has real text height, so it
+   anti-aliases cleanly at every zoom level. */
+.feed-day {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 18px 0 4px;
+  font-size: 10.5px; color: var(--muted);
+  letter-spacing: 0.1em; text-transform: uppercase;
+  white-space: nowrap;
+}
+.feed-day .d-rule {
+  color: var(--faint);
+  letter-spacing: 0;
+}
+.feed-day .d-label {
+  color: var(--dim);
+  font-variant-numeric: tabular-nums;
+}
+.feed-day .d-rule-after {
+  flex: 1;
+  align-self: center;
+  height: 4px;
+  background-image: linear-gradient(180deg,
+    var(--bg) 0,
+    var(--bg) 1px,
+    var(--line) 1px,
+    var(--line) 3px,
+    var(--bg) 3px,
+    var(--bg) 4px);
+  -webkit-mask-image: linear-gradient(90deg, #000 0%, transparent 85%);
+          mask-image: linear-gradient(90deg, #000 0%, transparent 85%);
+}
+
+.feed-row {
+  align-items: baseline;
+  padding: 2px 0;
+  min-height: var(--row-h);
+}
+.feed-row .ts  { color: var(--faint); font-size: 11.5px; font-variant-numeric: tabular-nums; }
+.feed-row .nick {
+  color: var(--nick-color, var(--accent));
+  font-weight: 600;
+  text-align: right;
+  white-space: nowrap;
+}
+.feed-row .nick::before { content: "<"; color: var(--faint); font-weight: 400; }
+.feed-row .nick::after  { content: ">"; color: var(--faint); font-weight: 400; }
+.feed-row .msg {
+  color: var(--text);
+  text-wrap: pretty;
+  min-width: 0;
+}
+.feed-row.cat-log .msg    { color: var(--dim); }
+.feed-row.cat-daily .msg  { color: var(--text); }
+.feed-row.cat-feature .msg { color: var(--text); }
+.feed-row.cat-feature .msg::before {
+  content: "★ ";
+  color: var(--accent);
+}
+.feed-row .proj-pill {
+  color: var(--ch-accent);
+  border-bottom: 1px dashed color-mix(in oklab, var(--ch-accent) 40%, transparent);
+  margin-right: 4px;
+  font-weight: 500;
+}
+
+.feed-row mark {
+  background: color-mix(in oklab, var(--accent) 35%, transparent);
+  color: #000;
+  border-radius: 2px;
+  padding: 0 1px;
+}
+
+/* modem-jitter states */
+.feed-row.jitter .msg,
+.feed-row.jitter .nick,
+.feed-row.jitter .proj-pill {
+  color: var(--muted) !important;
+  filter: contrast(0.85) brightness(0.85);
+}
+.feed-row.jitter .msg::after {
+  content: "▌";
+  color: var(--ch-accent);
+  opacity: 0.6;
+  margin-left: 2px;
+  animation: blink 0.55s steps(2) infinite;
+}
+@keyframes blink { 50% { opacity: 0; } }
+
+.feed-row.arriving {
+  animation: rowArrive var(--jitter-ms) ease-out both;
+}
+@keyframes rowArrive {
+  0%   { opacity: 0; transform: translateX(-3px); }
+  60%  { opacity: 0.8; transform: none; }
+  100% { opacity: 1; transform: none; }
+}
+
+/* feed overlay for channel-switch scanline */
+.feed-overlay {
+  position: absolute; inset: 0;
+  pointer-events: none;
+  opacity: 0;
+}
+.feed-overlay.active { opacity: 1; }
+.feed-overlay .scan {
+  position: absolute; left: 0; right: 0;
+  height: 180px;
+  background:
+    linear-gradient(180deg,
+      transparent 0%,
+      color-mix(in oklab, var(--ch-accent) 0%, transparent) 10%,
+      color-mix(in oklab, var(--ch-accent) 22%, transparent) 50%,
+      color-mix(in oklab, var(--ch-accent) 0%, transparent) 90%,
+      transparent 100%);
+  mix-blend-mode: screen;
+  top: -200px;
+  animation: scanDown var(--switch-ms) ease-in-out forwards;
+}
+@keyframes scanDown {
+  0%   { top: -200px; }
+  100% { top: 110%; }
+}
+.feed-overlay .static-band {
+  position: absolute; left: 0; right: 0;
+  top: 30%;
+  padding: 8px 20px;
+  color: var(--ch-accent);
+  font-size: 11px;
+  white-space: pre;
+  opacity: 0;
+  animation: staticFlicker var(--switch-ms) ease-in-out forwards;
+  line-height: 1.35;
+  filter: drop-shadow(0 0 8px color-mix(in oklab, var(--ch-accent) 30%, transparent));
+}
+@keyframes staticFlicker {
+  0%, 100% { opacity: 0; }
+  20%      { opacity: 0.95; }
+  45%      { opacity: 0.3; }
+  65%      { opacity: 0.8; }
+  80%      { opacity: 0.1; }
+}

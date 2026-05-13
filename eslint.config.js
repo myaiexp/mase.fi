@@ -9,6 +9,8 @@ export default [
       globals: {
         window: 'readonly',
         document: 'readonly',
+        addEventListener: 'readonly',
+        URL: 'readonly',
         CSS: 'readonly',
         fetch: 'readonly',
         console: 'readonly',

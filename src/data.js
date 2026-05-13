@@ -1,143 +1,178 @@
-/** Data layer: project maps, channel lists, entry filtering. */
+// Data adapter: fetches updates.json and normalizes it to the shape the UI expects.
 
-import { relativeDate } from './terminal.js';
+const SOURCE_URL = '/updates.json';
 
 /**
- * Build lookup: project.name (lowercase) -> project object.
- * @param {Array} projects
- * @returns {Map<string, object>}
+ * Fetch + normalize the live updates.json into the canonical shape used by the UI:
+ *   { meta:{nick,server,bootTime}, projects:[{name,channel,description,tag,links[],heat}], entries:[{ch,date,cat,nick,text,project?}] }
+ *
+ * The real /updates.json carries a different shape — see README — so we map here.
+ *  - entry.category → cat
+ *  - entry.project (slug) → ch (via project.slug or project.channel match)
+ *  - entry.text || entry.summary → text
+ *  - project.heat is computed from last-30d entry count, normalized 0..1
+ *  - project.tag, project.links don't exist live — we synthesize: tag = "" (dropped chip), links = [project.url]
  */
-export function buildProjectMap(projects) {
-  const map = new Map();
-  for (const p of projects) {
-    map.set(p.name.toLowerCase(), p);
+export async function fetchData() {
+  let raw;
+  try {
+    raw = await fetch(SOURCE_URL).then((r) => r.json());
+  } catch {
+    raw = { entries: [], projects: [] };
   }
-  return map;
-}
 
-/**
- * Get the most recent entry date for a project.
- * Matches entry.project against project.slug (falls back to channel).
- */
-function getLastActivity(entries, project) {
-  const slug = (project.slug || project.channel).toLowerCase();
-  let latest = null;
-  for (const e of entries) {
-    if (e.project?.toLowerCase() === slug) {
-      if (!latest || e.date > latest) latest = e.date;
+  const rawProjects = Array.isArray(raw.projects) ? raw.projects : [];
+  const rawEntries = Array.isArray(raw.entries) ? raw.entries : [];
+
+  // slug → channel lookup (entries reference by slug, channels are by `channel`)
+  const slugToChannel = new Map();
+  for (const p of rawProjects) {
+    const slug = (p.slug || p.channel || '').toLowerCase();
+    if (slug) slugToChannel.set(slug, p.channel);
+  }
+
+  // last-30d counts for heat
+  const now = Date.now();
+  const cutoff = now - 30 * 86400000;
+  const counts = new Map();
+  for (const e of rawEntries) {
+    if (!e.project) continue;
+    if (e.category !== 'log' && e.category !== 'feature') continue;
+    const t = Date.parse(e.date);
+    if (!Number.isFinite(t) || t < cutoff) continue;
+    const slug = e.project.toLowerCase();
+    counts.set(slug, (counts.get(slug) || 0) + 1);
+  }
+  const maxCount = Math.max(1, ...counts.values());
+
+  const projects = rawProjects.map((p) => {
+    const slug = (p.slug || p.channel || '').toLowerCase();
+    const heat = Math.min(1, (counts.get(slug) || 0) / maxCount);
+    const links = [];
+    if (p.url) {
+      try {
+        const host = new URL(p.url).host.replace(/^www\./, '');
+        links.push({ label: host, href: p.url });
+      } catch {
+        links.push({ label: 'open', href: p.url });
+      }
     }
-  }
-  return latest;
-}
+    return {
+      name: p.name,
+      channel: p.channel,
+      slug,
+      description: p.desc || '',
+      tag: '', // not present in live data; renderers should drop the "stack" chip
+      url: p.url || '',
+      links,
+      heat,
+    };
+  });
 
-/**
- * Check if a project has a category=project entry within the last 14 days.
- */
-function isNewProject(entries, project) {
-  const slug = (project.slug || project.channel).toLowerCase();
-  const cutoff = new Date();
-  cutoff.setDate(cutoff.getDate() - 14);
-  const cutoffISO = cutoff.toISOString().slice(0, 10);
+  const entries = rawEntries
+    .map((e) => {
+      const slug = (e.project || '').toLowerCase();
+      const ch = slugToChannel.get(slug)
+        || (e.category === 'daily' ? 'home' : e.category === 'log' ? 'activity' : null);
+      if (!ch) return null;
+      const date = normalizeDate(e.date);
+      const text = e.text || e.summary || '';
+      const nick = pickNick(e);
+      return {
+        ch,
+        cat: e.category,
+        date,
+        nick,
+        text,
+        project: slug || undefined,
+        sticky: !!e.sticky,
+      };
+    })
+    .filter(Boolean)
+    .sort((a, b) => a.date.localeCompare(b.date));
 
-  return entries.some(
-    (e) =>
-      e.category === 'project' &&
-      e.project?.toLowerCase() === slug &&
-      e.date >= cutoffISO,
-  );
-}
-
-/**
- * Get structured channel list for sidebar rendering.
- * @param {Array} entries
- * @param {Array} projects
- * @returns {Array<{group: string, channels: Array}>}
- */
-export function getChannels(entries, projects) {
-  const projectChannels = projects
-    .map((p) => ({
-      id: p.channel,
-      label: `#${p.channel}`,
-      lastActivity: getLastActivity(entries, p),
-      isNew: isNewProject(entries, p),
-    }))
-    .sort((a, b) => {
-      if (!a.lastActivity && !b.lastActivity) return 0;
-      if (!a.lastActivity) return 1;
-      if (!b.lastActivity) return -1;
-      return b.lastActivity.localeCompare(a.lastActivity);
-    });
-
-  return [
-    { group: 'home', channels: [{ id: 'home', label: '#home' }] },
-    { group: 'projects', channels: projectChannels },
-    {
-      group: 'meta',
-      channels: [
-        { id: 'activity', label: '#activity' },
-        { id: 'about', label: '#about' },
-      ],
-    },
-  ];
-}
-
-/**
- * Get entries for a specific channel, sorted date ascending (oldest first).
- * @param {string} channelId
- * @param {Array} entries
- * @param {Array} projects
- * @returns {Array}
- */
-export function getChannelEntries(channelId, entries, projects) {
-  let filtered;
-
-  if (channelId === 'home') {
-    filtered = entries.filter((e) => e.category === 'daily');
-  } else if (channelId === 'activity') {
-    filtered = entries.filter((e) => e.category === 'log');
-  } else if (channelId === 'about') {
-    return [];
-  } else {
-    // Find the project by channel id
-    const project = projects.find((p) => p.channel === channelId);
-    if (!project) return [];
-
-    const slug = (project.slug || project.channel).toLowerCase();
-    filtered = entries.filter(
-      (e) =>
-        (e.category === 'feature' || e.category === 'project') &&
-        e.project?.toLowerCase() === slug,
-    );
-  }
-
-  // Sort ascending (oldest first — chat order)
-  return [...filtered].sort((a, b) => a.date.localeCompare(b.date));
-}
-
-/**
- * Compute stats for #about channel.
- * @param {Array} entries
- * @param {Array} projects
- * @returns {{ projectCount: number, featuresThisMonth: number, lastDeploy: string }}
- */
-export function getAboutStats(entries, projects) {
-  const now = new Date();
-  const currentMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
-
-  const featuresThisMonth = entries.filter(
-    (e) =>
-      (e.category === 'feature' || e.category === 'project') &&
-      e.date.startsWith(currentMonth),
-  ).length;
-
-  let latestDate = null;
-  for (const e of entries) {
-    if (!latestDate || e.date > latestDate) latestDate = e.date;
-  }
+  // #activity gets *all* log entries (cross-project firehose), regardless of channel routing above.
+  // To avoid duplicating, we mark entries with `ch` of the project, then the activity feed pulls
+  // separately. See entriesFor() below.
 
   return {
-    projectCount: projects.length,
-    featuresThisMonth,
-    lastDeploy: latestDate ? relativeDate(latestDate) : 'unknown',
+    meta: {
+      nick: 'mase',
+      server: 'irc.mase.fi',
+      bootTime: Date.now(),
+    },
+    projects,
+    entries,
   };
 }
+
+/** Normalize a date string to "YYYY-MM-DDTHH:MM" form used by the UI. */
+function normalizeDate(s) {
+  if (!s) return '1970-01-01T00:00';
+  // Already has time component
+  if (/T\d{2}:\d{2}/.test(s)) return s.slice(0, 16);
+  // Bare YYYY-MM-DD → append T00:00
+  if (/^\d{4}-\d{2}-\d{2}$/.test(s)) return s + 'T00:00';
+  return s;
+}
+
+/** Pick a nick for an entry based on category — daily/feature = mase, log = git. */
+function pickNick(e) {
+  if (e.category === 'log') return 'git';
+  return 'mase';
+}
+
+/**
+ * Return entries for a given channel id, sorted ascending (oldest first).
+ * - home     → daily summaries
+ * - activity → all log entries across projects (firehose)
+ * - <slug>   → entries matching that project channel (any category)
+ */
+export function entriesFor(channelId, data) {
+  if (channelId === 'home') {
+    return data.entries.filter((e) => e.cat === 'daily');
+  }
+  if (channelId === 'activity') {
+    return data.entries.filter((e) => e.cat === 'log');
+  }
+  return data.entries.filter((e) => e.ch === channelId && e.cat !== 'log');
+}
+
+/**
+ * Total commit count across the dataset (used in #home pinned stats).
+ */
+export function totalLogCount(data) {
+  return data.entries.filter((e) => e.cat === 'log').length;
+}
+
+/**
+ * Last-N-day commit buckets for the #home heatstrip.
+ * Returns an array of N integers (oldest first), one per day, counting `log` entries.
+ */
+export function dailyLogBuckets(data, days = 28) {
+  const out = new Array(days).fill(0);
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const start = today.getTime() - (days - 1) * 86400000;
+  for (const e of data.entries) {
+    if (e.cat !== 'log') continue;
+    const t = Date.parse(e.date);
+    if (!Number.isFinite(t)) continue;
+    const idx = Math.floor((t - start) / 86400000);
+    if (idx >= 0 && idx < days) out[idx]++;
+  }
+  return out;
+}
+
+/**
+ * Last commit info — returns { date, project } of the newest log entry, or null.
+ */
+export function lastLog(data) {
+  let best = null;
+  for (const e of data.entries) {
+    if (e.cat !== 'log') continue;
+    if (!best || e.date > best.date) best = e;
+  }
+  return best;
+}
+
