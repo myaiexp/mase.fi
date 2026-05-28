@@ -103,6 +103,10 @@
   /* Stop the drop-shadow glow from blurring the per-char spans. */
   filter: none;
   user-select: none;
+  /* Host is sized to the measured logo bounds (beam.js), so clipping here keeps
+     the sweeping bar and its glow inside the logo instead of bleeding across
+     the card and into neighbouring content. */
+  overflow: hidden;
 }
 .ascii .bch {
   position: absolute;
