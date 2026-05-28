@@ -165,22 +165,3 @@
   from { transform: translateY(-200px); }
   to   { transform: translateY(var(--scan-to, 120vh)); }
 }
-.feed-overlay .static-band {
-  position: absolute; left: 0; right: 0;
-  top: 30%;
-  padding: 8px 20px;
-  color: var(--ch-accent);
-  font-size: 11px;
-  white-space: pre;
-  opacity: 0;
-  animation: staticFlicker var(--switch-ms) ease-in-out forwards;
-  line-height: 1.35;
-  filter: drop-shadow(0 0 8px color-mix(in oklab, var(--ch-accent) 30%, transparent));
-}
-@keyframes staticFlicker {
-  0%, 100% { opacity: 0; }
-  20%      { opacity: 0.95; }
-  45%      { opacity: 0.3; }
-  65%      { opacity: 0.8; }
-  80%      { opacity: 0.1; }
-}

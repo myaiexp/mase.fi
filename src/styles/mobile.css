@@ -154,7 +154,6 @@
 @media (prefers-reduced-motion: reduce) {
   .feed-row.arriving,
   .feed-overlay .scan,
-  .feed-overlay .static-band,
   .boot .boot-line {
     animation: none !important;
   }
