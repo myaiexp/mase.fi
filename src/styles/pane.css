@@ -103,11 +103,11 @@
   /* Stop the drop-shadow glow from blurring the per-char spans. */
   filter: none;
   user-select: none;
-  /* Host is sized to the measured logo bounds (beam.js), so clipping here keeps
-     the sweeping bar and its glow inside the logo instead of bleeding across
-     the card and into neighbouring content. */
-  overflow: hidden;
 }
+/* Clip the sweeping bar and its wide glow to the hero card frame: it still
+   washes ambient light across the card interior, but can't bleed into the
+   feed below or neighbouring content. Scoped to the beam card only. */
+.card:has(.beam-host) { overflow: hidden; }
 .ascii .bch {
   position: absolute;
   white-space: pre;
