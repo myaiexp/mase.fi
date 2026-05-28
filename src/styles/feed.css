@@ -143,6 +143,7 @@
 .feed-overlay.active { opacity: 1; }
 .feed-overlay .scan {
   position: absolute; left: 0; right: 0;
+  top: 0;
   height: 180px;
   background:
     linear-gradient(180deg,
@@ -152,12 +153,17 @@
       color-mix(in oklab, var(--ch-accent) 0%, transparent) 90%,
       transparent 100%);
   mix-blend-mode: screen;
-  top: -200px;
+  /* Composited transform sweep: translateY runs on its own GPU layer, so a
+     busy main thread (the synchronous feed relayout at the swap point) can no
+     longer stall the descent. --scan-to is the live feed height, supplied by
+     transition.js so the band clears the bottom on any viewport. */
+  transform: translateY(-200px);
+  will-change: transform;
   animation: scanDown var(--switch-ms) ease-in-out forwards;
 }
 @keyframes scanDown {
-  0%   { top: -200px; }
-  100% { top: 110%; }
+  from { transform: translateY(-200px); }
+  to   { transform: translateY(var(--scan-to, 120vh)); }
 }
 .feed-overlay .static-band {
   position: absolute; left: 0; right: 0;
