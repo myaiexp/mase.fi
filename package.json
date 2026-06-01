@@ -5,10 +5,10 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "vite build && cp src/base.css dist/base.css && npm run build:components",
+    "build": "build-lock vite build && cp src/base.css dist/base.css && npm run build:components",
     "preview": "vite preview",
     "test": "vitest run",
-    "build:components": "vite build --config vite.components.config.js",
+    "build:components": "build-lock vite build --config vite.components.config.js",
     "build:all": "vite build && npm run build:components",
     "lint": "eslint src/"
   },
