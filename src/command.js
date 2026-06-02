@@ -98,7 +98,7 @@ function chooseFromComplete() {
   $cmdInput.blur();
 }
 
-function fuzzyScore(str, q) {
+export function fuzzyScore(str, q) {
   if (q === '') return 1;
   str = str.toLowerCase();
   let si = 0, score = 0, streak = 0;
@@ -114,7 +114,7 @@ function fuzzyScore(str, q) {
   return score;
 }
 
-function highlightFuzzy(str, q) {
+export function highlightFuzzy(str, q) {
   if (!q) return escapeHtml(str);
   let out = '', si = 0;
   for (const c of q.toLowerCase()) {
