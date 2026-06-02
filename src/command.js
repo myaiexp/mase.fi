@@ -1,11 +1,7 @@
 // Command input — slash-jump, ?-help, plain-text search; global / ? g-leader shortcuts.
 import { CHANNELS, chAccent, navigate } from './channels.js';
 import { entriesFor } from './data.js';
-
-function escapeHtml(s) {
-  return String(s).replace(/[&<>"']/g, c =>
-    ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
-}
+import { escapeHtml } from './html.js';
 
 let ccIndex = 0;
 let searchTerm = '';

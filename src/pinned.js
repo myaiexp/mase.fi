@@ -2,12 +2,7 @@
 import { LOGO, PROJECT_ART, sparkbar } from './ascii.js';
 import { totalLogCount, dailyLogBuckets, lastLog } from './data.js';
 import { mountBeam } from './beam.js';
-// Local duplicate (avoids a util module for one tiny function)
-function escapeHtml(s) {
-  return String(s).replace(/[&<>"']/g, c => (
-    { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]
-  ));
-}
+import { escapeHtml } from './html.js';
 
 function cardHead(meta, right) {
   const chips = meta
