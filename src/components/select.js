@@ -1,6 +1,7 @@
 // <base-select>, <base-option>, <base-option-group> — custom select form control
 
 import { addOverlayListeners, removeOverlayListeners } from './overlay-utils.js';
+import { applyMenuFlip } from './menu-flip.js';
 
 // --- base-option ─────────────────────────────────────────────────────────────
 
@@ -153,8 +154,6 @@ selectTemplate.content.appendChild(style);
 selectTemplate.content.appendChild(triggerWrap);
 selectTemplate.content.appendChild(menuDiv);
 
-const MENU_HEIGHT_ESTIMATE = 200;
-
 class BaseSelect extends HTMLElement {
   static observedAttributes = ['value', 'placeholder', 'searchable', 'disabled', 'size'];
 
@@ -210,9 +209,7 @@ class BaseSelect extends HTMLElement {
     if (this.hasAttribute('disabled')) return;
     this.#open = true;
 
-    const rect = this.getBoundingClientRect();
-    const spaceBelow = window.innerHeight - rect.bottom;
-    this._menu.classList.toggle('flip', spaceBelow < MENU_HEIGHT_ESTIMATE);
+    applyMenuFlip(this, this._menu);
 
     this._menu.hidden = false;
 

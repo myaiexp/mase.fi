@@ -330,8 +330,10 @@ describe('base-select', () => {
   it('no flip class when space available', () => {
     const el = createSelect({ options: [{ value: 'x', label: 'X' }] });
 
+    // spaceBelow = 768 - 518 = 250, just clears the 200px estimate. Boundary-
+    // sensitive: bumping MENU_HEIGHT_ESTIMATE to 300 would flip this RED.
     el.getBoundingClientRect = () => ({
-      top: 100, bottom: 140, left: 0, right: 100, width: 100, height: 40,
+      top: 478, bottom: 518, left: 0, right: 100, width: 100, height: 40,
     });
     Object.defineProperty(window, 'innerHeight', { value: 768, configurable: true });
 

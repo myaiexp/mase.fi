@@ -1,6 +1,7 @@
 // <base-dropdown>, <base-dropdown-item>, <base-dropdown-divider> — accessible dropdown menu components
 
 import { addOverlayListeners, removeOverlayListeners } from './overlay-utils.js';
+import { applyMenuFlip } from './menu-flip.js';
 
 // ─── base-dropdown-item ──────────────────────────────────────────────────────
 
@@ -130,8 +131,6 @@ dropdownTemplate.innerHTML = `<style>
   <slot name="items"></slot>
 </div>`;
 
-const MENU_HEIGHT_ESTIMATE = 200;
-
 class BaseDropdown extends HTMLElement {
   #open = false;
 
@@ -220,10 +219,7 @@ class BaseDropdown extends HTMLElement {
   open() {
     this.#open = true;
 
-    // Auto-flip check
-    const rect = this.getBoundingClientRect();
-    const spaceBelow = window.innerHeight - rect.bottom;
-    this._menu.classList.toggle('flip', spaceBelow < MENU_HEIGHT_ESTIMATE);
+    applyMenuFlip(this, this._menu);
 
     this._menu.hidden = false;
 
