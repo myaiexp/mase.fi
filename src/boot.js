@@ -108,15 +108,7 @@ export function runBoot() {
       setTimeout(renderOne, delay);
       return;
     }
-    if (kind === 'logo') {
-      line.classList.add('boot-logo');
-      // mark first/last logo lines for spacing
-      const prev = script[i-2];
-      const next = script[i];
-      if (!prev || prev[1] !== 'logo') line.classList.add('first');
-      if (!next || next[1] !== 'logo') line.classList.add('last');
-      line.textContent = text;
-    } else if (kind === 'ok' || kind === 'fail' || kind === 'warn') {
+    if (kind === 'ok' || kind === 'fail' || kind === 'warn') {
       const body = document.createElement('span');
       body.textContent = text + ' ';
       const tag = document.createElement('span');
