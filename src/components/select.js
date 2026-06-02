@@ -1,5 +1,7 @@
 // <base-select>, <base-option>, <base-option-group> — custom select form control
 
+import { addOverlayListeners, removeOverlayListeners } from './overlay-utils.js';
+
 // --- base-option ─────────────────────────────────────────────────────────────
 
 class BaseOption extends HTMLElement {
@@ -158,8 +160,6 @@ class BaseSelect extends HTMLElement {
 
   #open = false;
   #highlightIdx = -1;
-  #onDocClick = null;
-  #onDocKeydown = null;
   #blurTimeout = null;
   #lastLetter = '';
   #lastLetterIdx = -1;
@@ -482,25 +482,11 @@ class BaseSelect extends HTMLElement {
   // --- Document listeners ---
 
   _addDocListeners() {
-    this.#onDocClick = (e) => {
-      if (!this.contains(e.target) && !this.shadowRoot.contains(e.target)) this.close();
-    };
-    this.#onDocKeydown = (e) => {
-      if (e.key === 'Escape') this.close();
-    };
-    document.addEventListener('click', this.#onDocClick);
-    document.addEventListener('keydown', this.#onDocKeydown);
+    addOverlayListeners(this, (e) => !this.contains(e.target) && !this.shadowRoot.contains(e.target));
   }
 
   _removeDocListeners() {
-    if (this.#onDocClick) {
-      document.removeEventListener('click', this.#onDocClick);
-      this.#onDocClick = null;
-    }
-    if (this.#onDocKeydown) {
-      document.removeEventListener('keydown', this.#onDocKeydown);
-      this.#onDocKeydown = null;
-    }
+    removeOverlayListeners(this);
   }
 }
 

@@ -1,5 +1,7 @@
 // <base-dropdown>, <base-dropdown-item>, <base-dropdown-divider> — accessible dropdown menu components
 
+import { addOverlayListeners, removeOverlayListeners } from './overlay-utils.js';
+
 // ─── base-dropdown-item ──────────────────────────────────────────────────────
 
 const itemTemplate = document.createElement('template');
@@ -132,8 +134,6 @@ const MENU_HEIGHT_ESTIMATE = 200;
 
 class BaseDropdown extends HTMLElement {
   #open = false;
-  #onDocClick = null;
-  #onDocKeydown = null;
 
   constructor() {
     super();
@@ -245,25 +245,11 @@ class BaseDropdown extends HTMLElement {
   }
 
   _addDocListeners() {
-    this.#onDocClick = (e) => {
-      if (!this.contains(e.target)) this.close();
-    };
-    this.#onDocKeydown = (e) => {
-      if (e.key === 'Escape') this.close();
-    };
-    document.addEventListener('click', this.#onDocClick);
-    document.addEventListener('keydown', this.#onDocKeydown);
+    addOverlayListeners(this, (e) => !this.contains(e.target));
   }
 
   _removeDocListeners() {
-    if (this.#onDocClick) {
-      document.removeEventListener('click', this.#onDocClick);
-      this.#onDocClick = null;
-    }
-    if (this.#onDocKeydown) {
-      document.removeEventListener('keydown', this.#onDocKeydown);
-      this.#onDocKeydown = null;
-    }
+    removeOverlayListeners(this);
   }
 }
 
