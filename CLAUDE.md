@@ -52,6 +52,7 @@ Shared web components library built from `src/components/` via Vite library mode
 - `git push production main` then `git push origin main` (keep GitHub in sync)
 - Post-receive hook: `npm install` → `vite build` → copies `dist/` to webroot
 - **Components:** `npm run build` now includes `build:components` automatically (chained in the script).
+- **build-lock:** package.json's `build` and `build:components` scripts already wrap vite in `build-lock`. Do **not** double-prefix (e.g. `build-lock npm run build`) — nesting two flocks on `/tmp/helm-build.lock` deadlocks the inner one for 30 min and produces an empty `dist/`. Invoke as plain `npm run build`.
 
 ## Decisions from previous phases
 
