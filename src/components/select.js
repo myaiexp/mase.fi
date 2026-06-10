@@ -242,6 +242,14 @@ class BaseSelect extends HTMLElement {
       input.setAttribute('type', 'text');
       input.setAttribute('part', 'trigger');
       input.setAttribute('placeholder', this.getAttribute('placeholder') ?? '');
+      // A filter input must never be an autofill target. Password managers
+      // (Bitwarden et al.) traverse open shadow roots, attach inline-menu
+      // observers to this persistent text field, and thrash field-heavy pages.
+      input.setAttribute('autocomplete', 'off');
+      input.setAttribute('data-bwignore', 'true'); // Bitwarden
+      input.setAttribute('data-lpignore', 'true'); // LastPass
+      input.setAttribute('data-1p-ignore', ''); // 1Password
+      input.setAttribute('data-form-type', 'other'); // Dashlane
       input.addEventListener('click', () => { if (!this.#open) this.open(); });
       input.addEventListener('focus', () => { if (!this.#open) this.open(); });
       input.addEventListener('input', () => this._onFilter());
