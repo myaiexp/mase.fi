@@ -17,6 +17,7 @@ function createSelect({ options = [], groups = [], placeholder = '', searchable 
     const o = document.createElement('base-option');
     o.setAttribute('value', opt.value);
     if (opt.disabled) o.setAttribute('disabled', '');
+    if (opt.action) o.setAttribute('action', '');
     o.textContent = opt.label ?? opt.value;
     el.appendChild(o);
   }
@@ -465,5 +466,52 @@ describe('base-select', () => {
     const el = createSelect({ size: 'sm', options: [{ value: 'a', label: 'A' }] });
     const trigger = getTrigger(el);
     expect(trigger.classList.contains('sm')).toBe(true);
+  });
+
+  // --- Action variant ---
+
+  it('option with action attribute renders an action button', () => {
+    const el = createSelect({ options: [{ value: 'foo', label: 'Foo', action: true }] });
+    const div = getOptions(el)[0];
+    expect(div.classList.contains('has-action')).toBe(true);
+    const btn = div.querySelector('.action-btn');
+    expect(btn).toBeTruthy();
+    expect(btn.tagName).toBe('BUTTON');
+  });
+
+  it('non-action option renders no action button', () => {
+    const el = createSelect({ options: [{ value: 'a', label: 'A' }] });
+    const div = getOptions(el)[0];
+    expect(div.classList.contains('has-action')).toBe(false);
+    expect(div.querySelector('.action-btn')).toBeNull();
+  });
+
+  it('clicking action button dispatches option-action with value, label and anchor', () => {
+    const el = createSelect({ options: [{ value: 'foo', label: 'Foo', action: true }] });
+    getTrigger(el).click();
+
+    const received = [];
+    el.addEventListener('option-action', (e) => received.push(e));
+
+    const btn = getOptions(el)[0].querySelector('.action-btn');
+    btn.click();
+
+    expect(received).toHaveLength(1);
+    expect(received[0].detail).toEqual({ value: 'foo', label: 'Foo', anchor: btn });
+    expect(received[0].target).toBe(el);
+  });
+
+  it('action button click does not trigger normal selection', () => {
+    const el = createSelect({ options: [{ value: 'foo', label: 'Foo', action: true }] });
+    getTrigger(el).click();
+
+    const changes = [];
+    el.addEventListener('change', (e) => changes.push(e.detail));
+
+    getOptions(el)[0].querySelector('.action-btn').click();
+
+    expect(changes).toHaveLength(0);
+    expect(el.value).toBe('');
+    expect(el.isOpen).toBe(true);
   });
 });
