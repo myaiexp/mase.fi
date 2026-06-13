@@ -14,12 +14,13 @@ let _resizeRaf = 0;
 let _lastMsgWidth = 0;
 let _chipNavWired = false;
 
+const NICK_COLORS = { git: '#06b6d4', mase: '#e8a308' };
+
 function nickColor(nick) {
+  if (Object.hasOwn(NICK_COLORS, nick)) return NICK_COLORS[nick];
   const palette = ['#e8a308', '#ffbe2a', '#f59e0b', '#eab308', '#a16207', '#fcd34d', '#fbbf24'];
   let h = 0;
   for (const c of nick) h = ((h << 5) - h + c.charCodeAt(0)) | 0;
-  if (nick === 'git') return '#06b6d4';
-  if (nick === 'mase') return '#e8a308';
   return palette[Math.abs(h) % palette.length];
 }
 
