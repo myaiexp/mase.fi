@@ -22,26 +22,26 @@ function pinnedHome(data) {
   const last = lastLog(data);
   // lastStr uses escapeHtml on user data; the accent span is a static wrapper
   const lastStr = last
-    ? last.date.slice(0, 10) + ' \xb7 ' + last.date.slice(11, 16) + ' \xb7 <span class="accent">' + escapeHtml(last.project || '—') + '</span>'
+    ? `${last.date.slice(0, 10)} \xb7 ${last.date.slice(11, 16)} \xb7 <span class="accent">${escapeHtml(last.project || '—')}</span>`
     : '—';
-  return '<div class="card">' +
+  return `<div class="card">` +
     cardHead([['modes', '+ntr'], ['users', '1'], ['since', '2018']], '● live') +
-    '<div class="card-body pin-grid">' +
-    '<pre class="ascii">' + escapeHtml(LOGO) + '</pre>' +
-    '<div>' +
-    '<p class="pin-tagline"><b>mase</b> — software, in progress. this is the always-on log: what i shipped, what i broke, what i thought was worth writing down.</p>' +
-    '<dl class="pin-meta">' +
-    '<dt>projects</dt><dd class="accent">' + data.projects.length + ' active</dd>' +
-    '<dt>commits</dt><dd>' + totalCommits + ' in feed \xb7 ' + spark + '</dd>' +
-    '<dt>last push</dt><dd>' + lastStr + '</dd>' +
-    '<dt>links</dt><dd class="links">' +
-    '<a href="#/activity">activity</a>' +
-    '<a href="https://github.com/myaiexp">github</a>' +
-    '</dd>' +
-    '</dl>' +
-    '</div>' +
-    '</div>' +
-    '</div>';
+    `<div class="card-body pin-grid">` +
+    `<pre class="ascii">${escapeHtml(LOGO)}</pre>` +
+    `<div>` +
+    `<p class="pin-tagline"><b>mase</b> — software, in progress. this is the always-on log: what i shipped, what i broke, what i thought was worth writing down.</p>` +
+    `<dl class="pin-meta">` +
+    `<dt>projects</dt><dd class="accent">${data.projects.length} active</dd>` +
+    `<dt>commits</dt><dd>${totalCommits} in feed \xb7 ${spark}</dd>` +
+    `<dt>last push</dt><dd>${lastStr}</dd>` +
+    `<dt>links</dt><dd class="links">` +
+    `<a href="#/activity">activity</a>` +
+    `<a href="https://github.com/myaiexp">github</a>` +
+    `</dd>` +
+    `</dl>` +
+    `</div>` +
+    `</div>` +
+    `</div>`;
 }
 
 function pinnedProject(p, data) {
