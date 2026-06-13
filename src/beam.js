@@ -13,6 +13,9 @@ const REFORM_MS = 1900;
 const REST_MS  = 24000;
 const FIRST_DELAY_MS = 1600;
 
+// Deliberate single-active-beam singleton: only one beam runs at a time. mountBeam
+// tears down the previous beam (calls activeCleanup) before mounting the next, so a
+// re-mount never leaves a second animation loop running. Not a multi-beam registry by design.
 let activeCleanup = null;
 
 // Per-span bucket cache: { b: lastBucket, sb: lastDecaySubBucket }. Keyed off the
