@@ -27,8 +27,7 @@ customElements.define('base-option-group', BaseOptionGroup);
 // --- base-select ─────────────────────────────────────────────────────────────
 
 const selectTemplate = document.createElement('template');
-const style = document.createElement('style');
-style.textContent = `
+selectTemplate.innerHTML = `<style>
   :host {
     display: inline-block;
     position: relative;
@@ -144,15 +143,9 @@ style.textContent = `
     font-family: var(--font-mono, monospace);
     color: var(--text-muted, #71717a);
   }
-`;
-const triggerWrap = document.createElement('div');
-triggerWrap.setAttribute('part', 'trigger-wrap');
-const menuDiv = document.createElement('div');
-menuDiv.setAttribute('part', 'menu');
-menuDiv.hidden = true;
-selectTemplate.content.appendChild(style);
-selectTemplate.content.appendChild(triggerWrap);
-selectTemplate.content.appendChild(menuDiv);
+</style>
+<div part="trigger-wrap"></div>
+<div part="menu" hidden></div>`;
 
 class BaseSelect extends HTMLElement {
   static observedAttributes = ['value', 'placeholder', 'searchable', 'disabled', 'size'];
