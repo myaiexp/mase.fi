@@ -87,7 +87,10 @@ export function initChannels(data) {
     })),
     { id: 'activity', group: 'system', label: 'activity', topic: 'raw commit stream across all projects' },
   ];
-  // Rebuild byId in-place so other modules holding the exported reference see updates
+  // Rebuild byId IN-PLACE (clear keys, then repopulate) — do NOT reassign.
+  // Other modules (e.g. sidebar.js) import the byId object reference and read
+  // through it (byId.home, byId[p.channel]). Mutating the same object keeps
+  // their reference live; `byId = {...}` would orphan their now-stale copies.
   Object.keys(byId).forEach(k => delete byId[k]);
   CHANNELS.forEach(c => { byId[c.id] = c; });
 
