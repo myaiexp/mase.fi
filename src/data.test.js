@@ -197,6 +197,41 @@ describe('fetchData routing', () => {
   });
 });
 
+// ---- normalizeDate (via fetchData) ---------------------------------------
+// normalizeDate is module-private (not exported), so it's exercised through its
+// only caller: fetchData maps each entry's raw date through it into entry.date.
+// These pin every branch of the normalizer by asserting the resulting .date.
+
+describe('fetchData date normalization (normalizeDate)', () => {
+  // Push one daily entry (no project → routes to #home regardless of date) and
+  // read back the normalized date fetchData produced.
+  async function dateOf(rawDate) {
+    stubFetch({ projects: [], entries: [{ category: 'daily', date: rawDate, text: 't' }] });
+    const data = await fetchData();
+    return data.entries[0].date;
+  }
+
+  it('appends T00:00 to a bare YYYY-MM-DD date', async () => {
+    expect(await dateOf('2026-01-01')).toBe('2026-01-01T00:00');
+  });
+
+  it('truncates a full ISO timestamp to minute precision (YYYY-MM-DDTHH:MM)', async () => {
+    expect(await dateOf('2026-01-01T08:30:45.123Z')).toBe('2026-01-01T08:30');
+  });
+
+  it('leaves an already-minute-precision timestamp unchanged', async () => {
+    expect(await dateOf('2026-01-01T08:30')).toBe('2026-01-01T08:30');
+  });
+
+  it('falls back to the epoch for an empty/missing date', async () => {
+    expect(await dateOf('')).toBe('1970-01-01T00:00');
+  });
+
+  it('returns an unrecognized date format unchanged', async () => {
+    expect(await dateOf('01/02/2026')).toBe('01/02/2026');
+  });
+});
+
 // ---- totalLogCount -------------------------------------------------------
 
 describe('totalLogCount', () => {
