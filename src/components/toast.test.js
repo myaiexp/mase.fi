@@ -36,6 +36,30 @@ describe('BaseToast', () => {
     expect(container.children.length).toBe(0);
   });
 
+  it('fades out (opacity 0) before removal, not abruptly', () => {
+    BaseToast.show('fading', 'info', 100);
+    const container = document.querySelector('[data-toast-container]');
+    const toast = container.children[0];
+
+    // The opacity transition is what makes the fade visible rather than a snap.
+    expect(toast.style.transition).toBe('opacity 0.3s');
+    // Fully visible while the duration is still counting down.
+    expect(toast.style.opacity).toBe('1');
+
+    // At the duration boundary the fade begins, but the toast is NOT yet removed.
+    vi.advanceTimersByTime(100);
+    expect(toast.style.opacity).toBe('0');
+    expect(container.children.length).toBe(1);
+
+    // Mid-fade (before the 300ms transition completes) the toast is still present.
+    vi.advanceTimersByTime(299);
+    expect(container.children.length).toBe(1);
+
+    // Only after the full 300ms fade does the toast leave the DOM.
+    vi.advanceTimersByTime(1);
+    expect(container.children.length).toBe(0);
+  });
+
   it('multiple toasts stack vertically', () => {
     BaseToast.show('first');
     BaseToast.show('second');
