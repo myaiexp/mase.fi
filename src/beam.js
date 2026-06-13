@@ -15,6 +15,10 @@ const FIRST_DELAY_MS = 1600;
 
 let activeCleanup = null;
 
+// Per-span bucket cache: { b: lastBucket, sb: lastDecaySubBucket }. Keyed off the
+// span so the cache is GC'd with the element instead of polluting the DOM node.
+const buckets = new WeakMap();
+
 function sampleScramble() {
   return SCRAMBLE[(Math.random() * SCRAMBLE.length) | 0];
 }
@@ -39,8 +43,10 @@ function paintChar(span, original, dest) {
   else if (dest < 1.0)   bucket = 3; // decay (ramp ▓▒░·)
   else                   bucket = 4; // ash
 
-  const prevBucket = span._b;
-  const prevSubBucket = span._sb;
+  let rec = buckets.get(span);
+  if (!rec) { rec = { b: undefined, sb: undefined }; buckets.set(span, rec); }
+  const prevBucket = rec.b;
+  const prevSubBucket = rec.sb;
 
   if (bucket === 0) {
     if (prevBucket !== 0) {
@@ -63,7 +69,7 @@ function paintChar(span, original, dest) {
     if (prevBucket !== 3 || prevSubBucket !== idx) {
       span.textContent = DECAY_RAMP[idx];
       span.className = 'bch dc dc' + idx;
-      span._sb = idx;
+      rec.sb = idx;
     }
   } else {
     if (prevBucket !== 4) {
@@ -71,7 +77,7 @@ function paintChar(span, original, dest) {
       span.className = 'bch ash';
     }
   }
-  span._b = bucket;
+  rec.b = bucket;
 }
 
 /** Mount the beam effect over an `.ascii` element. Returns a cleanup fn. */
@@ -153,8 +159,7 @@ export function mountBeam(asciiEl, logoText) {
     for (const c of chars) {
       c.el.textContent = c.original;
       c.el.className = 'bch';
-      c.el._b = 0;
-      c.el._sb = undefined;
+      buckets.set(c.el, { b: 0, sb: undefined });
     }
     beam.style.opacity = '0';
   }
