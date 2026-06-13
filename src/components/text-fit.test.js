@@ -138,6 +138,34 @@ describe('base-text-fit mode=justify', () => {
   });
 });
 
+describe('base-text-fit mode=wrap', () => {
+  it('wraps and truncates last line with ellipsis when exceeding lines limit', async () => {
+    const el = document.createElement('base-text-fit');
+    el.setAttribute('mode', 'wrap');
+    el.setAttribute('lines', '3');
+    el.textContent = 'word '.repeat(100);
+    document.body.appendChild(el);
+    await new Promise(r => setTimeout(r, 0));
+    const rendered = el.shadowRoot.querySelector('#text').textContent;
+    // Overflow branch: kept first 3 lines, last truncated with ellipsis.
+    expect(rendered.split('\n').length).toBe(3);
+    expect(rendered).toContain('…');
+  });
+
+  it('renders short text without ellipsis in wrap mode', async () => {
+    const el = document.createElement('base-text-fit');
+    el.setAttribute('mode', 'wrap');
+    el.setAttribute('lines', '2');
+    el.textContent = 'tiny';
+    document.body.appendChild(el);
+    await new Promise(r => setTimeout(r, 0));
+    const rendered = el.shadowRoot.querySelector('#text').textContent;
+    // Balanced branch: fits within lines, no truncation.
+    expect(rendered).not.toContain('…');
+    expect(rendered.replace(/\n/g, '')).toBe('tiny');
+  });
+});
+
 describe('BaseTextFit.justifyLines (static)', () => {
   const DEFAULT_FONT = '13px monospace';
   let prepareWithSegments;
@@ -218,5 +246,54 @@ describe('BaseTextFit.truncate (static)', () => {
     const prepared = prep('');
     const result = BaseTextFit.truncate(prepared, 200, 1);
     expect(result).toBe('');
+  });
+});
+
+describe('BaseTextFit.wrapOptimal (static)', () => {
+  const DEFAULT_FONT = '13px monospace';
+  let prepareWithSegments;
+
+  beforeAll(async () => {
+    const mod = await import('@chenglou/pretext');
+    prepareWithSegments = mod.prepareWithSegments;
+  });
+
+  function prep(text) {
+    const result = prepareWithSegments(text, DEFAULT_FONT);
+    result._font = DEFAULT_FONT;
+    return result;
+  }
+
+  it('returns empty string for null prepared', () => {
+    expect(BaseTextFit.wrapOptimal(null, 200, 2)).toBe('');
+  });
+
+  it('returns empty string for empty text', () => {
+    expect(BaseTextFit.wrapOptimal(prep(''), 200, 2)).toBe('');
+  });
+
+  it('balances width when text fits within maxLines (no truncation)', () => {
+    // 'aaa bbb ccc' = 11 chars * 8px = 88px, fits in 1 line at 200px.
+    // stats.lineCount (1) <= maxLines (3) -> balanced binary-search branch.
+    const result = BaseTextFit.wrapOptimal(prep('aaa bbb ccc'), 200, 3);
+    expect(result).not.toContain('…');
+    expect(result.split('\n').length).toBeLessThanOrEqual(3);
+    for (const w of ['aaa', 'bbb', 'ccc']) expect(result).toContain(w);
+  });
+
+  it('truncates last line with ellipsis when text exceeds maxLines', () => {
+    // Far more than 2 lines of text -> overflow branch, last line truncated.
+    const result = BaseTextFit.wrapOptimal(prep('word '.repeat(100)), 200, 2);
+    expect(result.split('\n').length).toBe(2);
+    expect(result).toContain('…');
+  });
+
+  it('wraps without truncation when maxLines is 0', () => {
+    // maxLines=0 -> neither balanced nor overflow branch; collect all wrapped lines.
+    // 19 chars * 8px = 152px > 100px container -> must wrap to multiple lines.
+    const result = BaseTextFit.wrapOptimal(prep('aaa bbb ccc ddd eee'), 100, 0);
+    expect(result).not.toContain('…');
+    for (const w of ['aaa', 'bbb', 'ccc', 'ddd', 'eee']) expect(result).toContain(w);
+    expect(result.split('\n').length).toBeGreaterThan(1);
   });
 });
