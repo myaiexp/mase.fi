@@ -19,6 +19,8 @@ export default [
         setInterval: 'readonly',
         clearInterval: 'readonly',
         requestAnimationFrame: 'readonly',
+        cancelAnimationFrame: 'readonly',
+        performance: 'readonly',
         localStorage: 'readonly',
         location: 'readonly',
         matchMedia: 'readonly',
