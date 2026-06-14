@@ -113,8 +113,9 @@ class BaseModal extends HTMLElement {
     this.shadowRoot.querySelector('[data-close]').addEventListener('click', () => this.close());
 
     // Backdrop click — but not content clicks (stop propagation from content)
-    this.shadowRoot.querySelector('[data-backdrop]').addEventListener('click', (e) => {
-      if (e.target === this.shadowRoot.querySelector('[data-backdrop]')) {
+    const backdrop = this.shadowRoot.querySelector('[data-backdrop]');
+    backdrop.addEventListener('click', (e) => {
+      if (e.target === backdrop) {
         this.close();
       }
     });
