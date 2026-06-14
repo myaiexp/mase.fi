@@ -101,7 +101,7 @@ const FOCUSABLE_SELECTORS = [
 ].join(', ');
 
 class BaseModal extends HTMLElement {
-  #_open = false;
+  #open = false;
   #onKeyDown = null;
 
   constructor() {
@@ -127,11 +127,11 @@ class BaseModal extends HTMLElement {
   }
 
   get isOpen() {
-    return this.#_open;
+    return this.#open;
   }
 
   open() {
-    this.#_open = true;
+    this.#open = true;
     this.setAttribute('open', '');
 
     // Bind and register keydown handler
@@ -146,7 +146,7 @@ class BaseModal extends HTMLElement {
   }
 
   close() {
-    this.#_open = false;
+    this.#open = false;
     this.removeAttribute('open');
 
     if (this.#onKeyDown) {
@@ -158,7 +158,7 @@ class BaseModal extends HTMLElement {
   }
 
   _handleKeyDown(e) {
-    if (!this.#_open) return;
+    if (!this.#open) return;
 
     if (e.key === 'Escape') {
       e.preventDefault();
