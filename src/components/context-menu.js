@@ -52,7 +52,6 @@ menuTemplate.innerHTML = `<style>
 
 class BaseContextMenu extends HTMLElement {
   #zones = new Map();
-  #zoneOrder = [];
   #open = false;
   #highlightIdx = -1;
   #items = [];
@@ -83,17 +82,13 @@ class BaseContextMenu extends HTMLElement {
   }
 
   register(id, { selector, items }) {
-    const existed = this.#zones.has(id);
+    // Map preserves insertion order, and re-setting an existing key keeps its
+    // original position — so zone iteration order is derived, never duplicated.
     this.#zones.set(id, { selector, items });
-    if (!existed) {
-      this.#zoneOrder.push(id);
-    }
   }
 
   unregister(id) {
     this.#zones.delete(id);
-    const idx = this.#zoneOrder.indexOf(id);
-    if (idx !== -1) this.#zoneOrder.splice(idx, 1);
   }
 
   show(x, y, items) {
@@ -157,9 +152,7 @@ class BaseContextMenu extends HTMLElement {
     // Close any open menu first
     if (this.#open) this.close();
 
-    for (const id of this.#zoneOrder) {
-      const zone = this.#zones.get(id);
-      if (!zone) continue;
+    for (const zone of this.#zones.values()) {
       const matched = e.target.closest(zone.selector);
       if (!matched) continue;
 
