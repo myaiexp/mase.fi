@@ -460,6 +460,73 @@ describe('base-select', () => {
     expect(input.value).toBe('Apple');
   });
 
+  it('close restores input to selected label after an abandoned search', () => {
+    const el = createSelect({ searchable: true, value: 'a', options: [
+      { value: 'a', label: 'Apple' },
+      { value: 'b', label: 'Banana' },
+    ] });
+    el.open();
+
+    const input = getTrigger(el);
+    input.value = 'ban';
+    input.dispatchEvent(new Event('input', { bubbles: true }));
+    expect(input.value).toBe('ban');
+
+    el.close();
+    expect(input.value).toBe('Apple');
+  });
+
+  it('close clears input when nothing is selected', () => {
+    const el = createSelect({ searchable: true, options: [{ value: 'a', label: 'Apple' }] });
+    el.open();
+
+    const input = getTrigger(el);
+    input.value = 'app';
+    input.dispatchEvent(new Event('input', { bubbles: true }));
+
+    el.close();
+    expect(input.value).toBe('');
+  });
+
+  it('close resets the filter so a fresh open shows all options', () => {
+    const el = createSelect({ searchable: true, value: 'a', options: [
+      { value: 'a', label: 'Apple' },
+      { value: 'b', label: 'Banana' },
+    ] });
+    el.open();
+
+    const input = getTrigger(el);
+    input.value = 'ban';
+    input.dispatchEvent(new Event('input', { bubbles: true }));
+    expect(getOptions(el).filter(o => o.style.display !== 'none')).toHaveLength(1);
+
+    el.close();
+    el.open();
+    // Filter abandoned: every option visible again (incl. the selected Apple,
+    // which the restored input now displays) and no-matches stays hidden.
+    expect(getOptions(el).filter(o => o.style.display !== 'none')).toHaveLength(2);
+    expect(getMenu(el).querySelector('.no-matches').style.display).toBe('none');
+  });
+
+  it('close resets hidden group headers after a filtered search', () => {
+    const el = createSelect({ searchable: true, groups: [
+      { label: 'Fruits', options: [{ value: 'a', label: 'Apple' }] },
+      { label: 'Vegs', options: [{ value: 'c', label: 'Carrot' }] },
+    ] });
+    el.open();
+
+    const input = getTrigger(el);
+    input.value = 'carrot';
+    input.dispatchEvent(new Event('input', { bubbles: true }));
+    const headers = [...getMenu(el).querySelectorAll('.group-header')];
+    expect(headers[0].style.display).toBe('none');
+
+    el.close();
+    el.open();
+    expect(headers[0].style.display).toBe('');
+    expect(headers[1].style.display).toBe('');
+  });
+
   // --- Size variant ---
 
   it('sm size applies sm class to trigger', () => {

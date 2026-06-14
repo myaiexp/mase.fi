@@ -220,9 +220,13 @@ class BaseSelect extends HTMLElement {
     this.#highlightIdx = -1;
     this._removeDocListeners();
 
-    // Restore input text for searchable
+    // Searchable: cancelling reverts the trigger to the selected option's label
+    // AND clears the filter, so the abandoned query leaves no trace — a fresh
+    // open shows every option, not the stale filtered subset (which could even
+    // hide the selected option the input now displays).
     if (this._searchable && this._trigger) {
       this._syncTriggerText();
+      this._resetFilter();
     }
   }
 
@@ -478,6 +482,15 @@ class BaseSelect extends HTMLElement {
     const enabled = this._enabledOptionDivs();
     this.#highlightIdx = enabled.length ? 0 : -1;
     this._applyHighlight();
+  }
+
+  // Show every option/header and hide the no-matches row — the inverse of a
+  // filter pass, used when a search is abandoned (close) rather than applied.
+  _resetFilter() {
+    for (const opt of this._menu.querySelectorAll('.option')) opt.style.display = '';
+    for (const header of this._menu.querySelectorAll('.group-header')) header.style.display = '';
+    const noMatch = this._menu.querySelector('.no-matches');
+    if (noMatch) noMatch.style.display = 'none';
   }
 
   // --- Document listeners ---
