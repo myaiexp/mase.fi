@@ -8,7 +8,7 @@ function chanRow(c) {
   const bars = Array.from({ length: cells }, (_, i) =>
     `<b class="${i < on ? 'on' : ''}"></b>`).join('');
   return `
-    <div class="chan" data-ch="${c.id}" style="--ch-accent:${chAccent(c.id)}; --ch-heat:${chAccent(c.id)}">
+    <div class="chan" data-ch="${c.id}" style="--ch-accent:${chAccent(c.id)}">
       <span class="hash">#</span>
       <span class="name">${c.label}</span>
       <span class="heat" title="activity">${bars}</span>

@@ -91,7 +91,7 @@
   background: var(--faint);
   border-radius: 1px;
 }
-.chan .heat b.on { background: var(--ch-heat, var(--accent-lo)); }
+.chan .heat b.on { background: var(--ch-accent, var(--accent-lo)); }
 
 .chan.active {
   background: color-mix(in oklab, var(--ch-accent) 12%, transparent);
