@@ -8,6 +8,11 @@ import {
 // 4px gap after the project chip; matches `.feed-row .proj-pill { margin-right: 4px }`.
 const CHIP_GAP_PX = 4;
 
+// The feature-star fragment text (trailing space intentional). Shared by the
+// producer (buildItems / renderFallback) and the renderFragment detector so the
+// equality check can't typo-drift from the string it's matching against.
+const STAR_TEXT = '★ ';
+
 // Build fragment items for one row from the dataset attrs we stash at render time.
 function buildItems(row, font) {
   const items = [];
@@ -19,7 +24,7 @@ function buildItems(row, font) {
     items.push({ text: '#' + project, font, break: 'never', extraWidth: CHIP_GAP_PX });
   }
   if (isFeature) {
-    items.push({ text: '★ ', font, break: 'never' });
+    items.push({ text: STAR_TEXT, font, break: 'never' });
   }
   items.push({ text, font });
   return items;
@@ -36,7 +41,7 @@ function renderFragment(parent, frag, items, isFeature, chipTarget) {
     el.className = 'proj-pill';
     el.textContent = frag.text;
     if (chipTarget) el.dataset.target = chipTarget;
-  } else if (isFeature && item.text === '★ ') {
+  } else if (isFeature && item.text === STAR_TEXT) {
     el = document.createElement('span');
     el.className = 'star';
     el.textContent = frag.text;
@@ -66,7 +71,7 @@ function renderFallback(msg, row, isFeature) {
   if (isFeature) {
     const star = document.createElement('span');
     star.className = 'star';
-    star.textContent = '★ ';
+    star.textContent = STAR_TEXT;
     msg.appendChild(star);
   }
   msg.appendChild(document.createTextNode(row.dataset.raw || ''));
