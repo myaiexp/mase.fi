@@ -201,3 +201,33 @@ export function lastLog(data) {
   return best;
 }
 
+/**
+ * Single-pass log aggregate for the #home pinned card. Walks data.entries once
+ * and returns everything totalLogCount + dailyLogBuckets + lastLog produced
+ * separately, byte-for-byte identical to calling all three:
+ *   - totalCommits: count of every `log` entry
+ *   - buckets:      last-`days` per-day counts (finite, in-range dates only)
+ *   - last:         newest `log` entry by date string, or null
+ * The finite-date guard is a nested branch (not `continue`) so a malformed date
+ * still counts toward totalCommits and the lastLog comparison.
+ */
+export function homeLogStats(data, days = 28) {
+  const buckets = new Array(days).fill(0);
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const start = today.getTime() - (days - 1) * 86400000;
+  let totalCommits = 0;
+  let last = null;
+  for (const e of data.entries) {
+    if (e.cat !== 'log') continue;
+    totalCommits++;
+    const t = Date.parse(e.date);
+    if (Number.isFinite(t)) {
+      const idx = Math.floor((t - start) / 86400000);
+      if (idx >= 0 && idx < days) buckets[idx]++;
+    }
+    if (!last || e.date > last.date) last = e;
+  }
+  return { totalCommits, buckets, last };
+}
+

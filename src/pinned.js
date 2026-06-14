@@ -1,6 +1,6 @@
 // Pinned hero card renderers — one per channel kind
 import { LOGO, PROJECT_ART, sparkbar } from './ascii.js';
-import { totalLogCount, dailyLogBuckets, lastLog } from './data.js';
+import { homeLogStats } from './data.js';
 import { mountBeam } from './beam.js';
 import { escapeHtml } from './html.js';
 
@@ -15,11 +15,9 @@ function cardHead(meta, right) {
 }
 
 function pinnedHome(data) {
-  const totalCommits = totalLogCount(data);
-  const values = dailyLogBuckets(data, 28);
-  const maxV = Math.max(1, ...values);
-  const spark = sparkbar(values, maxV);
-  const last = lastLog(data);
+  const { totalCommits, buckets, last } = homeLogStats(data, 28);
+  const maxV = Math.max(1, ...buckets);
+  const spark = sparkbar(buckets, maxV);
   // lastStr uses escapeHtml on user data; the accent span is a static wrapper
   const lastStr = last
     ? `${last.date.slice(0, 10)} \xb7 ${last.date.slice(11, 16)} \xb7 <span class="accent">${escapeHtml(last.project || '—')}</span>`
