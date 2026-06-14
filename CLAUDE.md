@@ -43,8 +43,10 @@ Shared web components library built from `src/components/` via Vite library mode
 
 - **Build:** `npm run build:components` → `dist/base-components.js` (IIFE)
 - **URL:** `https://mase.fi/base-components.js`
-- **Components:** `<base-badge>`, `<base-modal>`, `<base-tabs>`/`<base-tab>`, `<base-dropdown>`/`<base-dropdown-item>`/`<base-dropdown-divider>`, `<base-select>`/`<base-option>`/`<base-option-group>`
+- **Components:** `<base-badge>`, `<base-modal>`, `<base-tabs>`/`<base-tab>`, `<base-dropdown>`/`<base-dropdown-item>`/`<base-dropdown-divider>`, `<base-select>`/`<base-option>`/`<base-option-group>`, `<base-text-fit>`, `<base-context-menu>`
 - **Toast:** `window.BaseToast.show(message, type, duration)` — no HTML tag, static API
+- **Text-fit:** `<base-text-fit lines="2" mode="wrap">…</base-text-fit>` — pretext-measured truncation/wrapping of its text content. Attrs: `lines` (max, default `1`; `0` = unlimited), `mode` (`fit` default = ellipsis truncate, `wrap` = balanced binary-search wrap, `justify` = word-spacing justify), `hyphenate` (no-op stub, warns once). Auto-sets `title` to full text; reflows on resize/content-change/font-load. No custom events.
+- **Context-menu:** singleton — place one `<base-context-menu>` in the DOM (it listens for `contextmenu` on `document`). Imperative API: `register(id, {selector, items})` (zone matched via `target.closest(selector)`; `items(target, selection)` callback returns an item array, or `[]`/falsy to fall through to the native menu), `unregister(id)`, `show(x, y, items)`, `close()`, `isOpen` getter. Item shape: `{label, action}`, `{separator: true}`, optional `disabled: true`. Keyboard nav (↑/↓/Enter/Esc), viewport-edge flip; closes on outside-click/scroll/blur. No custom events — selection runs the item's `action()`.
 - **Theming:** Shadow DOM with `base.css` custom properties (`--bg-raised`, `--accent`, `--green`, etc.)
 
 ## Deploy
