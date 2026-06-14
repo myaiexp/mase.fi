@@ -47,7 +47,11 @@ export async function fetchData() {
       if (t >= cutoff) counts.set(slug, (counts.get(slug) || 0) + 1);
       if (t > (lastActivity.get(slug) || 0)) lastActivity.set(slug, t);
     }
-    const maxCount = Math.max(1, ...counts.values());
+    // Reduce instead of spreading into Math.max: a large map would exceed the
+    // engine's argument-count limit (~65k) and throw. Floor of 1 matches the
+    // prior Math.max(1, …), which also yielded 1 for an empty map.
+    let maxCount = 1;
+    for (const c of counts.values()) if (c > maxCount) maxCount = c;
 
     const projects = rawProjects.map((p) => {
       const slug = (p.slug || p.channel || '').toLowerCase();
