@@ -1,6 +1,6 @@
-// Unit tests for ascii.js pure helpers (sparkbar, scramble, boxHeader, staticBand).
+// Unit tests for ascii.js pure helpers (sparkbar, scramble, boxHeader).
 import { describe, it, expect, vi, afterEach } from 'vitest';
-import { sparkbar, scramble, boxHeader, staticBand, GLYPHS } from './ascii.js';
+import { sparkbar, scramble, boxHeader, GLYPHS } from './ascii.js';
 
 const BARS = '▁▂▃▄▅▆▇█'; // 8 cells, indices 0..7
 const DIGITS = '0123456789ABCDEF'; // module-private in ascii.js; mirrored here for assertions
@@ -126,54 +126,5 @@ describe('boxHeader', () => {
     expect(out.endsWith(r)).toBe(true);
     expect(out.length).toBe(l.length + 4 + r.length); // exactly 4 dashes
     expect(out.slice(l.length, out.length - r.length)).toBe('────');
-  });
-});
-
-describe('staticBand', () => {
-  const inCharset = (ch) => ch === ' ' || GLYPHS.includes(ch) || DIGITS.includes(ch);
-
-  it('produces 5 rows of the default width (80)', () => {
-    const rows = staticBand().split('\n');
-    expect(rows.length).toBe(5);
-    for (const row of rows) expect(row.length).toBe(80);
-  });
-
-  it('honours a custom width', () => {
-    const rows = staticBand(12).split('\n');
-    expect(rows.length).toBe(5);
-    for (const row of rows) expect(row.length).toBe(12);
-  });
-
-  it('produces 5 empty rows for width 0', () => {
-    expect(staticBand(0)).toBe('\n\n\n\n');
-    expect(staticBand(0).split('\n')).toEqual(['', '', '', '', '']);
-  });
-
-  it('only emits spaces, GLYPHS or DIGITS characters', () => {
-    for (const ch of staticBand(40)) {
-      if (ch === '\n') continue;
-      expect(inCharset(ch)).toBe(true);
-    }
-  });
-
-  it('fills with spaces when Math.random is stubbed below 0.55', () => {
-    vi.spyOn(Math, 'random').mockReturnValue(0.1);
-    expect(staticBand(3)).toBe('   \n   \n   \n   \n   ');
-  });
-
-  it('emits GLYPHS in the 0.55..0.85 band', () => {
-    vi.spyOn(Math, 'random').mockReturnValue(0.7);
-    for (const ch of staticBand(4)) {
-      if (ch === '\n') continue;
-      expect(GLYPHS.includes(ch)).toBe(true);
-    }
-  });
-
-  it('emits DIGITS at or above 0.85', () => {
-    vi.spyOn(Math, 'random').mockReturnValue(0.9);
-    for (const ch of staticBand(4)) {
-      if (ch === '\n') continue;
-      expect(DIGITS.includes(ch)).toBe(true);
-    }
   });
 });

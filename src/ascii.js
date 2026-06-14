@@ -65,22 +65,6 @@ export function sparkbar(values, max) {
   }).join("");
 }
 
-// produce the "static band" text used during channel-switch
-export function staticBand(width = 80) {
-  const rows = [];
-  for (let r = 0; r < 5; r++) {
-    let line = "";
-    for (let c = 0; c < width; c++) {
-      const roll = Math.random();
-      if (roll < 0.55) line += " ";
-      else if (roll < 0.85) line += GLYPHS[Math.floor(Math.random() * GLYPHS.length)];
-      else line += DIGITS[Math.floor(Math.random() * DIGITS.length)];
-    }
-    rows.push(line);
-  }
-  return rows.join("\n");
-}
-
 // scramble a string — each char has `p` chance of being replaced by noise
 export function scramble(str, p = 0.6) {
   let out = "";
@@ -101,6 +85,3 @@ export function boxHeader(label, right, width) {
   const dashes = Math.max(4, width - l.length - r.length);
   return l + "─".repeat(dashes) + r;
 }
-
-// For convenience for code that prefers to destructure:
-export const ASCII = { LOGO, PROJECT_ART, sparkbar, staticBand, scramble, boxHeader, GLYPHS };
