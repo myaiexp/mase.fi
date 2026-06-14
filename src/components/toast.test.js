@@ -74,6 +74,31 @@ describe('BaseToast', () => {
     expect(toast.style.borderColor).toBe('var(--red)');
   });
 
+  it('success type applies the green semantic color', () => {
+    BaseToast.show('saved', 'success');
+    const container = document.querySelector('[data-toast-container]');
+    const toast = container.children[0];
+    expect(toast.style.borderColor).toBe('var(--green)');
+  });
+
+  it('info type applies the blue semantic color', () => {
+    BaseToast.show('heads up', 'info');
+    const container = document.querySelector('[data-toast-container]');
+    const toast = container.children[0];
+    expect(toast.style.borderColor).toBe('var(--blue)');
+  });
+
+  it('warning is not a defined variant and falls back to the info color', () => {
+    // TYPE_COLORS defines only success/error/info — there is no 'warning' entry,
+    // so unknown types fall through to the info default rather than rendering
+    // uncolored. This test pins that fallback so a future 'warning' variant (or a
+    // change to the default) is a deliberate, visible decision.
+    BaseToast.show('careful', 'warning');
+    const container = document.querySelector('[data-toast-container]');
+    const toast = container.children[0];
+    expect(toast.style.borderColor).toBe('var(--blue)');
+  });
+
   it('container is created only once', () => {
     BaseToast.show('a');
     BaseToast.show('b');
