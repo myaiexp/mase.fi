@@ -195,6 +195,17 @@ describe('fetchData routing', () => {
     expect(data.entries).toEqual([]);
     expect(data.projects).toEqual([]);
   });
+
+  it('degrades to empty data when normalization throws (null element in entries)', async () => {
+    // A null entry makes the heat-count loop's `e.project` access throw. The fix
+    // keeps normalization inside the error boundary, so this degrades gracefully
+    // instead of escaping as an unhandled rejection that stalls the app shell.
+    stubFetch({ projects: [], entries: [null] });
+    const data = await fetchData();
+    expect(data.entries).toEqual([]);
+    expect(data.projects).toEqual([]);
+    expect(data.meta.nick).toBe('mase');
+  });
 });
 
 // ---- normalizeDate (via fetchData) ---------------------------------------
@@ -227,8 +238,12 @@ describe('fetchData date normalization (normalizeDate)', () => {
     expect(await dateOf('')).toBe('1970-01-01T00:00');
   });
 
-  it('returns an unrecognized date format unchanged', async () => {
-    expect(await dateOf('01/02/2026')).toBe('01/02/2026');
+  it('bounds an unrecognized date format to the epoch fallback', async () => {
+    expect(await dateOf('01/02/2026')).toBe('1970-01-01T00:00');
+  });
+
+  it('bounds an oversized/garbage date string to the epoch fallback', async () => {
+    expect(await dateOf('"><script>alert(1)</script>'.repeat(20))).toBe('1970-01-01T00:00');
   });
 });
 
