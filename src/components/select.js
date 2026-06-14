@@ -327,6 +327,9 @@ class BaseSelect extends HTMLElement {
     const div = document.createElement('div');
     div.className = 'option';
     div.dataset.value = opt.value;
+    // Store the clean label here: action options nest a <span> label beside an
+    // action-btn whose textContent is '...', so div.textContent is unreliable.
+    div.dataset.label = opt.label;
     div.setAttribute('tabindex', '-1');
     if (opt.disabled) div.classList.add('disabled');
     if (groupLabel) div.dataset.group = groupLabel;
@@ -368,7 +371,7 @@ class BaseSelect extends HTMLElement {
   _selectOption(div) {
     if (div.classList.contains('disabled')) return;
     const value = div.dataset.value;
-    const label = div.textContent;
+    const label = div.dataset.label;
     this.setAttribute('value', value);
     this._markSelected();
     this._syncTriggerText();

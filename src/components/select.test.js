@@ -501,6 +501,22 @@ describe('base-select', () => {
     expect(received[0].target).toBe(el);
   });
 
+  it('selecting an action option fires change with the clean label, not the action affordance text', () => {
+    const el = createSelect({ options: [{ value: 'foo', label: 'Foo', action: true }] });
+    getTrigger(el).click();
+
+    const changes = [];
+    el.addEventListener('change', (e) => changes.push(e.detail));
+
+    // Click the option div itself (not the action-btn) to select it normally.
+    getOptions(el)[0].click();
+
+    expect(changes).toHaveLength(1);
+    // div.textContent would be 'Foo...' (label span + action-btn '...'); the
+    // change label must be the clean 'Foo'.
+    expect(changes[0]).toEqual({ value: 'foo', label: 'Foo' });
+  });
+
   it('action button click does not trigger normal selection', () => {
     const el = createSelect({ options: [{ value: 'foo', label: 'Foo', action: true }] });
     getTrigger(el).click();
