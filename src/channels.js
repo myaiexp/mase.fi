@@ -94,7 +94,7 @@ export function initChannels(data) {
   Object.keys(byId).forEach(k => delete byId[k]);
   CHANNELS.forEach(c => { byId[c.id] = c; });
 
-  addEventListener('hashchange', () => navigate(parseHash(), { fromHash: true }));
+  window.addEventListener('hashchange', () => navigate(parseHash(), { fromHash: true }));
 }
 
 /** Drive the initial render based on location.hash. Call after the sidebar/tabbar are in the DOM. */

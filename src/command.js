@@ -246,7 +246,7 @@ export function initCommand(data) {
 
   // Global: "/" to focus, "?" for help, "g h" / "g a" quick jumps
   let leader = null;
-  addEventListener('keydown', e => {
+  window.addEventListener('keydown', e => {
     if (e.target === $cmdInput) return;
     if (e.target.matches('input, textarea')) return;
     if (e.key === '/') {
