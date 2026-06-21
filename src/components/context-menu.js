@@ -1,6 +1,7 @@
 // <base-context-menu> — singleton right-click context menu with zone-based registration
 
 import { MENU_SURFACE_CSS } from './menu-styles.js';
+import { addOverlayListeners, removeOverlayListeners } from './overlay-utils.js';
 
 const contextMenuTemplate = document.createElement('template');
 contextMenuTemplate.innerHTML = `<style>
@@ -53,10 +54,6 @@ class BaseContextMenu extends HTMLElement {
   #highlightIdx = -1;
   #items = [];
   #onContextMenu = null;
-  #onDocClick = null;
-  #onDocKeydown = null;
-  #onScroll = null;
-  #onBlur = null;
 
   constructor() {
     super();
@@ -171,52 +168,38 @@ class BaseContextMenu extends HTMLElement {
     this.close();
   }
 
+  // Shared lifecycle (close-on-outside-click + Escape + cleanup) comes from
+  // overlay-utils; the arrow/enter nav and scroll/blur-to-close are this
+  // component's extras layered on top via the same descriptor registry.
   _addDocListeners() {
-    this.#onDocClick = (e) => {
-      const path = e.composedPath();
-      if (!path.includes(this._menu)) this.close();
-    };
-    this.#onDocKeydown = (e) => {
-      if (e.key === 'Escape') {
-        this.close();
-      } else if (e.key === 'ArrowDown') {
-        e.preventDefault();
-        this._moveHighlight(1);
-      } else if (e.key === 'ArrowUp') {
-        e.preventDefault();
-        this._moveHighlight(-1);
-      } else if (e.key === 'Enter') {
-        e.preventDefault();
-        if (this.#highlightIdx >= 0) {
-          this._onItemClick(this.#highlightIdx);
-        }
-      }
-    };
-    this.#onScroll = () => this.close();
-    this.#onBlur = () => this.close();
-
-    document.addEventListener('click', this.#onDocClick);
-    document.addEventListener('keydown', this.#onDocKeydown);
-    window.addEventListener('scroll', this.#onScroll, { passive: true, capture: true });
-    window.addEventListener('blur', this.#onBlur);
+    addOverlayListeners(
+      this,
+      (e) => !e.composedPath().includes(this._menu),
+      [
+        { target: document, type: 'keydown', handler: (e) => this._onNavKeydown(e) },
+        { target: window, type: 'scroll', handler: () => this.close(), options: { passive: true, capture: true } },
+        { target: window, type: 'blur', handler: () => this.close() },
+      ],
+    );
   }
 
   _removeDocListeners() {
-    if (this.#onDocClick) {
-      document.removeEventListener('click', this.#onDocClick);
-      this.#onDocClick = null;
-    }
-    if (this.#onDocKeydown) {
-      document.removeEventListener('keydown', this.#onDocKeydown);
-      this.#onDocKeydown = null;
-    }
-    if (this.#onScroll) {
-      window.removeEventListener('scroll', this.#onScroll, { passive: true, capture: true });
-      this.#onScroll = null;
-    }
-    if (this.#onBlur) {
-      window.removeEventListener('blur', this.#onBlur);
-      this.#onBlur = null;
+    removeOverlayListeners(this);
+  }
+
+  // Escape is handled by overlay-utils; this covers menu navigation only.
+  _onNavKeydown(e) {
+    if (e.key === 'ArrowDown') {
+      e.preventDefault();
+      this._moveHighlight(1);
+    } else if (e.key === 'ArrowUp') {
+      e.preventDefault();
+      this._moveHighlight(-1);
+    } else if (e.key === 'Enter') {
+      e.preventDefault();
+      if (this.#highlightIdx >= 0) {
+        this._onItemClick(this.#highlightIdx);
+      }
     }
   }
 

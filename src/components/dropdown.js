@@ -50,14 +50,14 @@ class BaseDropdownItem extends HTMLElement {
 
   connectedCallback() {
     this.setAttribute('tabindex', '-1');
-    this._update();
+    this._syncClasses();
   }
 
   attributeChangedCallback() {
-    this._update();
+    this._syncClasses();
   }
 
-  _update() {
+  _syncClasses() {
     const variant = this.getAttribute('variant');
     const disabled = this.hasAttribute('disabled');
     this._span.classList.toggle('danger', variant === 'danger');
@@ -129,6 +129,11 @@ dropdownTemplate.innerHTML = `<style>
 
 class BaseDropdown extends HTMLElement {
   #open = false;
+  // Items already wired with click/keydown listeners. A WeakSet keyed on the
+  // element avoids stamping a bookkeeping flag onto the public DOM node (which
+  // would survive detach/reattach and leak into the element's namespace) and
+  // lets GC reclaim removed items.
+  #boundItems = new WeakSet();
 
   constructor() {
     super();
@@ -173,8 +178,8 @@ class BaseDropdown extends HTMLElement {
   _bindItems() {
     const items = this._items();
     for (const item of items) {
-      if (!item._dropdownBound) {
-        item._dropdownBound = true;
+      if (!this.#boundItems.has(item)) {
+        this.#boundItems.add(item);
         item.addEventListener('click', () => this._selectItem(item));
         item.addEventListener('keydown', (e) => this._onItemKeydown(e, item));
       }
