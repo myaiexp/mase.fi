@@ -36,27 +36,40 @@ if [ ! -f "$UPDATES_FILE" ]; then
   echo '{"entries":[],"projects":[]}' > "$UPDATES_FILE"
 fi
 
-jq --arg date "$DATE" \
-   --arg project "$PROJECT" \
-   --arg text "$TEXT" \
-   --arg category "$CATEGORY" \
-   --argjson limit "$STICKY_LIMIT" \
-   '
-   .entries = [{date: $date, project: $project, text: $text, category: $category, sticky: true}] + .entries
-   | .entries = (
-       [ .entries | to_entries[] | select(.value.category == $category and .value.sticky == true) | .key ] as $sticky_indices
-       | if ($sticky_indices | length) > $limit then
-           ($sticky_indices[$limit:]) as $demote
-           | .entries | to_entries | map(
-               if (.key | IN($demote[])) then .value.sticky = false | .value else .value end
-             )
-         else
-           .entries
-         end
-     )
-   ' \
-   "$UPDATES_FILE" > /tmp/updates.json.tmp \
-&& cp /tmp/updates.json.tmp "$UPDATES_FILE" \
-&& rm /tmp/updates.json.tmp
+# Serialize against concurrent writers — deploy's commit-logger and other
+# mase-fi-update calls all mutate this one shared file, and a non-atomic cp
+# once let two of them interleave bytes and tear it. Shared lock path with
+# helm/scripts/deploy; a one-shot validity gate fails loud on a bad file
+# instead of silently echoing "Added"; unique mktemp avoids a shared temp.
+(
+  flock -w 30 9 || { echo "Error: updates.json lock busy >30s — not added" >&2; exit 1; }
+  if ! jq empty "$UPDATES_FILE" 2>/dev/null; then
+    echo "Error: $UPDATES_FILE is malformed JSON — fix it before adding entries" >&2
+    exit 1
+  fi
+  UPD_TMP=$(mktemp)
+  jq --arg date "$DATE" \
+     --arg project "$PROJECT" \
+     --arg text "$TEXT" \
+     --arg category "$CATEGORY" \
+     --argjson limit "$STICKY_LIMIT" \
+     '
+     .entries = [{date: $date, project: $project, text: $text, category: $category, sticky: true}] + .entries
+     | .entries = (
+         [ .entries | to_entries[] | select(.value.category == $category and .value.sticky == true) | .key ] as $sticky_indices
+         | if ($sticky_indices | length) > $limit then
+             ($sticky_indices[$limit:]) as $demote
+             | .entries | to_entries | map(
+                 if (.key | IN($demote[])) then .value.sticky = false | .value else .value end
+               )
+           else
+             .entries
+           end
+       )
+     ' \
+     "$UPDATES_FILE" > "$UPD_TMP" \
+  && cp "$UPD_TMP" "$UPDATES_FILE"
+  rm -f "$UPD_TMP"
+) 9>/tmp/mase-updates-json.lock
 
 echo "Added $CATEGORY entry: [$PROJECT] $TEXT ($DATE)"
