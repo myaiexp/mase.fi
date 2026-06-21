@@ -2,7 +2,7 @@
 
 import { addOverlayListeners, removeOverlayListeners } from './overlay-utils.js';
 import { applyMenuFlip } from './menu-flip.js';
-import { MENU_SURFACE_CSS } from './menu-styles.js';
+import { MENU_ITEM_CSS, MENU_SURFACE_CSS } from './menu-styles.js';
 
 // ─── base-dropdown-item ──────────────────────────────────────────────────────
 
@@ -12,17 +12,7 @@ itemTemplate.innerHTML = `<style>
     display: block;
     outline: none;
   }
-  span {
-    display: block;
-    padding: 4px 12px;
-    font-size: 13px;
-    font-family: var(--font-mono, monospace);
-    color: var(--text, #fafafa);
-    background: transparent;
-    cursor: pointer;
-    border-radius: 0;
-    white-space: nowrap;
-    user-select: none;
+  span {${MENU_ITEM_CSS}
   }
   span.danger {
     color: var(--red, #ef4444);

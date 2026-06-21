@@ -2,6 +2,7 @@
 
 import { addOverlayListeners, removeOverlayListeners } from './overlay-utils.js';
 import { applyMenuFlip } from './menu-flip.js';
+import { wrapIndex } from './menu-nav.js';
 import { selectStyles } from './select-styles.js';
 import './select-option.js';
 
@@ -262,11 +263,11 @@ class BaseSelect extends HTMLElement {
 
     if (e.key === 'ArrowDown') {
       e.preventDefault();
-      this.#highlightIdx = this.#highlightIdx >= opts.length - 1 ? 0 : this.#highlightIdx + 1;
+      this.#highlightIdx = wrapIndex(this.#highlightIdx, 1, opts.length);
       this._applyHighlight();
     } else if (e.key === 'ArrowUp') {
       e.preventDefault();
-      this.#highlightIdx = this.#highlightIdx <= 0 ? opts.length - 1 : this.#highlightIdx - 1;
+      this.#highlightIdx = wrapIndex(this.#highlightIdx, -1, opts.length);
       this._applyHighlight();
     } else if (e.key === 'Enter') {
       e.preventDefault();

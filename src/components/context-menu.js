@@ -1,6 +1,7 @@
 // <base-context-menu> — singleton right-click context menu with zone-based registration
 
-import { MENU_SURFACE_CSS } from './menu-styles.js';
+import { MENU_ITEM_CSS, MENU_SURFACE_CSS } from './menu-styles.js';
+import { wrapIndex } from './menu-nav.js';
 import { addOverlayListeners, removeOverlayListeners } from './overlay-utils.js';
 
 const contextMenuTemplate = document.createElement('template');
@@ -17,17 +18,7 @@ contextMenuTemplate.innerHTML = `<style>
   [part="menu"][hidden] {
     display: none;
   }
-  .item {
-    display: block;
-    padding: 4px 12px;
-    font-size: 12px;
-    font-family: var(--font-mono, monospace);
-    color: var(--text, #fafafa);
-    background: transparent;
-    cursor: pointer;
-    border-radius: 0;
-    white-space: nowrap;
-    user-select: none;
+  .item {${MENU_ITEM_CSS}
   }
   .item.highlighted {
     background: var(--bg-hover, #27272a);
@@ -90,7 +81,6 @@ class BaseContextMenu extends HTMLElement {
     this.#highlightIdx = -1;
     this.#open = true;
 
-    // Build menu content
     while (this._menu.firstChild) this._menu.firstChild.remove();
     for (let i = 0; i < items.length; i++) {
       const item = items[i];
@@ -112,12 +102,10 @@ class BaseContextMenu extends HTMLElement {
       }
     }
 
-    // Position
     this._menu.style.left = x + 'px';
     this._menu.style.top = y + 'px';
     this._menu.hidden = false;
 
-    // Flip if overflowing
     const rect = this._menu.getBoundingClientRect();
     if (rect.right > window.innerWidth) {
       this._menu.style.left = (x - rect.width) + 'px';
@@ -143,7 +131,6 @@ class BaseContextMenu extends HTMLElement {
   }
 
   _handleContextMenu(e) {
-    // Close any open menu first
     if (this.#open) this.close();
 
     for (const zone of this.#zones.values()) {
@@ -212,9 +199,7 @@ class BaseContextMenu extends HTMLElement {
 
     // Find next valid item
     for (let step = 0; step < len; step++) {
-      idx += direction;
-      if (idx < 0) idx = len - 1;
-      if (idx >= len) idx = 0;
+      idx = wrapIndex(idx, direction, len);
       const item = items[idx];
       if (!item.separator && !item.disabled) {
         this.#highlightIdx = idx;
