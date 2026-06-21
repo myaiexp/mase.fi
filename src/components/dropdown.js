@@ -2,6 +2,7 @@
 
 import { addOverlayListeners, removeOverlayListeners } from './overlay-utils.js';
 import { applyMenuFlip } from './menu-flip.js';
+import { MENU_SURFACE_CSS } from './menu-styles.js';
 
 // ─── base-dropdown-item ──────────────────────────────────────────────────────
 
@@ -111,12 +112,7 @@ dropdownTemplate.innerHTML = `<style>
     top: 100%;
     left: 0;
     z-index: 100;
-    min-width: 160px;
-    background: var(--bg-raised, #18181b);
-    border: 1px solid var(--border-color, #27272a);
-    border-radius: 0;
-    padding: 4px 0;
-    box-shadow: 0 4px 12px rgba(0,0,0,0.4);
+    min-width: 160px;${MENU_SURFACE_CSS}
   }
   [part="menu"].flip {
     top: auto;

@@ -1,149 +1,12 @@
-// <base-select>, <base-option>, <base-option-group> — custom select form control
+// <base-select> — custom select form control (options in select-option.js)
 
 import { addOverlayListeners, removeOverlayListeners } from './overlay-utils.js';
 import { applyMenuFlip } from './menu-flip.js';
-
-// --- base-option ─────────────────────────────────────────────────────────────
-
-class BaseOption extends HTMLElement {
-  static observedAttributes = ['value', 'disabled', 'action'];
-  get value() { return this.getAttribute('value') ?? ''; }
-  get disabled() { return this.hasAttribute('disabled'); }
-  get action() { return this.hasAttribute('action'); }
-  get label() { return this.textContent.trim(); }
-}
-
-customElements.define('base-option', BaseOption);
-
-// --- base-option-group ───────────────────────────────────────────────────────
-
-class BaseOptionGroup extends HTMLElement {
-  static observedAttributes = ['label'];
-  get label() { return this.getAttribute('label') ?? ''; }
-}
-
-customElements.define('base-option-group', BaseOptionGroup);
-
-// --- base-select ─────────────────────────────────────────────────────────────
+import { selectStyles } from './select-styles.js';
+import './select-option.js';
 
 const selectTemplate = document.createElement('template');
-selectTemplate.innerHTML = `<style>
-  :host {
-    display: inline-block;
-    position: relative;
-    font-family: var(--font-mono, monospace);
-    width: 100%;
-  }
-  button, input {
-    display: block;
-    width: 100%;
-    box-sizing: border-box;
-    padding: 6px 24px 6px 8px;
-    font-size: 13px;
-    font-family: var(--font-mono, monospace);
-    color: var(--text, #fafafa);
-    background: var(--bg-raised, #18181b);
-    border: 1px solid var(--border-color, #27272a);
-    border-radius: 0;
-    cursor: pointer;
-    text-align: left;
-    outline: none;
-    appearance: none;
-  }
-  button.sm, input.sm {
-    padding: 3px 20px 3px 6px;
-    font-size: 11px;
-  }
-  button .placeholder, input::placeholder {
-    color: var(--text-muted, #71717a);
-  }
-  :host([disabled]) button,
-  :host([disabled]) input {
-    opacity: 0.4;
-    cursor: default;
-  }
-  [part="menu"] {
-    position: absolute;
-    top: 100%;
-    left: 0;
-    right: 0;
-    z-index: 100;
-    background: var(--bg-raised, #18181b);
-    border: 1px solid var(--border-color, #27272a);
-    border-radius: 0;
-    padding: 4px 0;
-    max-height: 200px;
-    overflow-y: auto;
-    box-shadow: 0 4px 12px rgba(0,0,0,0.4);
-  }
-  [part="menu"].flip {
-    top: auto;
-    bottom: 100%;
-  }
-  [part="menu"][hidden] {
-    display: none;
-  }
-  .option {
-    padding: 4px 12px;
-    font-size: 13px;
-    font-family: var(--font-mono, monospace);
-    color: var(--text, #fafafa);
-    cursor: pointer;
-    white-space: nowrap;
-    user-select: none;
-  }
-  .option:hover, .option.active {
-    background: var(--bg-hover, #27272a);
-  }
-  .option.selected {
-    color: var(--accent, #3b82f6);
-  }
-  .option.disabled {
-    opacity: 0.4;
-    cursor: default;
-  }
-  .option.disabled:hover {
-    background: transparent;
-  }
-  .option.has-action {
-    position: relative;
-  }
-  .option .action-btn {
-    display: none;
-    position: absolute;
-    right: 8px;
-    top: 50%;
-    transform: translateY(-50%);
-    width: auto;
-    background: none;
-    border: none;
-    color: var(--text-muted, #71717a);
-    cursor: pointer;
-    padding: 0 4px;
-    font-size: 11px;
-    line-height: 1;
-  }
-  .option:hover .action-btn {
-    display: inline-block;
-  }
-  .option .action-btn:hover {
-    color: var(--text, #fafafa);
-  }
-  .group-header {
-    padding: 4px 12px;
-    font-size: 11px;
-    font-family: var(--font-mono, monospace);
-    color: var(--text-muted, #71717a);
-    text-transform: uppercase;
-    user-select: none;
-  }
-  .no-matches {
-    padding: 4px 12px;
-    font-size: 13px;
-    font-family: var(--font-mono, monospace);
-    color: var(--text-muted, #71717a);
-  }
-</style>
+selectTemplate.innerHTML = `${selectStyles}
 <div part="trigger-wrap"></div>
 <div part="menu" hidden></div>`;
 
@@ -153,8 +16,8 @@ class BaseSelect extends HTMLElement {
   #open = false;
   #highlightIdx = -1;
   #blurTimeout = null;
-  #lastLetter = '';
-  #lastLetterIdx = -1;
+  #lastJumpKey = '';
+  #lastJumpCycleIdx = -1;
 
   constructor() {
     super();
@@ -206,7 +69,6 @@ class BaseSelect extends HTMLElement {
 
     this._menu.hidden = false;
 
-    // Highlight first enabled option
     const opts = this._enabledOptionDivs();
     this.#highlightIdx = opts.length ? 0 : -1;
     this._applyHighlight();
@@ -224,7 +86,7 @@ class BaseSelect extends HTMLElement {
     // AND clears the filter, so the abandoned query leaves no trace — a fresh
     // open shows every option, not the stale filtered subset (which could even
     // hide the selected option the input now displays).
-    if (this._searchable && this._trigger) {
+    if (this._searchable) {
       this._syncTriggerText();
       this._resetFilter();
     }
@@ -273,25 +135,28 @@ class BaseSelect extends HTMLElement {
   _syncTriggerText() {
     if (!this._trigger) return;
     const sel = this.selectedOption;
+
     if (this._searchable) {
       this._trigger.value = sel ? sel.label : '';
       this._trigger.setAttribute('placeholder', this.getAttribute('placeholder') ?? '');
-    } else {
-      if (sel) {
-        this._trigger.textContent = sel.label;
-      } else {
-        const ph = this.getAttribute('placeholder') ?? '';
-        if (ph) {
-          const span = document.createElement('span');
-          span.className = 'placeholder';
-          span.textContent = ph;
-          this._trigger.textContent = '';
-          this._trigger.appendChild(span);
-        } else {
-          this._trigger.textContent = '';
-        }
-      }
+      return;
     }
+
+    if (sel) {
+      this._trigger.textContent = sel.label;
+      return;
+    }
+
+    const ph = this.getAttribute('placeholder') ?? '';
+    this._trigger.textContent = '';
+    if (ph) this._trigger.appendChild(this._makePlaceholderSpan(ph));
+  }
+
+  _makePlaceholderSpan(text) {
+    const span = document.createElement('span');
+    span.className = 'placeholder';
+    span.textContent = text;
+    return span;
   }
 
   _applySize() {
@@ -317,7 +182,6 @@ class BaseSelect extends HTMLElement {
         this._menu.appendChild(this._createOptionDiv(child, null));
       }
     }
-    // No-matches element (hidden by default)
     const noMatch = document.createElement('div');
     noMatch.className = 'no-matches';
     noMatch.textContent = 'No matches';
@@ -426,16 +290,16 @@ class BaseSelect extends HTMLElement {
     }
     if (!matches.length) return;
 
-    if (this.#lastLetter === lower && this.#lastLetterIdx >= 0) {
+    if (this.#lastJumpKey === lower && this.#lastJumpCycleIdx >= 0) {
       // Same letter repeated — cycle to next match
-      const nextIdx = (this.#lastLetterIdx + 1) % matches.length;
+      const nextIdx = (this.#lastJumpCycleIdx + 1) % matches.length;
       this.#highlightIdx = matches[nextIdx];
-      this.#lastLetterIdx = nextIdx;
+      this.#lastJumpCycleIdx = nextIdx;
     } else {
       // New letter — jump to first match
       this.#highlightIdx = matches[0];
-      this.#lastLetter = lower;
-      this.#lastLetterIdx = 0;
+      this.#lastJumpKey = lower;
+      this.#lastJumpCycleIdx = 0;
     }
     this._applyHighlight();
   }

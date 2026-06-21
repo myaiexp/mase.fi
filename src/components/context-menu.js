@@ -1,7 +1,9 @@
 // <base-context-menu> — singleton right-click context menu with zone-based registration
 
-const menuTemplate = document.createElement('template');
-menuTemplate.innerHTML = `<style>
+import { MENU_SURFACE_CSS } from './menu-styles.js';
+
+const contextMenuTemplate = document.createElement('template');
+contextMenuTemplate.innerHTML = `<style>
   :host {
     display: contents;
   }
@@ -9,12 +11,7 @@ menuTemplate.innerHTML = `<style>
     position: fixed;
     z-index: 1000;
     min-width: 140px;
-    max-width: 260px;
-    background: var(--bg-raised, #18181b);
-    border: 1px solid var(--border-color, #27272a);
-    border-radius: 0;
-    padding: 4px 0;
-    box-shadow: 0 4px 12px rgba(0,0,0,0.4);
+    max-width: 260px;${MENU_SURFACE_CSS}
   }
   [part="menu"][hidden] {
     display: none;
@@ -64,7 +61,7 @@ class BaseContextMenu extends HTMLElement {
   constructor() {
     super();
     this.attachShadow({ mode: 'open' });
-    this.shadowRoot.appendChild(menuTemplate.content.cloneNode(true));
+    this.shadowRoot.appendChild(contextMenuTemplate.content.cloneNode(true));
     this._menu = this.shadowRoot.querySelector('[part="menu"]');
   }
 
