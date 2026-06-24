@@ -47,6 +47,10 @@ function pinnedProject(p, data) {
   const commits = data.entries.filter(e => e.ch === p.channel && e.cat === 'log').length;
   const statusLabel = p.heat > 0.6 ? '● shipping' : p.heat > 0.3 ? '● steady' : '○ idle';
   const statusText = p.heat > 0.6 ? 'actively shipping' : p.heat > 0.3 ? 'steady' : 'maintenance only';
+  // "try demo →" when this channel has a published demo (demos/<channel>/).
+  const demoLink = (data.demos || []).includes(p.channel)
+    ? '<a class="demo-link" href="/demos/' + escapeHtml(p.channel) + '/">try demo →</a>'
+    : '';
   return '<div class="card">' +
     cardHead([['heat', (p.heat * 100 | 0) + '%'], ['commits', String(commits)]], statusLabel) +
     '<div class="card-body pin-grid">' +
@@ -56,7 +60,7 @@ function pinnedProject(p, data) {
     '<dl class="pin-meta">' +
     '<dt>activity</dt><dd>' + commits + ' commits in feed \xb7 heat ' + (p.heat * 100 | 0) + '%</dd>' +
     '<dt>status</dt><dd class="accent">' + statusText + '</dd>' +
-    '<dt>links</dt><dd class="links">' +
+    '<dt>links</dt><dd class="links">' + demoLink +
     p.links.map(l => '<a href="' + escapeHtml(l.href) + '">' + escapeHtml(l.label) + '</a>').join('') +
     '</dd>' +
     '</dl>' +
@@ -110,15 +114,18 @@ export function renderHeroLine(id, data) {
       '<a href="https://github.com/myaiexp">github</a>';
   } else if (project) {
     const statusText = project.heat > 0.6 ? 'shipping' : project.heat > 0.3 ? 'steady' : 'idle';
+    const demoLink = (data.demos || []).includes(id)
+      ? '<a class="demo-link" href="/demos/' + escapeHtml(id) + '/">try demo</a> <span class="sep">\xb7</span> '
+      : '';
     if (project.links && project.links.length > 0) {
       html =
-        '<span class="arr">→</span> ' +
+        '<span class="arr">→</span> ' + demoLink +
         '<a href="' + escapeHtml(project.links[0].href) + '">' + escapeHtml(project.links[0].label) + '</a> ' +
         '<span class="sep">\xb7</span> ' +
         '<span class="status">' + statusText + '</span>';
     } else {
       html =
-        '<span class="arr">→</span> ' +
+        '<span class="arr">→</span> ' + demoLink +
         '<span class="status">' + statusText + '</span>';
     }
   }

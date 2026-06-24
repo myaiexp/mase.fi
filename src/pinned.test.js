@@ -129,6 +129,20 @@ describe('renderPinned — project', () => {
     expect(html).not.toContain('<script>');
   });
 
+  it('renders a "try demo →" chip when the channel has a published demo', () => {
+    const data = { ...projectData({ channel: 'explorer', heat: 0.5, description: 'd', links: [] }), demos: ['explorer'] };
+    renderPinned('explorer', data);
+    const a = pinnedEl().querySelector('.demo-link');
+    expect(a).not.toBeNull();
+    expect(a.getAttribute('href')).toBe('/demos/explorer/');
+    expect(a.textContent).toContain('try demo');
+  });
+
+  it('omits the demo chip when the channel has no demo', () => {
+    renderPinned('explorer', projectData({ channel: 'explorer', heat: 0.5, description: 'd', links: [] }));
+    expect(pinnedEl().querySelector('.demo-link')).toBeNull();
+  });
+
   it('escapes malicious link href and label (no attribute breakout)', () => {
     const project = {
       channel: 'explorer',
@@ -209,6 +223,14 @@ describe('renderHeroLine', () => {
     const html = heroEl().innerHTML;
     expect(html).not.toContain('<a');
     expect(html).toContain('steady'); // heat > 0.3
+  });
+
+  it('includes a demo link when the channel has a published demo', () => {
+    const data = { projects: [{ channel: 'explorer', heat: 0.4, links: [] }], demos: ['explorer'] };
+    renderHeroLine('explorer', data);
+    const a = heroEl().querySelector('.demo-link');
+    expect(a).not.toBeNull();
+    expect(a.getAttribute('href')).toBe('/demos/explorer/');
   });
 
   it('escapes a malicious project link in the hero line', () => {

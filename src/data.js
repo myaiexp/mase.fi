@@ -1,6 +1,24 @@
 // Data adapter: fetches updates.json and normalizes it to the shape the UI expects.
 
 const SOURCE_URL = '/updates.json';
+const DEMOS_MANIFEST_URL = '/demos/manifest.json';
+
+/**
+ * Fetch the list of project channels that have a published demo, from the demos
+ * repo's manifest (written by its post-deploy from synced-dirs.txt). Tolerant of
+ * absence (no demos dir, local dev, 404) — returns [] so callers can always
+ * `.includes(channel)` without guarding. Returns a string[] of channel slugs.
+ */
+export async function fetchDemos() {
+  try {
+    const r = await fetch(DEMOS_MANIFEST_URL);
+    if (!r.ok) return [];
+    const list = await r.json();
+    return Array.isArray(list) ? list.filter((s) => typeof s === 'string') : [];
+  } catch {
+    return [];
+  }
+}
 
 /**
  * Fetch + normalize the live updates.json into the canonical shape used by the UI:

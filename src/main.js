@@ -1,5 +1,5 @@
 // Orchestrator: fetch updates, run boot (or skip), then wire all modules
-import { fetchData } from './data.js';
+import { fetchData, fetchDemos } from './data.js';
 import { shouldSkipBoot, runBoot, initReplayBoot } from './boot.js';
 import { initChannels, applyInitialChannel, navigate } from './channels.js';
 import { renderChanlist } from './sidebar.js';
@@ -9,10 +9,13 @@ import './styles/index.css';
 
 const reduced = matchMedia('(prefers-reduced-motion: reduce)').matches;
 const dataPromise = fetchData();
+const demosPromise = fetchDemos();
 initReplayBoot();
 
 async function init() {
   const data = await dataPromise;
+  // Attach the demo-channel list so pinned renderers can light up "try demo →".
+  data.demos = await demosPromise;
   initChannels(data);
   renderChanlist(data, navigate);
   initCommand(data);

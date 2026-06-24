@@ -28,6 +28,8 @@ Only list projects with a **public GitHub repo** or **live public deployment**. 
 
 Apps requiring login support `?demo` query param (per-app, not centrally).
 
+**Demo links:** A project channel surfaces a `try demo →` chip (hero card + mobile hero line) when the project has a published static demo in the `demos` repo, served at `https://mase.fi/demos/<channel>/`. mase.fi fetches `/demos/manifest.json` (written by the demos repo's `scripts/post-deploy.sh` from its `synced-dirs.txt`) and lights up the chip for any matching channel — adding a demo is a demos-repo-only change, no mase.fi edit needed. See `fetchDemos()` in `data.js` and the `demoLink` branches in `pinned.js`. Absent/404 manifest → no chips (local dev degrades cleanly).
+
 ## Design
 
 - **Background:** `#09090b` (near-black)
