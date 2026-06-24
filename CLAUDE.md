@@ -4,7 +4,7 @@
 
 ## Architecture
 
-- **Routing:** Hash-based (`#/home`, `#/explorer`, `#/about`), browser back/forward, localStorage last-channel
+- **Routing:** Hash-based (`#/home`, `#/explorer`, `#/about`), browser back/forward; defaults to `#home` via `parseHash()` (no last-channel persistence — only the boot animation uses localStorage)
 - **Channels:** `#home` (daily summaries), project channels (feature feed), `#activity` (commit log), `#about` (neofetch stats)
 - **Boot:** 3-phase TTY animation on first visit (7-day localStorage TTL), skip on click/key, `[▶ boot]` replay
 - **Search:** Plain text fuzzy-highlights feed lines, `/` prefix navigates to channels with autocomplete
@@ -51,8 +51,8 @@ Shared web components library built from `src/components/` via Vite library mode
 
 ## Deploy
 
-- `git push production main` then `git push origin main` (keep GitHub in sync)
-- Post-receive hook: `npm install` → `vite build` → copies `dist/` to webroot
+- Run `deploy` — pushes to the Forgejo `origin`, which fires a post-receive hook → `sudo forgejo-deploy mase.fi`.
+- Server-side build (`/usr/local/bin/forgejo-deploy`, `mase.fi` case): checks out to `/var/www/homepage-build`, runs `npm install --production=false && npm run build` (build-lock-wrapped, includes `build:components`) as user `mase`, then copies `dist/.` → `/var/www/html` (chowned to www-data). Build failure aborts before the copy, so a broken build can't ship a stale/empty webroot.
 - **Components:** `npm run build` now includes `build:components` automatically (chained in the script).
 - **build-lock:** package.json's `build` and `build:components` scripts already wrap vite in `build-lock`. Do **not** double-prefix (e.g. `build-lock npm run build`) — nesting two flocks on `/tmp/helm-build.lock` deadlocks the inner one for 30 min and produces an empty `dist/`. Invoke as plain `npm run build`.
 
