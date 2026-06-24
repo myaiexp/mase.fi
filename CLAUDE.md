@@ -4,8 +4,8 @@
 
 ## Architecture
 
-- **Routing:** Hash-based (`#/home`, `#/explorer`, `#/about`), browser back/forward; defaults to `#home` via `parseHash()` (no last-channel persistence — only the boot animation uses localStorage)
-- **Channels:** `#home` (daily summaries), project channels (feature feed), `#activity` (commit log), `#about` (neofetch stats)
+- **Routing:** Hash-based (`#/home`, `#/activity`, `#/<project>`), browser back/forward; defaults to `#home` via `parseHash()` (no last-channel persistence — only the boot animation uses localStorage)
+- **Channels:** `#home` (daily summaries), project channels (feature feed), `#activity` (commit log). Registry built in `channels.js` from `home` + `updates.json` projects + `activity` — no `#about` channel (removed in the rework).
 - **Boot:** 3-phase TTY animation on first visit (7-day localStorage TTL), skip on click/key, `[▶ boot]` replay
 - **Search:** Plain text fuzzy-highlights feed lines, `/` prefix navigates to channels with autocomplete
 - **Mobile (<640px):** Sidebar hidden, top bar with dropdown channel picker
