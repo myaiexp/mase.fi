@@ -119,7 +119,7 @@ class BaseTabs extends HTMLElement {
     this._applyActive();
 
     this.dispatchEvent(new CustomEvent('tab-change', {
-      detail: { index },
+      detail: { index, label: tabEl.getAttribute('label') || '' },
       bubbles: true,
       composed: true,
     }));
