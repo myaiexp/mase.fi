@@ -2,9 +2,18 @@
 import { CHANNELS, chAccent, navigate } from './channels.js';
 import { entriesFor } from './data.js';
 import { escapeHtml } from './html.js';
+import { buildCommands } from './commands.js';
+import { applySearch } from './command-search.js';
 
 let ccIndex = 0;
 let searchTerm = '';
+let _commands = [];
+
+// Run a feed search and remember the term so feed:relayout can re-apply it.
+function search(term) {
+  searchTerm = term.toLowerCase();
+  applySearch($feed, searchTerm);
+}
 
 // DOM refs — resolved lazily at init time
 let $cmd, $cmdInput, $cmdPrompt, $cmdHint, $cmdCC, $feed;
@@ -28,19 +37,29 @@ function updateMode() {
     if (v.trim()) {
       $cmd.classList.add('mode-search');
       $cmdHint.innerHTML = `<kbd>esc</kbd> clear`;
-      applySearch(v.trim());
+      search(v.trim());
     } else {
       $cmdHint.innerHTML = '';
-      applySearch('');
+      search('');
     }
   }
 }
 
 function renderComplete(q) {
   q = q.toLowerCase();
-  const matches = CHANNELS
-    .map(c => ({ c, score: fuzzyScore(c.label, q) }))
-    .filter(x => q === '' || x.score > 0)
+  const chMatches = CHANNELS
+    .map(c => ({ kind: 'channel', id: c.id, label: c.label, topic: c.topic, score: fuzzyScore(c.label, q) }))
+    .filter(x => q === '' || x.score > 0);
+  // Commands stay hidden on a bare "/" — they're easter eggs, surfaced only
+  // once the visitor types a genuine name *prefix* (or discovers them via /help
+  // and ?). Prefix, not fuzzy subsequence: otherwise "/o" (a channel hunt) would
+  // dredge up /whoami. The +10 prefix bonus keeps them ranked sensibly.
+  const cmdMatches = q === ''
+    ? []
+    : _commands
+      .filter(cmd => cmd.name.startsWith(q))
+      .map(cmd => ({ kind: 'cmd', cmd, label: cmd.name, desc: cmd.desc, score: fuzzyScore(cmd.name, q) }));
+  const matches = [...chMatches, ...cmdMatches]
     .sort((a, b) => b.score - a.score)
     .slice(0, 8);
   if (!matches.length) { hideComplete(); return; }
@@ -52,16 +71,7 @@ function renderComplete(q) {
       <span style="flex:1"></span>
       <span>tab-complete</span>
     </div>
-    ${matches.map((m, i) => {
-      const hit = highlightFuzzy(m.c.label, q);
-      const last = lastActivity(m.c.id);
-      return `
-        <div class="cc-item ${i === ccIndex ? 'selected' : ''}" data-ch="${m.c.id}" data-i="${i}" style="--ch-accent:${chAccent(m.c.id)}">
-          <div class="cc-ch"><span class="hash">#</span>${hit}</div>
-          <div class="cc-desc">${escapeHtml(m.c.topic)}</div>
-          <div class="cc-last">${last}</div>
-        </div>`;
-    }).join('')}
+    ${matches.map((m, i) => renderCompleteItem(m, i, q)).join('')}
   `;
   $cmdCC.hidden = false;
   $cmdCC.querySelectorAll('.cc-item').forEach(el => {
@@ -74,6 +84,28 @@ function renderComplete(q) {
     });
   });
   $cmdCC._matches = matches;
+}
+
+// Render one autocomplete row — a channel (#label, topic, recency) or a
+// slash-command (/name, description, "cmd" tag). All interpolated text is
+// escaped (highlightFuzzy escapes; escapeHtml on desc/topic; ids are slugs).
+function renderCompleteItem(m, i, q) {
+  const sel = i === ccIndex ? 'selected' : '';
+  const hit = highlightFuzzy(m.label, q);
+  if (m.kind === 'cmd') {
+    return `
+      <div class="cc-item is-cmd ${sel}" data-i="${i}">
+        <div class="cc-ch"><span class="slash">/</span>${hit}</div>
+        <div class="cc-desc">${escapeHtml(m.desc)}</div>
+        <div class="cc-last">cmd</div>
+      </div>`;
+  }
+  return `
+    <div class="cc-item ${sel}" data-ch="${m.id}" data-i="${i}" style="--ch-accent:${chAccent(m.id)}">
+      <div class="cc-ch"><span class="hash">#</span>${hit}</div>
+      <div class="cc-desc">${escapeHtml(m.topic)}</div>
+      <div class="cc-last">${lastActivity(m.id)}</div>
+    </div>`;
 }
 
 function renderHelp() {
@@ -92,9 +124,44 @@ function hideComplete() { $cmdCC.hidden = true; $cmdCC.innerHTML = ''; }
 function chooseFromComplete() {
   const m = ($cmdCC._matches || [])[ccIndex];
   if (!m) return;
+  if (m.kind === 'cmd') { runCommand(m.cmd); return; }
   $cmdInput.value = '';
   updateMode();
-  navigate(m.c.id);
+  navigate(m.id);
+  $cmdInput.blur();
+}
+
+// Append ephemeral IRC-style server-notice line(s) to the feed. Not .feed-row,
+// so relayoutAll and search (both query .feed-row) skip them; the next channel
+// render wipes them via replaceChildren. textContent only — no injection.
+function notice(lines) {
+  const arr = Array.isArray(lines) ? lines : [lines];
+  for (const text of arr) {
+    if (text == null) continue;
+    const el = document.createElement('div');
+    el.className = 'sys-notice';
+    const pre = document.createElement('span');
+    pre.className = 'sys-prefix';
+    pre.textContent = '-!-';
+    const body = document.createElement('span');
+    body.className = 'sys-body';
+    body.textContent = text;
+    el.append(pre, body);
+    $feed.appendChild(el);
+  }
+  $feed.scrollTop = $feed.scrollHeight;
+}
+
+function clearNotices() {
+  $feed.querySelectorAll('.sys-notice').forEach(el => el.remove());
+}
+
+// Run a slash-command: print its returned line(s) as notices, then reset input.
+function runCommand(cmd) {
+  const out = cmd.run();
+  if (out != null) notice(out);
+  $cmdInput.value = '';
+  updateMode();
   $cmdInput.blur();
 }
 
@@ -140,73 +207,6 @@ function lastActivity(id) {
   return Math.round(mins / 1440) + 'd';
 }
 
-// Walk text nodes inside an element and wrap substring matches with <mark>.
-// Operates per text node so we never touch element boundaries (pretext line
-// spans, .proj-pill, .star). Cross-line matches simply won't highlight — both
-// pretext and word search break at word boundaries, so this is rare.
-function highlightTextNodes(root, needle) {
-  const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
-  const targets = [];
-  for (let n = walker.nextNode(); n; n = walker.nextNode()) {
-    if (n.nodeValue.toLowerCase().includes(needle)) targets.push(n);
-  }
-  for (const node of targets) {
-    const text = node.nodeValue;
-    const lc = text.toLowerCase();
-    const frag = document.createDocumentFragment();
-    let i = 0;
-    while (i < text.length) {
-      const hit = lc.indexOf(needle, i);
-      if (hit < 0) { frag.appendChild(document.createTextNode(text.slice(i))); break; }
-      if (hit > i) frag.appendChild(document.createTextNode(text.slice(i, hit)));
-      const m = document.createElement('mark');
-      m.textContent = text.slice(hit, hit + needle.length);
-      frag.appendChild(m);
-      i = hit + needle.length;
-    }
-    node.parentNode.replaceChild(frag, node);
-  }
-}
-
-// Remove any <mark> wrappers and merge their text back into adjacent nodes.
-function clearMarks(root) {
-  const marks = root.querySelectorAll('mark');
-  for (const m of marks) {
-    const text = document.createTextNode(m.textContent);
-    m.parentNode.replaceChild(text, m);
-  }
-  // Normalize merges adjacent text nodes so future searches see one node per run.
-  root.normalize();
-}
-
-function applySearch(q) {
-  searchTerm = q.toLowerCase();
-  const needle = searchTerm;
-  $feed.querySelectorAll('.feed-row').forEach(row => {
-    const msg = row.querySelector('.msg');
-    if (!msg) return;
-    clearMarks(msg);
-    if (!needle) {
-      row.classList.remove('search-dim');
-      return;
-    }
-    const raw = (row.dataset.raw || '').toLowerCase();
-    if (raw.includes(needle)) {
-      highlightTextNodes(msg, needle);
-      row.classList.remove('search-dim');
-    } else {
-      row.classList.add('search-dim');
-    }
-  });
-  // Inject dim style once
-  if (!document.getElementById('search-dim-style')) {
-    const s = document.createElement('style');
-    s.id = 'search-dim-style';
-    s.textContent = '.feed-row.search-dim { opacity: 0.28; }';
-    document.head.appendChild(s);
-  }
-}
-
 // Module-level data ref set at init time
 let _data = null;
 
@@ -221,10 +221,18 @@ export function initCommand(data) {
   $cmdCC     = document.getElementById('cmd-complete');
   $feed      = document.getElementById('feed');
 
+  // Build the slash-command registry, wiring the side-effect hooks commands
+  // need (search reset + notice teardown) without commands.js touching the DOM.
+  _commands = buildCommands({
+    data,
+    clearSearch: () => { $cmdInput.value = ''; search(''); },
+    clearNotices,
+  });
+
   // Feed re-lays itself out on resize or channel switch; if a search is
   // active, the highlights are gone from the freshly-laid DOM, so re-apply.
   $feed.addEventListener('feed:relayout', () => {
-    if (searchTerm) applySearch(searchTerm);
+    if (searchTerm) applySearch($feed, searchTerm);
   });
 
   $cmdInput.addEventListener('input', updateMode);
@@ -239,7 +247,7 @@ export function initCommand(data) {
       const n = $cmdCC._matches.length;
       if (e.key === 'ArrowDown') { e.preventDefault(); ccIndex = (ccIndex + 1) % n; updateMode(); return; }
       if (e.key === 'ArrowUp')   { e.preventDefault(); ccIndex = (ccIndex - 1 + n) % n; updateMode(); return; }
-      if (e.key === 'Tab')       { e.preventDefault(); const m = $cmdCC._matches[ccIndex]; $cmdInput.value = '/' + m.c.label; updateMode(); return; }
+      if (e.key === 'Tab')       { e.preventDefault(); const m = $cmdCC._matches[ccIndex]; $cmdInput.value = '/' + m.label; updateMode(); return; }
       if (e.key === 'Enter')     { e.preventDefault(); chooseFromComplete(); return; }
     }
   });

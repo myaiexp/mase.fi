@@ -25,6 +25,8 @@ export default [
         location: 'readonly',
         matchMedia: 'readonly',
         getComputedStyle: 'readonly',
+        navigator: 'readonly',
+        screen: 'readonly',
         IntersectionObserver: 'readonly',
         ResizeObserver: 'readonly',
         AbortController: 'readonly',

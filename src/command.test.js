@@ -263,3 +263,47 @@ describe('applySearch', () => {
     expect(document.querySelector('.search-dim')).toBeNull();
   });
 });
+
+// ---- slash commands (easter-egg /help, /whoami, … in the "/" popup) -------
+
+describe('slash commands', () => {
+  const notices = () => [...document.getElementById('feed').querySelectorAll('.sys-notice')];
+
+  beforeEach(() => {
+    setChannels([ch('home'), ch('explorer'), ch('activity')]);
+    command.initCommand({ meta: { server: 'irc.test', bootTime: Date.now() } });
+  });
+
+  it('surfaces a matching command in the "/" popup, tagged is-cmd', () => {
+    type('/whoami'); // no channel matches "whoami"
+    const list = items();
+    expect(list).toHaveLength(1);
+    expect(list[0].classList.contains('is-cmd')).toBe(true);
+    expect(list[0].querySelector('.cc-ch').textContent).toContain('whoami');
+  });
+
+  it('keeps commands hidden on a bare "/" (channels only)', () => {
+    type('/');
+    expect(items().some((el) => el.classList.contains('is-cmd'))).toBe(false);
+    expect(items().map((el) => el.dataset.ch)).toEqual(['home', 'explorer', 'activity']);
+  });
+
+  it('Enter on a command prints server-notice line(s) and does not navigate', () => {
+    const input = type('/help');
+    input.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
+    const out = notices();
+    expect(out.length).toBeGreaterThan(1);
+    expect(out[0].textContent).toMatch(/slash commands/);
+    expect(input.value).toBe('');
+    expect(channels.navigate).not.toHaveBeenCalled();
+  });
+
+  it('/clear removes existing notices', () => {
+    let input = type('/help');
+    input.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
+    expect(notices().length).toBeGreaterThan(0);
+    input = type('/clear');
+    input.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
+    expect(notices()).toHaveLength(0);
+  });
+});
