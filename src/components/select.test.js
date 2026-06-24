@@ -166,9 +166,32 @@ describe('base-select', () => {
     expect(trigger.textContent).toContain('X Label');
   });
 
-  it('click outside closes menu', () => {
+  it('click outside closes menu', async () => {
     const el = createSelect({ options: [{ value: 'a', label: 'A' }] });
     getTrigger(el).click();
+    expect(el.isOpen).toBe(true);
+    await Promise.resolve(); // outside-click listener attaches on the next microtask
+    document.body.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    expect(el.isOpen).toBe(false);
+  });
+
+  it('stays open when opened from inside an external bubbling click (#1866)', async () => {
+    const el = createSelect({ searchable: true, options: [{ value: 'a', label: 'Apple' }, { value: 'b', label: 'Banana' }] });
+
+    // An unrelated control opens the select inside ITS click handler; that
+    // opening click then keeps bubbling up to document. A synchronously-attached
+    // outside-click listener would catch it and slam the menu shut the same tick.
+    const opener = document.createElement('button');
+    document.body.appendChild(opener);
+    opener.addEventListener('click', () => el.open());
+
+    opener.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    expect(el.isOpen).toBe(true);
+    expect(getMenu(el).hidden).toBe(false);
+
+    // Once the opening click is done, the outside-click listener is live, so a
+    // LATER outside click still closes the menu.
+    await Promise.resolve();
     expect(el.isOpen).toBe(true);
     document.body.dispatchEvent(new MouseEvent('click', { bubbles: true }));
     expect(el.isOpen).toBe(false);

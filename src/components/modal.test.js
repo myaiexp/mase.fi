@@ -185,17 +185,37 @@ describe('base-modal', () => {
     expect(focusable).not.toContain(disabled);
   });
 
-  it('focus trap does NOT exclude hidden focusables (actual behavior)', () => {
-    // Characterizes ACTUAL behavior: FOCUSABLE_SELECTORS (modal.js:94) filters
-    // [disabled] but not [hidden]/display:none, so a hidden button is still
-    // collected into the focus trap rather than skipped.
+  it('focus trap excludes hidden focusables (#1789)', () => {
+    // The trap must skip controls the user can't see: the hidden attribute,
+    // display:none, and visibility:hidden all disqualify an element.
     const modal = createModal();
     const visible = appendButton(modal, 'V');
     const hidden = appendButton(modal, 'H', { hidden: true });
 
+    const displayNone = appendButton(modal, 'D');
+    displayNone.style.display = 'none';
+    const invisible = appendButton(modal, 'I');
+    invisible.style.visibility = 'hidden';
+
     const focusable = modal._getFocusableElements();
     expect(focusable).toContain(visible);
-    expect(focusable).toContain(hidden); // not filtered out
+    expect(focusable).not.toContain(hidden);
+    expect(focusable).not.toContain(displayNone);
+    expect(focusable).not.toContain(invisible);
+  });
+
+  it('focus trap excludes a disabled control matched only by [tabindex] (#1789)', () => {
+    // FOCUSABLE_SELECTORS' :not([disabled]) only applies to the native-control
+    // clauses, so a disabled element carrying tabindex slips in via the
+    // [tabindex] clause. isFocusable's el.disabled check catches it.
+    const modal = createModal();
+    const ok = appendButton(modal, 'OK');
+    const sneaky = appendButton(modal, 'SNEAKY', { disabled: true });
+    sneaky.setAttribute('tabindex', '0');
+
+    const focusable = modal._getFocusableElements();
+    expect(focusable).toContain(ok);
+    expect(focusable).not.toContain(sneaky);
   });
 
   it('close event carries bubbles, composed, and null detail', () => {

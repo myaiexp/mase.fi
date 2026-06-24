@@ -77,11 +77,12 @@ describe('base-dropdown', () => {
     expect(el.isOpen).toBe(false);
   });
 
-  it('click outside closes menu', () => {
+  it('click outside closes menu', async () => {
     const el = createDropdown({ items: [{ value: 'x', label: 'X' }] });
     getTrigger(el).click();
     expect(el.isOpen).toBe(true);
 
+    await Promise.resolve(); // outside-click listener attaches on the next microtask
     document.body.dispatchEvent(new MouseEvent('click', { bubbles: true }));
     expect(el.isOpen).toBe(false);
   });

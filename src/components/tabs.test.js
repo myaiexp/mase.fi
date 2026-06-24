@@ -79,7 +79,7 @@ describe('base-tabs', () => {
     expect(buttons[0].getAttribute('aria-selected')).toBe('false');
   });
 
-  it('tab-change event fires with correct index', () => {
+  it('tab-change event fires with correct index and label', () => {
     const { tabs } = createTabs([
       { label: 'X' },
       { label: 'Y' },
@@ -89,6 +89,7 @@ describe('base-tabs', () => {
     tabs.selectTab(1);
     expect(events.length).toBe(1);
     expect(events[0].index).toBe(1);
+    expect(events[0].label).toBe('Y');
   });
 
   it('disabled tab cannot be selected', () => {

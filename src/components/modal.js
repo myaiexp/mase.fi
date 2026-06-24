@@ -100,6 +100,20 @@ const FOCUSABLE_SELECTORS = [
   '[tabindex]:not([tabindex="-1"])',
 ].join(', ');
 
+// True when `el` can actually receive focus: not disabled and not hidden. The
+// FOCUSABLE_SELECTORS query is a coarse first pass; this is the precise gate.
+// Visibility is checked on the element itself (hidden attribute, display:none,
+// visibility:hidden/collapse) — the reliable signals in a layout-less DOM. The
+// browser-only "ancestor display:none / zero-size" case isn't caught here.
+function isFocusable(el) {
+  if (el.disabled || el.getAttribute('aria-disabled') === 'true') return false;
+  if (el.hidden) return false;
+  const style = getComputedStyle(el);
+  if (style.display === 'none') return false;
+  if (style.visibility === 'hidden' || style.visibility === 'collapse') return false;
+  return true;
+}
+
 class BaseModal extends HTMLElement {
   #open = false;
   #onKeyDown = null;
@@ -194,7 +208,12 @@ class BaseModal extends HTMLElement {
     const lightDom = Array.from(this.querySelectorAll(FOCUSABLE_SELECTORS));
     // Also collect from shadow DOM (close button, etc.)
     const shadowDom = Array.from(this.shadowRoot.querySelectorAll(FOCUSABLE_SELECTORS));
-    return [...shadowDom, ...lightDom];
+    // The selectors only filter [disabled] on the native-control clauses, so a
+    // hidden control (hidden attr / display:none / visibility:hidden) or a
+    // disabled element matched solely by the [tabindex] clause still slips
+    // through. Drop those — the trap must never park focus on something the
+    // user can't see or interact with.
+    return [...shadowDom, ...lightDom].filter((el) => isFocusable(el));
   }
 
   disconnectedCallback() {

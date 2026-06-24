@@ -160,9 +160,15 @@ class BaseTextFit extends HTMLElement {
     const fullText = segments.join('');
     if (!fullText) return [];
 
+    // One walk yields each line's text AND its paint width. The width measured
+    // here is byte-identical to measureNaturalWidth(doPrepare(line.text, font))
+    // \u2014 same paint-width engine, trailing whitespace excluded the same way \u2014 so
+    // reusing it drops the N redundant per-line prepareWithSegments calls the
+    // old code paid just to re-read a width it already had.
     const allLines = [];
     walkLineRanges(prepared, maxWidth, (range) => {
-      allLines.push(materializeLineRange(prepared, range).text);
+      const line = materializeLineRange(prepared, range);
+      allLines.push({ text: line.text, width: line.width });
     });
 
     const linesToShow = maxLines > 0 ? allLines.slice(0, maxLines) : allLines;
@@ -171,7 +177,7 @@ class BaseTextFit extends HTMLElement {
 
     const result = [];
     for (let i = 0; i < linesToShow.length; i++) {
-      const text = linesToShow[i];
+      const { text, width: naturalWidth } = linesToShow[i];
       const isLast = i === linesToShow.length - 1;
 
       if (isLast && isOverflow) {
@@ -179,7 +185,6 @@ class BaseTextFit extends HTMLElement {
       } else if (isLast) {
         result.push({ text });
       } else {
-        const naturalWidth = measureNaturalWidth(doPrepare(text, font));
         const spaceCount = (text.match(/ /g) || []).length;
         if (spaceCount > 0 && naturalWidth < maxWidth) {
           result.push({ text, wordSpacing: (maxWidth - naturalWidth) / spaceCount });

@@ -358,11 +358,12 @@ describe('base-context-menu', () => {
   });
 
   // 21. Click outside closes the menu
-  it('click outside closes the menu', () => {
+  it('click outside closes the menu', async () => {
     const cm = createMenu();
     cm.show(100, 100, [{ label: 'A', action: () => {} }]);
     expect(cm.isOpen).toBe(true);
 
+    await Promise.resolve(); // outside-click listener attaches on the next microtask
     document.body.dispatchEvent(new MouseEvent('click', { bubbles: true }));
     expect(cm.isOpen).toBe(false);
   });
