@@ -32,6 +32,10 @@ function clickOn(target) {
   target.dispatchEvent(new MouseEvent('click', { bubbles: true }));
 }
 
+// The document 'click' listener attaches on the next microtask (see
+// addOverlayListeners), so click-driven tests must flush one tick first.
+const tick = () => Promise.resolve();
+
 function keydown(key) {
   document.dispatchEvent(new KeyboardEvent('keydown', { key, bubbles: true }));
 }
@@ -51,29 +55,32 @@ describe('overlay-utils', () => {
 
   // --- onClickOutside predicate drives close() ---
 
-  it('calls component.close() on document click when onClickOutside returns true', () => {
+  it('calls component.close() on document click when onClickOutside returns true', async () => {
     const c = track(makeComponent());
     addOverlayListeners(c, () => true);
+    await tick();
 
     clickOn(document.body);
     expect(c.close).toHaveBeenCalledTimes(1);
   });
 
-  it('does NOT call component.close() on document click when onClickOutside returns false', () => {
+  it('does NOT call component.close() on document click when onClickOutside returns false', async () => {
     const c = track(makeComponent());
     addOverlayListeners(c, () => false);
+    await tick();
 
     clickOn(document.body);
     expect(c.close).not.toHaveBeenCalled();
   });
 
-  it('closes on a click outside the component element but not on a click inside it', () => {
+  it('closes on a click outside the component element but not on a click inside it', async () => {
     const host = makeHost();
     const inside = document.createElement('button');
     host.appendChild(inside);
 
     const c = track(makeComponent());
     addOverlayListeners(c, (e) => !host.contains(e.target));
+    await tick();
 
     // Inside click — predicate false, stays open.
     clickOn(inside);
@@ -84,14 +91,35 @@ describe('overlay-utils', () => {
     expect(c.close).toHaveBeenCalledTimes(1);
   });
 
-  it('passes the click event to the onClickOutside predicate', () => {
+  it('passes the click event to the onClickOutside predicate', async () => {
     const c = track(makeComponent());
     const predicate = vi.fn(() => false);
     addOverlayListeners(c, predicate);
+    await tick();
 
     clickOn(document.body);
     expect(predicate).toHaveBeenCalledTimes(1);
     expect(predicate.mock.calls[0][0]).toBeInstanceOf(Event);
+  });
+
+  it('defers the document click listener so the opening click cannot self-close', () => {
+    // Synchronously after addOverlayListeners, a document click must NOT close —
+    // the listener is still queued. This is the core of the #1866 fix.
+    const c = track(makeComponent());
+    addOverlayListeners(c, () => true);
+
+    clickOn(document.body);
+    expect(c.close).not.toHaveBeenCalled();
+  });
+
+  it('does not attach the deferred click listener if closed before the microtask', async () => {
+    const c = track(makeComponent());
+    addOverlayListeners(c, () => true);
+    removeOverlayListeners(c); // close before the queued attach runs
+    await tick();
+
+    clickOn(document.body);
+    expect(c.close).not.toHaveBeenCalled();
   });
 
   // --- Escape routes through the same lifecycle ---
@@ -150,9 +178,10 @@ describe('overlay-utils', () => {
 
   // --- Cleanup ---
 
-  it('removeOverlayListeners detaches the click listener (no close after remove)', () => {
+  it('removeOverlayListeners detaches the click listener (no close after remove)', async () => {
     const c = track(makeComponent());
     addOverlayListeners(c, () => true);
+    await tick(); // let the deferred click listener actually attach
     removeOverlayListeners(c);
 
     clickOn(document.body);
