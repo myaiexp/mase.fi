@@ -25,6 +25,10 @@
   position: relative;
   gap: 2px;
 }
+.tab:focus-visible {
+  outline: 2px solid var(--ch-accent, var(--accent));
+  outline-offset: -2px;
+}
 .tab .tab-hash { font-size: 11px; color: var(--faint); line-height: 1; }
 .tab .tab-name { font-weight: 600; color: var(--dim); line-height: 1.1; }
 .tab.active { color: var(--ch-accent); background: color-mix(in oklab, var(--ch-accent) 10%, transparent); }

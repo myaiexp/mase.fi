@@ -168,3 +168,59 @@ describe('renderChanlist click wiring', () => {
     expect(seen).toEqual(['p1', 'home']);
   });
 });
+
+describe('accessibility attributes', () => {
+  beforeEach(() => {
+    mountContainers();
+    const data = dataWithHeats([0.5, 0.5]);
+    initChannels(data);
+    renderChanlist(data, () => {});
+  });
+
+  it('exposes sidebar rows as keyboard-operable links with a clean name', () => {
+    const row = document.querySelector('.chan[data-ch="p0"]');
+    expect(row.getAttribute('role')).toBe('link');
+    expect(row.getAttribute('tabindex')).toBe('0');
+    expect(row.getAttribute('aria-label')).toBe('p0 channel');
+    // Decorative bits are hidden from the accessibility tree.
+    expect(row.querySelector('.hash').getAttribute('aria-hidden')).toBe('true');
+    expect(row.querySelector('.heat').getAttribute('aria-hidden')).toBe('true');
+  });
+
+  it('labels mobile tab buttons', () => {
+    const tab = document.querySelector('.tab[data-ch="home"]');
+    expect(tab.tagName).toBe('BUTTON');
+    expect(tab.getAttribute('aria-label')).toBe('home channel');
+  });
+
+  it('marks only the active channel with aria-current=page on row and tab', () => {
+    setActiveChannel('p0');
+    const current = () =>
+      [...document.querySelectorAll('[aria-current="page"]')].map(el => `${el.tagName}:${el.dataset.ch}`);
+    expect(current().sort()).toEqual(['BUTTON:p0', 'DIV:p0']);
+
+    setActiveChannel('home');
+    // aria-current moved; the previous channel no longer carries it.
+    expect(document.querySelector('.chan[data-ch="p0"]').hasAttribute('aria-current')).toBe(false);
+    expect(current().sort()).toEqual(['BUTTON:home', 'DIV:home']);
+  });
+});
+
+describe('keyboard navigation', () => {
+  function press(el, key) {
+    el.dispatchEvent(new KeyboardEvent('keydown', { key, bubbles: true, cancelable: true }));
+  }
+
+  it('activates a sidebar row on Enter and Space (and not on other keys)', () => {
+    mountContainers();
+    const data = dataWithHeats([0.5, 0.5]);
+    initChannels(data);
+    const seen = [];
+    renderChanlist(data, id => seen.push(id));
+    const row = document.querySelector('.chan[data-ch="p1"]');
+    press(row, 'Enter');
+    press(row, ' ');
+    press(row, 'a'); // ignored
+    expect(seen).toEqual(['p1', 'p1']);
+  });
+});
