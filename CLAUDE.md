@@ -57,7 +57,7 @@ Shared web components library built from `src/components/` via Vite library mode
 - Server-side build (`/usr/local/bin/forgejo-deploy`, `mase.fi` case): checks out to `/var/www/homepage-build`, runs `npm install --production=false && npm run build` (build-lock-wrapped, includes `build:components`) as user `mase`, then copies `dist/.` → `/var/www/html` (chowned to www-data). Build failure aborts before the copy, so a broken build can't ship a stale/empty webroot.
 - **Components:** `npm run build` now includes `build:components` automatically (chained in the script).
 - **build-lock:** package.json's `build` and `build:components` scripts already wrap vite in `build-lock`. Do **not** double-prefix (e.g. `build-lock npm run build`) — nesting two flocks on `/tmp/helm-build.lock` deadlocks the inner one for 30 min and produces an empty `dist/`. Invoke as plain `npm run build`.
-- **Dev / worktree gates:** Helm sessions run with `NODE_ENV=production`, which makes npm auto-set `omit=dev` and skip devDependencies on plain `npm install`. The project `.npmrc` sets `omit=` (empty) to override this — so `npm install` in any worktree always installs devDeps. If you ever reinstall from scratch and gates fail with `eslint: not found` or similar, run `npm install` (the `.npmrc` handles it) or `npm install --include=dev` explicitly.
+- **Dev / worktree gates:** Helm sessions run with `NODE_ENV=production`, which makes npm auto-set `omit=dev` and skip devDependencies on plain `npm install`. If gates fail with `eslint: not found` or similar binary, run `npm install --include=dev` (or `NODE_ENV=development npm install`) before running lint/test/build.
 
 ## Decisions from previous phases
 
