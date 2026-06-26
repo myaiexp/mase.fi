@@ -1,0 +1,261 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>buttons · prototype</title>
+<link rel="stylesheet" href="src/base.css">
+<style>
+  body {
+    padding: 24px 28px 48px;
+    max-width: 760px;
+    color: var(--text);
+  }
+
+  h1 {
+    font-size: var(--text-md);
+    color: var(--text-dim);
+    font-weight: 500;
+    letter-spacing: 0.02em;
+    margin-bottom: 4px;
+  }
+
+  .lede {
+    color: var(--text-muted);
+    font-size: var(--text-sm);
+    margin-bottom: 32px;
+  }
+
+  section {
+    margin-bottom: 32px;
+  }
+
+  .recipe {
+    font-size: var(--text-xs);
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    margin-bottom: 8px;
+  }
+
+  h2 {
+    font-size: var(--text-base);
+    font-weight: 500;
+    color: var(--text);
+    margin-bottom: 2px;
+  }
+
+  .note {
+    color: var(--text-muted);
+    font-size: var(--text-sm);
+    margin-bottom: 14px;
+  }
+
+  .note code {
+    background: var(--bg-surface);
+    padding: 0 0.2em;
+  }
+
+  .row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    align-items: center;
+    padding: 10px 0;
+  }
+
+  .row + .row {
+    border-top: 1px solid var(--border);
+  }
+
+  .row-label {
+    color: var(--text-muted);
+    font-size: var(--text-xs);
+    width: 72px;
+    flex-shrink: 0;
+  }
+
+  .row-note {
+    color: var(--text-muted);
+    font-size: var(--text-sm);
+  }
+
+  /* ===== Button system (from spec, on real mase.fi tokens) ===== */
+
+  .btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    height: 22px;
+    padding: 0 10px;
+    border: 1px solid var(--border);
+    background: var(--bg-raised);
+    color: var(--text);
+    font-family: var(--font);
+    font-size: 11px;
+    font-weight: 500;
+    line-height: 1;
+    white-space: nowrap;
+    cursor: pointer;
+    transition: background var(--transition);
+  }
+  .btn:hover { background: var(--bg-hover); }
+
+  .btn-primary {
+    background: var(--accent-glow);
+    border-color: rgba(232, 163, 8, 0.4);
+    color: var(--accent);
+  }
+  .btn-primary:hover { background: rgba(232, 163, 8, 0.18); }
+
+  .btn-danger {
+    background: rgba(239, 68, 68, 0.08);
+    border-color: rgba(239, 68, 68, 0.4);
+    color: var(--red);
+  }
+  .btn-danger:hover { background: rgba(239, 68, 68, 0.16); }
+
+  .btn:disabled,
+  .btn[disabled] {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
+
+  /* ===== In-use pane mock ===== */
+
+  .pane {
+    background: var(--bg-surface);
+    border: 1px solid var(--border);
+    padding: 12px 14px;
+    margin-bottom: 8px;
+  }
+
+  .pane-title {
+    font-size: var(--text-base);
+    color: var(--text);
+    margin-bottom: 2px;
+  }
+
+  .pane-body {
+    font-size: var(--text-sm);
+    color: var(--text-dim);
+    margin-bottom: 14px;
+  }
+
+  .pane-footer {
+    display: flex;
+    justify-content: flex-end;
+    gap: 8px;
+  }
+
+  /* ===== "What not to do" — wrong-on-purpose inline specimens ===== */
+
+  .wrong {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    height: 22px;
+    padding: 0 10px;
+    border: 1px solid var(--border);
+    background: var(--bg-raised);
+    color: var(--text);
+    font-family: var(--font);
+    font-size: 11px;
+    font-weight: 500;
+    line-height: 1;
+  }
+</style>
+</head>
+<body>
+
+<h1>.btn</h1>
+<p class="lede">One size, three variants. Default is the baseline; primary earns its amber; danger is red. Hover any button — they're live.</p>
+
+<section>
+  <div class="recipe">Variants</div>
+  <h2>Default · Primary · Danger</h2>
+  <p class="note">22px tall, 11px, square. Most buttons are default. Primary marks the one most-forward action in a pane; danger is destructive — same shape as primary, red instead of amber.</p>
+
+  <div class="row">
+    <span class="row-label">at rest</span>
+    <button class="btn">Cancel</button>
+    <button class="btn btn-primary">Launch</button>
+    <button class="btn btn-danger">Delete</button>
+  </div>
+
+  <div class="row">
+    <span class="row-label">disabled</span>
+    <button class="btn" disabled>Waiting…</button>
+    <button class="btn btn-primary" disabled>Launch</button>
+    <button class="btn btn-danger" disabled>Delete</button>
+  </div>
+
+  <div class="row">
+    <span class="row-label">focus</span>
+    <button class="btn">Tab to me</button>
+    <span class="row-note">— ring is the global <code>:focus-visible</code> reset, not from <code>.btn</code></span>
+  </div>
+</section>
+
+<section>
+  <div class="recipe">In use</div>
+  <h2>One primary per pane</h2>
+  <p class="note">Primary is reserved for the single most-forward action. Pair it with a neutral cancel; never show two primaries at once.</p>
+
+  <div class="pane">
+    <div class="pane-title">Launch session</div>
+    <div class="pane-body">Spin up a new Claude Code worktree on <code>master</code>.</div>
+    <div class="pane-footer">
+      <button class="btn">Cancel</button>
+      <button class="btn btn-primary">Launch</button>
+    </div>
+  </div>
+
+  <div class="pane">
+    <div class="pane-title">Delete worktree</div>
+    <div class="pane-body">This removes the branch and its uncommitted changes. Can't be undone.</div>
+    <div class="pane-footer">
+      <button class="btn">Cancel</button>
+      <button class="btn btn-danger">Delete</button>
+    </div>
+  </div>
+</section>
+
+<section>
+  <div class="recipe">Rules</div>
+  <h2>What not to do</h2>
+  <p class="note">Each renders so the contrast reads — wrong for a specific reason.</p>
+
+  <div class="row">
+    <span class="row-label">❌ ghost</span>
+    <span class="wrong" style="border-color: transparent; background: transparent; color: var(--text-dim);">Edit</span>
+    <span class="row-note">— borderless reads as a link. Use a real <code>.btn</code> or an actual <code>&lt;a&gt;</code>.</span>
+  </div>
+
+  <div class="row">
+    <span class="row-label">❌ small</span>
+    <span class="wrong" style="height: 16px; padding: 1px 6px; font-size: 10px;">Run</span>
+    <span class="row-note">— one size only. For a tighter control, use a 16px icon-only affordance.</span>
+  </div>
+
+  <div class="row">
+    <span class="row-label">❌ two amber</span>
+    <button class="btn btn-primary">Save</button>
+    <button class="btn btn-primary">Publish</button>
+    <span class="row-note">— the eye can't pick the action.</span>
+  </div>
+
+  <div class="row">
+    <span class="row-label">❌ verbose</span>
+    <span class="wrong">Save and continue to next step</span>
+    <span class="row-note">→ shorten to <button class="btn">Continue</button>. Buttons never wrap.</span>
+  </div>
+
+  <div class="row">
+    <span class="row-label">❌ radius</span>
+    <span class="wrong" style="border-radius: 999px;">Launch</span>
+    <span class="row-note">— the system is square.</span>
+  </div>
+</section>
+
+</body>
+</html>
