@@ -90,8 +90,7 @@
     border: 1px solid var(--border);
     background: var(--bg-raised);
     color: var(--text);
-    font-family: var(--font);
-    font-size: 11px;
+    font-size: var(--text-sm);
     font-weight: 500;
     line-height: 1;
     white-space: nowrap;
@@ -114,8 +113,7 @@
   }
   .btn-danger:hover { background: rgba(239, 68, 68, 0.16); }
 
-  .btn:disabled,
-  .btn[disabled] {
+  .btn:disabled {
     opacity: 0.5;
     cursor: not-allowed;
   }
@@ -158,8 +156,7 @@
     border: 1px solid var(--border);
     background: var(--bg-raised);
     color: var(--text);
-    font-family: var(--font);
-    font-size: 11px;
+    font-size: var(--text-sm);
     font-weight: 500;
     line-height: 1;
   }
@@ -233,7 +230,7 @@
 
   <div class="row">
     <span class="row-label">❌ small</span>
-    <span class="wrong" style="height: 16px; padding: 1px 6px; font-size: 10px;">Run</span>
+    <span class="wrong" style="height: 16px; padding: 1px 6px; font-size: var(--text-xs);">Run</span>
     <span class="row-note">— one size only. For a tighter control, use a 16px icon-only affordance.</span>
   </div>
 
