@@ -152,10 +152,15 @@ class BaseModal extends HTMLElement {
     this.#onKeyDown = (e) => this._handleKeyDown(e);
     document.addEventListener('keydown', this.#onKeyDown);
 
-    // Focus first focusable element
+    // Focus the first user-meaningful field (a slotted light-DOM control) if one
+    // exists; otherwise fall back to the shadow-root close button. The trap's
+    // focusable list keeps the close button first to match the flattened Tab
+    // order, so focusable[0] can't be used here — a slotted form field would
+    // never receive the initial focus.
     requestAnimationFrame(() => {
-      const focusable = this._getFocusableElements();
-      if (focusable.length) focusable[0].focus();
+      const lightDom = this._getLightFocusables();
+      const target = lightDom[0] ?? this.shadowRoot.querySelector('[data-close]');
+      if (target) target.focus();
     });
   }
 
@@ -187,15 +192,23 @@ class BaseModal extends HTMLElement {
       const first = focusable[0];
       const last = focusable[focusable.length - 1];
 
+      // When focus is inside the shadow root (the close button), document.active-
+      // Element reports the <base-modal> host rather than the button — so a raw
+      // activeElement check never matches the close button and Shift+Tab escapes
+      // the modal. shadowRoot.activeElement resolves focus *within* the shadow
+      // tree; it is null for slotted light-DOM focus (those nodes live in the
+      // document), so fall back to document.activeElement in that case.
+      const active = this.shadowRoot.activeElement ?? document.activeElement;
+
       if (e.shiftKey) {
         // Shift+Tab: if on first, wrap to last
-        if (document.activeElement === first) {
+        if (active === first) {
           e.preventDefault();
           last.focus();
         }
       } else {
         // Tab: if on last, wrap to first
-        if (document.activeElement === last) {
+        if (active === last) {
           e.preventDefault();
           first.focus();
         }
@@ -203,17 +216,23 @@ class BaseModal extends HTMLElement {
     }
   }
 
+  // Focusable controls from the slotted light DOM, already gated by isFocusable.
+  // The selectors only filter [disabled] on the native-control clauses, so a
+  // hidden control (hidden attr / display:none / visibility:hidden) or a disabled
+  // element matched solely by the [tabindex] clause still slips through; drop
+  // those — the trap must never park focus on something the user can't see or use.
+  _getLightFocusables() {
+    return Array.from(this.querySelectorAll(FOCUSABLE_SELECTORS)).filter((el) => isFocusable(el));
+  }
+
   _getFocusableElements() {
-    // Collect focusable elements from light DOM children (slotted content)
-    const lightDom = Array.from(this.querySelectorAll(FOCUSABLE_SELECTORS));
-    // Also collect from shadow DOM (close button, etc.)
-    const shadowDom = Array.from(this.shadowRoot.querySelectorAll(FOCUSABLE_SELECTORS));
-    // The selectors only filter [disabled] on the native-control clauses, so a
-    // hidden control (hidden attr / display:none / visibility:hidden) or a
-    // disabled element matched solely by the [tabindex] clause still slips
-    // through. Drop those — the trap must never park focus on something the
-    // user can't see or interact with.
-    return [...shadowDom, ...lightDom].filter((el) => isFocusable(el));
+    // Shadow-DOM focusables (the close button) come first: in the flattened Tab
+    // order the close button is rendered ahead of the slotted content (it sits in
+    // the header, after the non-interactive title slot). Keeping it first makes
+    // the Tab/Shift+Tab wrap boundaries in _handleKeyDown match what the browser
+    // actually does.
+    const shadowDom = Array.from(this.shadowRoot.querySelectorAll(FOCUSABLE_SELECTORS)).filter((el) => isFocusable(el));
+    return [...shadowDom, ...this._getLightFocusables()];
   }
 
   disconnectedCallback() {

@@ -162,15 +162,50 @@ describe('base-modal', () => {
     expect(handler).toHaveBeenCalledTimes(2);
   });
 
-  it('open() auto-focuses the first focusable element (the close button)', async () => {
+  it('open() focuses the first light-DOM field, not the close button', async () => {
+    // Initial focus must land on the first user-meaningful slotted control, not
+    // the shadow close button (which leads the focusable list for Tab-order).
     const modal = createModal();
-    const first = modal._getFocusableElements()[0];
-    // First focusable is the shadow-root close button (shadow DOM precedes light DOM)
-    expect(first).toBe(modal.shadowRoot.querySelector('[data-close]'));
-    const focusSpy = vi.spyOn(first, 'focus');
+    const field = appendButton(modal, 'First field');
+    appendButton(modal, 'Second field');
+    const closeBtn = modal.shadowRoot.querySelector('[data-close]');
+    const fieldSpy = vi.spyOn(field, 'focus');
+    const closeSpy = vi.spyOn(closeBtn, 'focus');
     modal.open();
     await new Promise((resolve) => requestAnimationFrame(resolve));
-    expect(focusSpy).toHaveBeenCalled();
+    expect(fieldSpy).toHaveBeenCalled();
+    expect(closeSpy).not.toHaveBeenCalled();
+  });
+
+  it('open() falls back to the close button when no light-DOM focusable exists', async () => {
+    const modal = createModal();
+    const closeBtn = modal.shadowRoot.querySelector('[data-close]');
+    const closeSpy = vi.spyOn(closeBtn, 'focus');
+    modal.open();
+    await new Promise((resolve) => requestAnimationFrame(resolve));
+    expect(closeSpy).toHaveBeenCalled();
+  });
+
+  it('Shift+Tab from the shadow close button wraps to the last light element', () => {
+    // Regression: the close button lives in the shadow root, so document.active-
+    // Element reports the host, not the button. The trap must use shadowRoot.active-
+    // Element to detect it; otherwise Shift+Tab from the close button escapes the modal.
+    const modal = createModal();
+    appendButton(modal, 'B1');
+    appendButton(modal, 'B2');
+    modal.open();
+
+    const focusable = modal._getFocusableElements();
+    const closeBtn = modal.shadowRoot.querySelector('[data-close]');
+    expect(focusable[0]).toBe(closeBtn); // close button leads the Tab order
+    const last = focusable[focusable.length - 1];
+
+    closeBtn.focus();
+    expect(modal.shadowRoot.activeElement).toBe(closeBtn);
+
+    const lastFocusSpy = vi.spyOn(last, 'focus');
+    modal._handleKeyDown(new KeyboardEvent('keydown', { key: 'Tab', shiftKey: true }));
+    expect(lastFocusSpy).toHaveBeenCalled();
   });
 
   it('focus trap excludes disabled focusables', () => {
