@@ -9,7 +9,6 @@
     "preview": "vite preview",
     "test": "vitest run",
     "build:components": "build-lock vite build --config vite.components.config.js",
-    "build:all": "vite build && npm run build:components",
     "lint": "eslint src/"
   },
   "devDependencies": {
