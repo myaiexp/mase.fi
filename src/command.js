@@ -8,6 +8,10 @@ import { applySearch } from './command-search.js';
 let ccIndex = 0;
 let searchTerm = '';
 let _commands = [];
+// Current autocomplete match list, shared between renderComplete (writer) and
+// chooseFromComplete + the keydown handler (readers). Module-level, not an
+// expando on the popup element, so the data lifecycle is explicit.
+let currentMatches = [];
 
 // Run a feed search and remember the term so feed:relayout can re-apply it.
 function search(term) {
@@ -83,7 +87,7 @@ function renderComplete(q) {
       chooseFromComplete();
     });
   });
-  $cmdCC._matches = matches;
+  currentMatches = matches;
 }
 
 // Render one autocomplete row — a channel (#label, topic, recency) or a
@@ -122,7 +126,7 @@ function renderHelp() {
 function hideComplete() { $cmdCC.hidden = true; $cmdCC.innerHTML = ''; }
 
 function chooseFromComplete() {
-  const m = ($cmdCC._matches || [])[ccIndex];
+  const m = currentMatches[ccIndex];
   if (!m) return;
   if (m.kind === 'cmd') { runCommand(m.cmd); return; }
   $cmdInput.value = '';
@@ -243,11 +247,11 @@ export function initCommand(data) {
       $cmdInput.blur();
       return;
     }
-    if (!$cmdCC.hidden && ($cmdCC._matches || []).length) {
-      const n = $cmdCC._matches.length;
+    if (!$cmdCC.hidden && currentMatches.length) {
+      const n = currentMatches.length;
       if (e.key === 'ArrowDown') { e.preventDefault(); ccIndex = (ccIndex + 1) % n; updateMode(); return; }
       if (e.key === 'ArrowUp')   { e.preventDefault(); ccIndex = (ccIndex - 1 + n) % n; updateMode(); return; }
-      if (e.key === 'Tab')       { e.preventDefault(); const m = $cmdCC._matches[ccIndex]; $cmdInput.value = '/' + m.label; updateMode(); return; }
+      if (e.key === 'Tab')       { e.preventDefault(); const m = currentMatches[ccIndex]; $cmdInput.value = '/' + m.label; updateMode(); return; }
       if (e.key === 'Enter')     { e.preventDefault(); chooseFromComplete(); return; }
     }
   });
