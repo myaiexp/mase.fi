@@ -186,6 +186,45 @@ describe('renderPinned — activity', () => {
     expect(html).toContain('0 entries');
     expect(html).toContain('<dt>range</dt><dd>—</dd>');
   });
+
+  // A local-noon naive date string N days ago. dailyLogBuckets parses naive ISO
+  // as local time, so building the string in local terms keeps the bucket index
+  // stable across timezones and clear of day/window boundaries.
+  const localNoonDaysAgo = (n) => {
+    const d = new Date();
+    d.setHours(12, 0, 0, 0);
+    d.setDate(d.getDate() - n);
+    const p = (x) => String(x).padStart(2, '0');
+    return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}T12:00`;
+  };
+
+  it('shows a recent rate computed as average commits per active day (~N/day)', () => {
+    const data = {
+      projects: [],
+      entries: [
+        // 4 commits one recent day + 2 another recent day → 6 / 2 active days = ~3.
+        logEntry({ cat: 'log', date: localNoonDaysAgo(3) }),
+        logEntry({ cat: 'log', date: localNoonDaysAgo(3) }),
+        logEntry({ cat: 'log', date: localNoonDaysAgo(3) }),
+        logEntry({ cat: 'log', date: localNoonDaysAgo(3) }),
+        logEntry({ cat: 'log', date: localNoonDaysAgo(7) }),
+        logEntry({ cat: 'log', date: localNoonDaysAgo(7) }),
+      ],
+    };
+    renderPinned('activity', data);
+    expect(pinnedEl().innerHTML).toContain('~3/day');
+  });
+
+  it('shows an em-dash rate when there is no recent (last-28d) activity', () => {
+    const data = {
+      projects: [],
+      // Older than the 28-day window → no active days → '—', never a stale number.
+      entries: [logEntry({ cat: 'log', date: localNoonDaysAgo(60) })],
+    };
+    renderPinned('activity', data);
+    const html = pinnedEl().innerHTML;
+    expect(html).toContain('<i>rate</i><b>—</b>');
+  });
 });
 
 // ---- renderPinned: unmatched ---------------------------------------------

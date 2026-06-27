@@ -219,6 +219,28 @@ describe('base-select', () => {
     expect(el.isOpen).toBe(false);
   });
 
+  it('disconnect removes document listeners — no leak on a detached element', async () => {
+    const el = createSelect({ options: [{ value: 'a', label: 'A' }] });
+    el.open();
+    await Promise.resolve(); // let the deferred outside-click listener attach
+    expect(el.isOpen).toBe(true);
+
+    // Detach the element. disconnectedCallback() must remove BOTH the document
+    // 'click' and 'keydown' listeners; a leak would let these stray document
+    // events still reach close() — silently accumulating handlers in long-lived
+    // apps that mount/unmount selects.
+    el.remove();
+
+    expect(() => {
+      document.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+      document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+    }).not.toThrow();
+
+    // Listeners were detached, so neither event invoked close(): the detached
+    // element's open state is untouched (a leak would have flipped it to false).
+    expect(el.isOpen).toBe(true);
+  });
+
   // --- Keyboard ---
 
   it('ArrowDown/Up navigates options', () => {
@@ -276,6 +298,14 @@ describe('base-select', () => {
 
     expect(received).toHaveLength(1);
     expect(received[0].value).toBe('b');
+    expect(el.isOpen).toBe(false);
+  });
+
+  it('Tab closes the menu', () => {
+    const el = createSelect({ options: [{ value: 'a', label: 'A' }] });
+    el.open();
+    expect(el.isOpen).toBe(true);
+    getTrigger(el).dispatchEvent(new KeyboardEvent('keydown', { key: 'Tab', bubbles: true }));
     expect(el.isOpen).toBe(false);
   });
 
@@ -387,6 +417,24 @@ describe('base-select', () => {
     const el = createSelect({ searchable: true, options: [{ value: 'a', label: 'A' }] });
     const trigger = getTrigger(el);
     expect(trigger.tagName).toBe('INPUT');
+  });
+
+  it('letter key does NOT jump in searchable mode (input handles typing)', () => {
+    // Non-searchable, 'b' would letter-jump the highlight to Banana (index 1).
+    // Searchable mode guards that off (the input field owns typed characters), so
+    // the highlight must stay where open() put it — the first option, Apple.
+    const el = createSelect({ searchable: true, options: [
+      { value: 'a', label: 'Apple' },
+      { value: 'b', label: 'Banana' },
+    ] });
+    el.open();
+
+    const opts = getOptions(el);
+    expect(opts[0].classList.contains('active')).toBe(true);
+
+    getTrigger(el).dispatchEvent(new KeyboardEvent('keydown', { key: 'b', bubbles: true }));
+    expect(opts[0].classList.contains('active')).toBe(true);  // unmoved — no jump
+    expect(opts[1].classList.contains('active')).toBe(false); // Banana NOT jumped to
   });
 
   it('typing filters options', () => {

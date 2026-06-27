@@ -1,6 +1,6 @@
 // Pinned hero card renderers — one per channel kind
 import { LOGO, PROJECT_ART, sparkbar } from './ascii.js';
-import { homeLogStats } from './data.js';
+import { homeLogStats, dailyLogBuckets } from './data.js';
 import { mountBeam } from './beam.js';
 import { escapeHtml } from './html.js';
 
@@ -18,9 +18,10 @@ function pinnedHome(data) {
   const { totalCommits, buckets, last } = homeLogStats(data, 28);
   const maxV = Math.max(1, ...buckets);
   const spark = sparkbar(buckets, maxV);
-  // lastStr uses escapeHtml on user data; the accent span is a static wrapper
+  // Every dynamic value (date slices + project) is escapeHtml'd; the accent span
+  // is a static wrapper.
   const lastStr = last
-    ? `${last.date.slice(0, 10)} \xb7 ${last.date.slice(11, 16)} \xb7 <span class="accent">${escapeHtml(last.project || '—')}</span>`
+    ? `${escapeHtml(last.date.slice(0, 10))} \xb7 ${escapeHtml(last.date.slice(11, 16))} \xb7 <span class="accent">${escapeHtml(last.project || '—')}</span>`
     : '—';
   return `<div class="card">` +
     cardHead([['modes', '+ntr'], ['users', '1'], ['since', '2018']], '● live') +
@@ -75,10 +76,19 @@ function pinnedActivity(data) {
   const logEntries = data.entries.filter(e => e.cat === 'log');
   let range = '—';
   if (logEntries.length) {
-    const first = logEntries[0].date.slice(0, 10);
-    const last = logEntries[logEntries.length - 1].date.slice(0, 10);
+    const first = escapeHtml(logEntries[0].date.slice(0, 10));
+    const last = escapeHtml(logEntries[logEntries.length - 1].date.slice(0, 10));
     range = first + ' → ' + last;
   }
+  // Real recent commit rate: average log entries per ACTIVE day over the last 28
+  // days (idle days excluded so the figure reflects "when I push, ~N/day" rather
+  // than a calendar average diluted to near-zero). Recomputed every render — no
+  // stale hardcoded constant. '—' when there's been no recent activity.
+  const recent = dailyLogBuckets(data, 28);
+  const activeDays = recent.filter(n => n > 0).length;
+  const rate = activeDays
+    ? '~' + Math.round(recent.reduce((a, b) => a + b, 0) / activeDays) + '/day'
+    : '—';
   const artLines = [
     '  ╭─ stream ────────────────╮',
     '  │  log      ▇▇▇▇▇▇▇▇▇  ' + String(cats.log).padStart(2) + '  │',
@@ -87,7 +97,7 @@ function pinnedActivity(data) {
     '  ╰───────────────────────╯',
   ].join('\n');
   return '<div class="card">' +
-    cardHead([['modes', '+mn'], ['source', 'post-receive'], ['rate', '~12/day']], 'live tail') +
+    cardHead([['modes', '+mn'], ['source', 'post-receive'], ['rate', rate]], 'live tail') +
     '<div class="card-body pin-grid">' +
     '<pre class="ascii">' + escapeHtml(artLines) + '</pre>' +
     '<div>' +
