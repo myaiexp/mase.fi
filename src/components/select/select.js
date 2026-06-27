@@ -1,8 +1,8 @@
 // <base-select> — custom select form control (options in select-option.js)
 
-import { addOverlayListeners, removeOverlayListeners } from './overlay-utils.js';
-import { applyMenuFlip } from './menu-flip.js';
-import { wrapIndex } from './menu-nav.js';
+import { addOverlayListeners, removeOverlayListeners } from '../shared/overlay-utils.js';
+import { applyMenuFlip } from '../shared/menu-flip.js';
+import { wrapIndex } from '../shared/menu-nav.js';
 import { selectStyles } from './select-styles.js';
 import { buildMenu, markSelected, filterMenu, resetFilter } from './select-menu.js';
 import './select-option.js';

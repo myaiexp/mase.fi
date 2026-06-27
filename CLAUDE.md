@@ -64,6 +64,6 @@ Shared web components library built from `src/components/` via Vite library mode
 - **Module architecture:** `main.js` orchestrates boot/skip decision, each domain owns its module
 - **JSON shape:** `{entries: [], projects: []}` — single fetch, dual arrays. Projects have `channel` field for routing.
 - **Sticky capacity:** `mase-fi-update` enforces limits (2 project, 3 feature) server-side via jq
-- **Channel mapping:** `entry.project` matched case-insensitively against `project.name`, routed via `project.channel`
+- **Channel mapping:** `entry.project` (slug) matched case-insensitively against `project.slug` (falling back to `project.channel`), routed via `project.channel`
 - **Boot skip logic:** `prefers-reduced-motion` or `mase-fi-boot-seen` localStorage within 7 days
 - **View Transitions:** Used for channel switches with direct-render fallback

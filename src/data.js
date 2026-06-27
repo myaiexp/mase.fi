@@ -38,7 +38,13 @@ export async function fetchData() {
   // the same empty fallback instead of escaping as an unhandled rejection — main.js
   // awaits this without a catch, so an escape would silently stall the app shell.
   try {
-    const raw = await fetch(SOURCE_URL).then((r) => r.json());
+    const raw = await fetch(SOURCE_URL).then((r) => {
+      // Assert a 2xx before parsing: a 4xx/5xx with a JSON error body (e.g. from a
+      // reverse proxy) would otherwise parse as data and degrade silently to empty
+      // state. Throwing routes it to the catch below, which is the same fallback.
+      if (!r.ok) throw new Error('updates.json HTTP ' + r.status);
+      return r.json();
+    });
 
     const rawProjects = Array.isArray(raw.projects) ? raw.projects : [];
     const rawEntries = Array.isArray(raw.entries) ? raw.entries : [];

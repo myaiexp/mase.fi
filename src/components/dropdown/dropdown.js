@@ -1,8 +1,8 @@
 // <base-dropdown>, <base-dropdown-item>, <base-dropdown-divider> — accessible dropdown menu components
 
-import { addOverlayListeners, removeOverlayListeners } from './overlay-utils.js';
-import { applyMenuFlip } from './menu-flip.js';
-import { MENU_ITEM_CSS, MENU_SURFACE_CSS } from './menu-styles.js';
+import { addOverlayListeners, removeOverlayListeners } from '../shared/overlay-utils.js';
+import { applyMenuFlip } from '../shared/menu-flip.js';
+import { MENU_ITEM_CSS, MENU_SURFACE_CSS } from '../shared/menu-styles.js';
 
 // ─── base-dropdown-item ──────────────────────────────────────────────────────
 

@@ -39,7 +39,7 @@ function dayStr(offsetDays, hour = 12) {
 }
 
 function stubFetch(payload) {
-  vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ json: async () => payload }));
+  vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: true, json: async () => payload }));
 }
 
 afterEach(() => {
@@ -228,6 +228,20 @@ describe('fetchData routing', () => {
     const data = await fetchData();
     expect(data.entries).toEqual([]);
     expect(data.projects).toEqual([]);
+  });
+
+  it('degrades to empty data on a non-ok HTTP response (does not parse the error body)', async () => {
+    // A 4xx/5xx with a JSON error body must not be parsed as data. The r.ok guard
+    // throws, routing it to the same empty fallback as a network failure.
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
+      ok: false,
+      status: 503,
+      json: async () => ({ entries: [{ category: 'daily', date: '2026-01-01', text: 'proxy error' }] }),
+    }));
+    const data = await fetchData();
+    expect(data.entries).toEqual([]);
+    expect(data.projects).toEqual([]);
+    expect(data.meta.nick).toBe('mase');
   });
 
   it('degrades to empty data when normalization throws (null element in entries)', async () => {

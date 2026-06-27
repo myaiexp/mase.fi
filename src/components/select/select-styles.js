@@ -1,6 +1,6 @@
 // Shadow DOM stylesheet for <base-select> — trigger, menu surface, options, groups
 
-import { MENU_SURFACE_CSS } from './menu-styles.js';
+import { MENU_SURFACE_CSS } from '../shared/menu-styles.js';
 
 export const selectStyles = `<style>
   :host {

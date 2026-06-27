@@ -1,8 +1,8 @@
 // <base-context-menu> — singleton right-click context menu with zone-based registration
 
-import { MENU_ITEM_CSS, MENU_SURFACE_CSS } from './menu-styles.js';
-import { wrapIndex } from './menu-nav.js';
-import { addOverlayListeners, removeOverlayListeners } from './overlay-utils.js';
+import { MENU_ITEM_CSS, MENU_SURFACE_CSS } from '../shared/menu-styles.js';
+import { wrapIndex } from '../shared/menu-nav.js';
+import { addOverlayListeners, removeOverlayListeners } from '../shared/overlay-utils.js';
 
 const contextMenuTemplate = document.createElement('template');
 contextMenuTemplate.innerHTML = `<style>
