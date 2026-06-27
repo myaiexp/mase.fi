@@ -77,9 +77,18 @@ export async function fetchData() {
       const links = [];
       if (p.url) {
         try {
-          const host = new URL(p.url).host.replace(/^www\./, '');
-          links.push({ label: host, href: p.url });
+          const u = new URL(p.url);
+          // Only surface http(s) links. Non-special schemes (javascript:, data:,
+          // vbscript:) parse successfully with an empty host and would otherwise
+          // pass straight through to escapeHtml(), which doesn't strip protocols —
+          // a protocol-based XSS vector. Drop anything that isn't http/https.
+          if (u.protocol === 'http:' || u.protocol === 'https:') {
+            const host = u.host.replace(/^www\./, '');
+            links.push({ label: host, href: p.url });
+          }
         } catch {
+          // URL() throws only on schemeless/relative inputs (e.g. "/explorer"),
+          // which are inherently same-origin and safe to link as-is.
           links.push({ label: 'open', href: p.url });
         }
       }
