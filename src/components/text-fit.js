@@ -279,15 +279,24 @@ function truncateLastLine(lineText, maxWidth, ellipsis, font) {
 
   if (availWidth <= 0) return ellipsis;
 
-  for (let j = lineText.length; j >= 0; j--) {
-    const candidate = lineText.slice(0, j).trimEnd();
-    const candidatePrep = doPrepare(candidate, font);
-    const candidateWidth = measureNaturalWidth(candidatePrep);
+  // width(slice(0, j).trimEnd()) is monotonic non-decreasing in j, so binary
+  // search for the largest fitting prefix in O(log N) measurements. j = 0 (the
+  // empty string, width 0) always fits, so `best` is never left unset.
+  let lo = 0;
+  let hi = lineText.length;
+  let best = 0;
+  while (lo <= hi) {
+    const mid = (lo + hi) >>> 1;
+    const candidate = lineText.slice(0, mid).trimEnd();
+    const candidateWidth = measureNaturalWidth(doPrepare(candidate, font));
     if (candidateWidth <= availWidth) {
-      return candidate + ellipsis;
+      best = mid;
+      lo = mid + 1;
+    } else {
+      hi = mid - 1;
     }
   }
-  return ellipsis;
+  return lineText.slice(0, best).trimEnd() + ellipsis;
 }
 
 customElements.define('base-text-fit', BaseTextFit);
