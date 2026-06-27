@@ -4,7 +4,7 @@ set -euo pipefail
 
 UPDATES_FILE="/var/www/html/updates.json"
 TODAY=$(TZ="Europe/Helsinki" date +%Y-%m-%d)
-CREDS_FILE="${HOME}/.claude/.credentials.json"
+DELEGATE_URL="http://localhost:9754/api/delegate"
 
 if [[ ! -f "$UPDATES_FILE" ]]; then
     echo "No updates.json found"
@@ -26,20 +26,16 @@ if [[ "$LOG_COUNT" -eq 0 ]]; then
     exit 0
 fi
 
-# Generate AI summary from a list of commit messages via Haiku
-# Falls back to "project: N commits" on failure
+# Generate AI summary from a list of commit messages via helm delegate (#954).
+# Routes through localhost helm delegate (Nous Hermes) instead of a direct
+# Anthropic OAuth call — standardizes external automation on the dispatch
+# primitive and drops the ~/.claude OAuth-token dependency.
+# Falls back to "project: N commits" if helm/delegate is unavailable.
 generate_summary() {
     local project="$1"
     local commits_text="$2"
     local count="$3"
     local fallback="${project}: ${count} commits"
-
-    local token
-    token=$(jq -r '.claudeAiOauth.accessToken // empty' "$CREDS_FILE" 2>/dev/null)
-    if [[ -z "$token" ]]; then
-        echo "$fallback"
-        return
-    fi
 
     local prompt
     prompt="Summarize these git commits into a terse comma-separated list of highlights. Max 80 characters. No project name prefix. Lowercase. Example output: kanban board, multiline prompts, UI fixes
@@ -48,23 +44,18 @@ Commits:
 ${commits_text}"
 
     local payload
-    payload=$(jq -n --arg prompt "$prompt" '{
-        model: "claude-haiku-4-5-20251001",
-        max_tokens: 60,
-        messages: [{role: "user", content: $prompt}]
-    }')
+    payload=$(jq -n --arg prompt "$prompt" '{prompt: $prompt, providerId: "nous"}')
 
     local response
-    response=$(curl -s --max-time 10 \
-        -H "Authorization: Bearer ${token}" \
-        -H "anthropic-version: 2023-06-01" \
-        -H "anthropic-beta: oauth-2025-04-20" \
+    response=$(curl -s --max-time 60 \
         -H "content-type: application/json" \
         -d "$payload" \
-        "https://api.anthropic.com/v1/messages" 2>/dev/null)
+        "$DELEGATE_URL" 2>/dev/null)
 
+    # `.output` carries the model text; first non-empty line guards against a stray
+    # trailing newline or rare multi-line reply. Empty (delegate down / error JSON) → fallback.
     local summary
-    summary=$(echo "$response" | jq -r '.content[0].text // empty' 2>/dev/null)
+    summary=$(echo "$response" | jq -r '.output // empty' 2>/dev/null | tr -d '\r' | head -1)
 
     if [[ -n "$summary" ]]; then
         echo "$summary"

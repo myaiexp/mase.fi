@@ -16,7 +16,7 @@
 - **Projects:** Data-driven from `updates.json` `.projects` array with `channel` field for routing (e.g. `"channel": "explorer"`)
 - **Updates:** Activity entries from `updates.json` `.entries` array, routed to channels by category: `daily` → `#home`, `log` → `#activity`, `feature`/`project` → per-project channel
 - **Auto-generated entries:** `git deployboth` appends commit titles as `log` category entries. Manual `project`/`feature` entries via `mase-fi-update`.
-- **Daily summaries:** Systemd timer at 23:55 Finnish time. Groups `log` entries by project, calls Haiku via OAuth to generate terse comma-separated highlight summaries, creates `daily` entries. Falls back to `"project: N commits"` if API unavailable. Script: `~/.local/bin/mase-fi-daily-summary`.
+- **Daily summaries:** Systemd timer at 23:55 Finnish time. Groups `log` entries by project, calls **helm delegate** (`localhost:9754/api/delegate`, Nous Hermes — no OAuth token) to generate terse comma-separated highlight summaries, creates `daily` entries. Falls back to `"project: N commits"` if delegate is unavailable. Script: `~/.local/bin/mase-fi-daily-summary` (symlink → `scripts/mase-fi-daily-summary`).
 - **JSON format:** `{"entries": [...], "projects": [...]}` — single fetch provides both arrays
 - Dates: ISO in JSON, Finnish DD.MM format client-side
 
