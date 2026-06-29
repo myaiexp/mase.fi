@@ -47,7 +47,8 @@ sanitize_output() {
         }
         if (line == "")            next   # blank
         if (line ~ /^```/)         next   # code fence
-        if (line ~ /^[{[]/)        next   # JSON / tool-call wrapper ({"command":…}, [ … ])
+        if (line ~ /^[][{}]/)      next   # JSON / tool-call structure ({ } [ ] — open or close)
+        if (line ~ /^"?[A-Za-z_][A-Za-z0-9_-]*"?[[:space:]]*:[[:space:]]*["{[]/) next  # JSON key line ("command": "echo…, "args": {)
         if (line ~ /[<>]/)         next   # any XML/HTML tag (<?xml, <warning>, <md>, </…>)
         if (line ~ /:[[:space:]]*$/) next # lead-in ending in a colon
         low = tolower(line)
@@ -81,8 +82,19 @@ generate_summary() {
     local count="$3"
     local fallback="${project}: ${count} commits"
 
+    # Group-into-themes prompt (chosen over per-commit enumeration and prose after
+    # a live dry run on Hermes-4 across real project-days): synthesizes related
+    # commits into a few themes instead of de-verbing every subject, and the
+    # few-shot keeps the model out of "tool call" mode that the old terse prompt
+    # tripped. Output stays terminal-dense (lowercase, comma-separated).
     local prompt
-    prompt="Summarize these git commits into a terse comma-separated list of highlights. Max 80 characters. No project name prefix. Lowercase. Output ONLY the list on a single line — no preamble, no explanation, no tags, no quotes, no markdown. Example output: kanban board, multiline prompts, UI fixes
+    prompt="You are writing a one-line daily changelog for a software project from its git commits. Group the related commits into 3-5 short THEMES (not one-per-commit). Synthesize; drop trivial noise like version bumps and lint unless that is all there is. Output ONLY a terse, lowercase, comma-separated list on a single line, max 90 characters. No project name, no preamble, no tags, no quotes.
+Example commits:
+feat(auth): add OAuth login
+fix(auth): handle token refresh
+chore(deps): bump axios
+test(auth): cover login flow
+Example output: oauth login + token refresh, dep bumps, auth tests
 
 Commits:
 ${commits_text}"

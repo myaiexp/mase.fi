@@ -174,9 +174,18 @@ function normalizeDate(s) {
   return '1970-01-01T00:00';
 }
 
-/** Pick a nick for an entry based on category — daily/feature = mase, log = git. */
+/**
+ * Pick a nick for an entry based on category.
+ * - log → 'git' (commit firehose)
+ * - daily → the project slug, so #home reads as a per-project standup: each
+ *   project "speaks" its own colour-coded line (nick colours are name-hashed),
+ *   which is the channel's subject identity. Project-less daily → 'mase'.
+ * - feature/project → 'mase' (these live in a project channel that already
+ *   names the subject, so the nick stays the author).
+ */
 function pickNick(e) {
   if (e.category === 'log') return 'git';
+  if (e.category === 'daily' && e.project) return String(e.project).toLowerCase();
   return 'mase';
 }
 
