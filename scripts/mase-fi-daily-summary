@@ -26,11 +26,55 @@ if [[ "$LOG_COUNT" -eq 0 ]]; then
     exit 0
 fi
 
+# Salvage the real highlight list from a small model's raw reply.
+# Hermes routinely leaks preamble and wrapper junk around the actual answer —
+# XML/markdown tags (`<?xml…`, `<warning>`, `<md>`), colon lead-ins
+# ("Here are the highlights:"), refusals ("I don't have…"), and stray words on
+# their own line (a bare " downturn" before the list). `head -1` stored that junk
+# verbatim onto the homepage. Instead: drop the junk lines, then among survivors
+# pick the one that most looks like the requested comma-separated list (most
+# commas wins; first line otherwise). Emits one line, or nothing if all dropped.
+sanitize_output() {
+    awk '
+    {
+        line = $0
+        gsub(/\r/, "", line)
+        sub(/^[[:space:]]+/, "", line); sub(/[[:space:]]+$/, "", line)
+        # strip a single pair of wrapping quotes/backticks around the whole line
+        if (line ~ /^".*"$/ || line ~ /^`.*`$/ || line ~ /^'\''.*'\''$/) {
+            line = substr(line, 2, length(line) - 2)
+            sub(/^[[:space:]]+/, "", line); sub(/[[:space:]]+$/, "", line)
+        }
+        if (line == "")            next   # blank
+        if (line ~ /^```/)         next   # code fence
+        if (line ~ /^[{[]/)        next   # JSON / tool-call wrapper ({"command":…}, [ … ])
+        if (line ~ /[<>]/)         next   # any XML/HTML tag (<?xml, <warning>, <md>, </…>)
+        if (line ~ /:[[:space:]]*$/) next # lead-in ending in a colon
+        low = tolower(line)
+        if (low ~ /^(i (do not|don.?t|can.?t|cannot|am unable|will)|i.?m (unable|sorry)|as an ai|here (are|is|.?s)|sure[,:]|note:|disclaimer|output:|summary:)/) next
+        commas = gsub(/,/, ",", line)     # gsub returns the match count
+        if (first == "") first = line
+        if (commas > bestn) { bestn = commas; best = line }
+    }
+    END { if (best != "") print best; else if (first != "") print first }
+    '
+}
+
+# A highlight list is short by design; clamp a rambling reply to the last whole
+# item under ~110 chars rather than dumping an over-long line on the homepage.
+truncate_summary() {
+    local s="$1" max=110
+    [[ ${#s} -le $max ]] && { printf '%s' "$s"; return; }
+    local head="${s:0:$max}"
+    if [[ "$head" == *,* ]]; then printf '%s' "${head%,*}"; else printf '%s…' "${head% *}"; fi
+}
+
 # Generate AI summary from a list of commit messages via helm delegate (#954).
 # Routes through localhost helm delegate (Nous Hermes) instead of a direct
 # Anthropic OAuth call — standardizes external automation on the dispatch
 # primitive and drops the ~/.claude OAuth-token dependency.
-# Falls back to "project: N commits" if helm/delegate is unavailable.
+# Falls back to "project: N commits" if helm/delegate is unavailable or the
+# reply survives sanitization as nothing usable.
 generate_summary() {
     local project="$1"
     local commits_text="$2"
@@ -38,7 +82,7 @@ generate_summary() {
     local fallback="${project}: ${count} commits"
 
     local prompt
-    prompt="Summarize these git commits into a terse comma-separated list of highlights. Max 80 characters. No project name prefix. Lowercase. Example output: kanban board, multiline prompts, UI fixes
+    prompt="Summarize these git commits into a terse comma-separated list of highlights. Max 80 characters. No project name prefix. Lowercase. Output ONLY the list on a single line — no preamble, no explanation, no tags, no quotes, no markdown. Example output: kanban board, multiline prompts, UI fixes
 
 Commits:
 ${commits_text}"
@@ -52,13 +96,13 @@ ${commits_text}"
         -d "$payload" \
         "$DELEGATE_URL" 2>/dev/null)
 
-    # `.output` carries the model text; first non-empty line guards against a stray
-    # trailing newline or rare multi-line reply. Empty (delegate down / error JSON) → fallback.
+    # `.output` carries the model text. sanitize_output strips the model's
+    # preamble/tag/refusal noise and returns the line that reads as the list.
     local summary
-    summary=$(echo "$response" | jq -r '.output // empty' 2>/dev/null | tr -d '\r' | head -1)
+    summary=$(echo "$response" | jq -r '.output // empty' 2>/dev/null | sanitize_output)
 
     if [[ -n "$summary" ]]; then
-        echo "$summary"
+        truncate_summary "$summary"; echo
     else
         echo "$fallback"
     fi
