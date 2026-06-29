@@ -33,3 +33,6 @@ public/updates.json
 *.njsproj
 *.sln
 *.sw?
+
+# Helm session attachments (screenshots etc. dropped into the worktree)
+.helm-attachments/
