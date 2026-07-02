@@ -247,6 +247,43 @@ pre code {
   color: var(--text-muted);
 }
 
+/* ===== Status / Tag badges (dot+tint recipe) ===== */
+/* Additive — coexists with .label*. .status = live state (leading dot),
+   .tag = static classification (no dot). Tints via color-mix so they track the color var.
+   font-weight:500 renders as the Regular file (the 400 @font-face covers 400-500). */
+
+.status,
+.tag {
+  display: inline-flex; align-items: center;
+  height: 16px; padding: 0 6px;
+  font-size: var(--text-sm); font-weight: 500;
+  line-height: 1;
+}
+.status { gap: 4px; }
+.status::before {
+  content: ""; display: inline-block;
+  width: 6px; height: 6px;
+  background: currentColor;   /* 6px square — deterministic across fonts/OSes */
+}
+
+.status-running { color: var(--green);    background: color-mix(in srgb, var(--green)    8%, transparent); }
+.status-idle    { color: var(--text-dim); background: color-mix(in srgb, var(--text-dim) 4%, transparent); }
+.status-queued  { color: var(--orange);   background: color-mix(in srgb, var(--orange)   8%, transparent); }
+.status-error   { color: var(--red);      background: color-mix(in srgb, var(--red)      8%, transparent); }
+
+.tag-feature  { color: var(--blue);     background: color-mix(in srgb, var(--blue)     8%, transparent); }
+.tag-security { color: var(--red);      background: color-mix(in srgb, var(--red)      8%, transparent); }
+.tag-chore    { color: var(--text-dim); background: color-mix(in srgb, var(--text-dim) 4%, transparent); }
+
+/* ===== Icons (Lucide, 14px, 1.5 stroke, round caps) ===== */
+.icon {
+  width: 14px; height: 14px;
+  stroke: currentColor; fill: none;
+  stroke-width: 1.5;
+  stroke-linecap: round; stroke-linejoin: round;
+  flex-shrink: 0;
+}
+
 /* ===== Buttons ===== */
 
 .btn {
@@ -308,6 +345,23 @@ pre code {
 .input::placeholder, .textarea::placeholder {
   color: var(--text-muted);
 }
+
+.input[disabled], .textarea[disabled], .select[disabled] {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.input[aria-invalid="true"], .textarea[aria-invalid="true"], .select[aria-invalid="true"] {
+  border-color: var(--red);
+}
+
+/* Field helper / validation text under an input */
+.helper {
+  font-size: var(--text-sm);
+  color: var(--text-muted);
+  margin-top: var(--space-1);
+}
+.helper-error { color: var(--red); }
 
 /* ===== Form Labels ===== */
 
