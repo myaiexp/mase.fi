@@ -69,6 +69,11 @@
           spellcheck="false"
           placeholder="press / to jump · type to search · ? for help"
           aria-label="Command input"
+          role="combobox"
+          aria-autocomplete="list"
+          aria-haspopup="listbox"
+          aria-expanded="false"
+          aria-controls="cmd-complete"
         />
         <span class="cmd-hint" id="cmd-hint"></span>
         <div class="cmd-complete" id="cmd-complete" hidden></div>

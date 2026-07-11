@@ -2,9 +2,43 @@
 # Generate daily summary entries from today's log entries in updates.json
 set -euo pipefail
 
-UPDATES_FILE="/var/www/html/updates.json"
+UPDATES_FILE="${UPDATES_FILE:-/var/www/html/updates.json}"
 TODAY=$(TZ="Europe/Helsinki" date +%Y-%m-%d)
-DELEGATE_URL="http://localhost:9754/api/delegate"
+DELEGATE_URL="${DELEGATE_URL:-http://localhost:9754/api/delegate}"
+NTFY_URL="${NTFY_URL:-https://ntfy.mase.fi/kelo}"
+HELM_ENV="${HELM_ENV:-/home/mase/Projects/helm/.env}"
+
+# Best-effort ntfy push, isolated in a subshell so `set +e` and any failing
+# command here can't propagate into the script's `set -e`. Token from $NTFY_TOKEN
+# or helm's .env — no systemd EnvironmentFile needed, so this observability lives
+# entirely in the versioned script (mirrors helm's refuse-dirty-tree helper).
+ntfy_send() (
+  set +e
+  title="$1"; body="$2"
+  token="${NTFY_TOKEN:-}"
+  if [ -z "$token" ] && [ -f "$HELM_ENV" ]; then
+    token=$(grep -E '^NTFY_TOKEN=' "$HELM_ENV" 2>/dev/null | head -1 | cut -d= -f2-)
+  fi
+  [ -n "$token" ] || exit 0
+  curl -fsS -m 10 \
+    -H "Authorization: Bearer $token" \
+    -H "Title: $title" \
+    -d "$body" \
+    "$NTFY_URL" >/dev/null 2>&1 || true
+)
+
+# `set -euo pipefail` aborts before any in-script alert, so a hard failure (jq
+# error, delegate curl breaking a pipe, mid-run I/O) would degrade the homepage
+# silently. Fire one alert on any non-zero exit; the intentional skip paths below
+# all `exit 0`, so a normal no-op run stays quiet.
+on_exit() {
+  local rc=$?
+  if [[ $rc -ne 0 ]]; then
+    ntfy_send "mase.fi daily-summary FAILED (exit $rc)" \
+      "${TODAY}: daily-summary aborted (exit $rc) — check: journalctl --user -u mase-fi-daily-summary"
+  fi
+}
+trap on_exit EXIT
 
 if [[ ! -f "$UPDATES_FILE" ]]; then
     echo "No updates.json found"
@@ -129,6 +163,9 @@ jq --arg date "$TODAY" '
 # Build daily entries with AI summaries
 echo '[]' > /tmp/daily_entries.json
 
+FALLBACK_COUNT=0   # projects where the delegate produced nothing usable
+DELEGATE_COUNT=0   # projects that actually went through the delegate (multi-commit)
+
 for i in $(jq -r 'range(length)' /tmp/daily_groups.json); do
     project=$(jq -r ".[$i].project" /tmp/daily_groups.json)
     count=$(jq -r ".[$i].commits | length" /tmp/daily_groups.json)
@@ -139,6 +176,11 @@ for i in $(jq -r 'range(length)' /tmp/daily_groups.json); do
     else
         commits_text=$(jq -r ".[$i].commits[]" /tmp/daily_groups.json)
         summary=$(generate_summary "$project" "$commits_text" "$count")
+        DELEGATE_COUNT=$((DELEGATE_COUNT + 1))
+        # generate_summary echoes exactly this string when the delegate is down or
+        # its reply sanitizes to nothing — the silent-degradation signal. The model
+        # prompt forbids the "project: N" shape, so a real summary can't collide.
+        [[ "$summary" == "${project}: ${count} commits" ]] && FALLBACK_COUNT=$((FALLBACK_COUNT + 1))
     fi
 
     jq --arg date "$TODAY" --arg project "$project" --arg summary "$summary" \
@@ -159,3 +201,12 @@ jq --slurpfile daily /tmp/daily_entries.json '
 
 DAILY_COUNT=$(jq --arg date "$TODAY" '[.entries[] | select(.category == "daily" and .date == $date)] | length' "$UPDATES_FILE")
 echo "Created $DAILY_COUNT daily summary entries for $TODAY"
+
+# One consolidated alert if any delegate summary silently degraded to a commit
+# count — rather than per-project spam. The run still succeeded (fallback text is
+# valid), so this is informational, not a failure.
+if [[ "$FALLBACK_COUNT" -gt 0 ]]; then
+    ntfy_send "mase.fi daily-summary degraded" \
+        "${TODAY}: ${FALLBACK_COUNT}/${DELEGATE_COUNT} project summaries fell back to commit counts — helm delegate unavailable or returned nothing usable"
+    echo "Degraded run: ${FALLBACK_COUNT}/${DELEGATE_COUNT} projects fell back — ntfy sent"
+fi
