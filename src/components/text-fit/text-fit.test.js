@@ -86,6 +86,15 @@ describe('base-text-fit', () => {
     expect(el.shadowRoot.querySelector('#text').textContent).toBe('A'.repeat(50));
   });
 
+  it('paints text synchronously on connect (no blank frame before RO fires)', () => {
+    const el = document.createElement('base-text-fit');
+    el.textContent = 'Sync paint';
+    document.body.appendChild(el);
+    // No await: assert immediately, before the async ResizeObserver callback.
+    // jsdom has no layout so width is 0 -> full-text fallback paints at once.
+    expect(el.shadowRoot.querySelector('#text').textContent).toBe('Sync paint');
+  });
+
   it('cleans up observers on disconnect', () => {
     const el = document.createElement('base-text-fit');
     document.body.appendChild(el);

@@ -74,6 +74,12 @@ class BaseTextFit extends HTMLElement {
     if (typeof document !== 'undefined' && document.fonts) {
       document.fonts.addEventListener('loadingdone', this.#fontHandler);
     }
+
+    // Paint synchronously on connect so the element never shows a blank frame
+    // waiting for the async ResizeObserver callback. Costs one forced layout
+    // (getBoundingClientRect); if width is 0 (not yet laid out) #reflow paints
+    // the full text and the RO callback corrects it once a real size arrives.
+    this.#reflow();
   }
 
   disconnectedCallback() {
