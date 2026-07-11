@@ -43,7 +43,7 @@ Apps requiring login support `?demo` query param (per-app, not centrally).
 
 Shared web components library built from `src/components/` via Vite library mode.
 
-- **Build:** `npm run build:components` → `dist/base-components.js` (IIFE)
+- **Build:** `pnpm build:components` → `dist/base-components.js` (IIFE)
 - **URL:** `https://mase.fi/base-components.js`
 - **Components:** `<base-badge>`, `<base-modal>`, `<base-tabs>`/`<base-tab>`, `<base-dropdown>`/`<base-dropdown-item>`/`<base-dropdown-divider>`, `<base-select>`/`<base-option>`/`<base-option-group>`, `<base-text-fit>`, `<base-context-menu>`
 - **Toast:** `window.BaseToast.show(message, type, duration)` — no HTML tag, static API
@@ -54,10 +54,10 @@ Shared web components library built from `src/components/` via Vite library mode
 ## Deploy
 
 - Run `deploy` — pushes to the Forgejo `origin`, which fires a post-receive hook → `sudo forgejo-deploy mase.fi`.
-- Server-side build (`/usr/local/bin/forgejo-deploy`, `mase.fi` case): checks out to `/var/www/homepage-build`, runs `npm install --production=false && npm run build` (build-lock-wrapped, includes `build:components`) as user `mase`, then copies `dist/.` → `/var/www/html` (chowned to www-data). Build failure aborts before the copy, so a broken build can't ship a stale/empty webroot.
-- **Components:** `npm run build` now includes `build:components` automatically (chained in the script).
-- **build-lock:** package.json's `build` and `build:components` scripts already wrap vite in `build-lock`. Do **not** double-prefix (e.g. `build-lock npm run build`) — nesting two flocks on `/tmp/helm-build.lock` deadlocks the inner one for 30 min and produces an empty `dist/`. Invoke as plain `npm run build`.
-- **Dev / worktree gates:** Helm sessions run with `NODE_ENV=production`, which makes npm auto-set `omit=dev` and skip devDependencies on plain `npm install` — gates would then fail with `eslint: not found`. The committed `.npmrc` (`include=dev`) overrides this: npm reconciles `include` over `omit`, so `npm install` always pulls devDeps regardless of `NODE_ENV`. So in a fresh worktree just run `npm install` and the gates work. (If you ever wipe `.npmrc`, the manual fallback is `npm install --include=dev`.) Harmless for the server build, which already passes `--production=false`.
+- Server-side build (`/usr/local/bin/forgejo-deploy`, `mase.fi` case): checks out to `/var/www/homepage-build`, runs `CI=true pnpm install --frozen-lockfile && pnpm run build` (build-lock-wrapped, includes `build:components`) as user `mase`, then copies `dist/.` → `/var/www/html` (chowned to www-data). Build failure aborts before the copy, so a broken build can't ship a stale/empty webroot.
+- **Components:** `pnpm run build` now includes `build:components` automatically (chained in the script).
+- **build-lock:** package.json's `build` and `build:components` scripts already wrap vite in `build-lock`. Do **not** double-prefix (e.g. `build-lock pnpm run build`) — invoke as plain `pnpm run build`.
+- **Dev / worktree gates:** pnpm installs devDependencies by default regardless of `NODE_ENV`, so in a fresh worktree just run `pnpm install` and the lint/test/build gates work. (The old npm-era `.npmrc` `include=dev` hack was dropped in the pnpm migration: npm auto-set `omit=dev` under `NODE_ENV=production`, but pnpm does not.)
 
 ## Decisions from previous phases
 

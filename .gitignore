@@ -14,11 +14,11 @@ dist
 dist-ssr
 *.local
 
-# Canonical package manager is npm (package-lock.json). Other PM lockfiles are
+# Canonical package manager is pnpm (pnpm-lock.yaml). Other PM lockfiles are
 # redundant and drift in resolved versions — keep them out of the repo.
+package-lock.json
 bun.lock
 bun.lockb
-pnpm-lock.yaml
 
 # Dev-only fixture; production updates.json lives in nginx webroot
 public/updates.json
