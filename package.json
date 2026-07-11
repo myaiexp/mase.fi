@@ -20,5 +20,6 @@
   },
   "dependencies": {
     "@chenglou/pretext": "^0.0.7"
-  }
+  },
+  "packageManager": "npm@11.16.0"
 }
