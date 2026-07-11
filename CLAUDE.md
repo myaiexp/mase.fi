@@ -6,7 +6,7 @@
 
 - **Routing:** Hash-based (`#/home`, `#/activity`, `#/<project>`), browser back/forward; defaults to `#home` via `parseHash()` (no last-channel persistence — only the boot animation uses localStorage)
 - **Channels:** `#home` (daily summaries, nick'd per-project for a color-coded standup via `pickNick` in `data.js`), project channels (feature feed), `#activity` (commit log). Registry built in `channels.js` from `home` + `updates.json` projects + `activity` — no `#about` channel (removed in the rework).
-- **Boot:** 3-phase TTY animation on first visit (7-day localStorage TTL), skip on click/key, `[▶ boot]` replay
+- **Boot:** 3-phase TTY animation on first visit (7-day localStorage TTL), skip on click/key; replay via the `window.__maseReplayBoot()` console helper (no visible replay button)
 - **Search & commands:** Plain text fuzzy-highlights feed lines; `/` prefix navigates to channels with autocomplete and runs easter-egg slash commands (`/help`, `/whoami`, `/uptime`, `/date`, `/clear` — registry in `commands.js`, surfaced in the `/` popup on name-prefix match, output as ephemeral IRC server-notice lines in the feed via `command.js`). Search highlighting lives in `command-search.js`; `?` shows the help panel.
 - **Mobile (<640px):** Sidebar hidden, top bar with dropdown channel picker
 - **Scroll model:** Chat-style (newest at bottom), IntersectionObserver lazy loads older entries on scroll-up
@@ -65,5 +65,5 @@ Shared web components library built from `src/components/` via Vite library mode
 - **JSON shape:** `{entries: [], projects: []}` — single fetch, dual arrays. Projects have `channel` field for routing.
 - **Sticky capacity:** `mase-fi-update` enforces limits (2 project, 3 feature) server-side via jq
 - **Channel mapping:** `entry.project` (slug) matched case-insensitively against `project.slug` (falling back to `project.channel`), routed via `project.channel`
-- **Boot skip logic:** `prefers-reduced-motion` or `mase-fi-boot-seen` localStorage within 7 days
+- **Boot skip logic:** `prefers-reduced-motion` or a fresh `mase.boot.last` localStorage stamp within 7 days (force-replay via `window.MASE_FORCE_BOOT = true`)
 - **View Transitions:** Used for channel switches with direct-render fallback
