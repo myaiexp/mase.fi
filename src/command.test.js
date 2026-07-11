@@ -200,6 +200,62 @@ describe('renderComplete', () => {
   });
 });
 
+// ---- combobox ARIA (autocomplete announced to screen readers) ------------
+
+describe('combobox ARIA', () => {
+  const input = () => document.getElementById('cmd-input');
+  const options = () => [...cc().querySelectorAll('[role="option"]')];
+
+  beforeEach(() => {
+    setChannels([ch('home'), ch('explorer'), ch('activity')]);
+    command.initCommand({ meta: { server: 'irc.test', bootTime: Date.now() } });
+  });
+
+  it('slash mode marks the popup a listbox of options with an active descendant', () => {
+    type('/o'); // matches home + explorer
+    expect(cc().getAttribute('role')).toBe('listbox');
+    const opts = options();
+    expect(opts).toHaveLength(2);
+    expect(opts.map((el) => el.id)).toEqual(['cc-opt-0', 'cc-opt-1']);
+    expect(input().getAttribute('aria-expanded')).toBe('true');
+    expect(input().getAttribute('aria-activedescendant')).toBe('cc-opt-0');
+    expect(opts[0].getAttribute('aria-selected')).toBe('true');
+    expect(opts[1].getAttribute('aria-selected')).toBe('false');
+  });
+
+  it('ArrowDown moves aria-activedescendant and aria-selected to the next option', () => {
+    const el = type('/o');
+    el.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowDown', bubbles: true }));
+    expect(input().getAttribute('aria-activedescendant')).toBe('cc-opt-1');
+    const opts = options();
+    expect(opts[0].getAttribute('aria-selected')).toBe('false');
+    expect(opts[1].getAttribute('aria-selected')).toBe('true');
+  });
+
+  it('hovering an option syncs aria-selected and the active descendant', () => {
+    type('/o');
+    options()[1].dispatchEvent(new MouseEvent('mouseenter', { bubbles: true }));
+    expect(input().getAttribute('aria-activedescendant')).toBe('cc-opt-1');
+    expect(options()[1].getAttribute('aria-selected')).toBe('true');
+  });
+
+  it('help mode announces a note, not a listbox, with no active descendant', () => {
+    type('?');
+    expect(cc().getAttribute('role')).toBe('note');
+    expect(options()).toHaveLength(0);
+    expect(input().getAttribute('aria-expanded')).toBe('true');
+    expect(input().hasAttribute('aria-activedescendant')).toBe(false);
+  });
+
+  it('collapses the combobox when the popup hides (no match / search)', () => {
+    type('/o');
+    type('/zzz'); // no match -> hidden
+    expect(input().getAttribute('aria-expanded')).toBe('false');
+    expect(input().hasAttribute('aria-activedescendant')).toBe(false);
+    expect(cc().hasAttribute('role')).toBe(false);
+  });
+});
+
 // ---- chooseFromComplete (channel navigation) -----------------------------
 
 describe('chooseFromComplete', () => {

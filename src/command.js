@@ -4,6 +4,7 @@ import { entriesFor } from './data.js';
 import { escapeHtml } from './html.js';
 import { buildCommands } from './commands.js';
 import { applySearch } from './command-search.js';
+import { optionAttrs, markListbox, setActive, markHelp, collapseCombobox } from './command-aria.js';
 
 let ccIndex = 0;
 let searchTerm = '';
@@ -69,7 +70,7 @@ function renderComplete(q) {
   if (!matches.length) { hideComplete(); return; }
   ccIndex = Math.min(ccIndex, matches.length - 1);
   $cmdCC.innerHTML = `
-    <div class="cc-head">
+    <div class="cc-head" aria-hidden="true">
       <span>jump to channel</span>
       <kbd>${matches.length}</kbd>
       <span style="flex:1"></span>
@@ -82,12 +83,14 @@ function renderComplete(q) {
     el.addEventListener('mouseenter', () => {
       ccIndex = Number(el.dataset.i);
       $cmdCC.querySelectorAll('.cc-item').forEach((e2, i) => e2.classList.toggle('selected', i === ccIndex));
+      setActive($cmdInput, $cmdCC, ccIndex);
     });
     el.addEventListener('click', () => {
       chooseFromComplete();
     });
   });
   currentMatches = matches;
+  markListbox($cmdInput, $cmdCC, ccIndex);
 }
 
 // Render one autocomplete row — a channel (#label, topic, recency) or a
@@ -98,14 +101,14 @@ function renderCompleteItem(m, i, q) {
   const hit = highlightFuzzy(m.label, q);
   if (m.kind === 'cmd') {
     return `
-      <div class="cc-item is-cmd ${sel}" data-i="${i}">
+      <div class="cc-item is-cmd ${sel}" data-i="${i}" ${optionAttrs(i, i === ccIndex)}>
         <div class="cc-ch"><span class="slash">/</span>${hit}</div>
         <div class="cc-desc">${escapeHtml(m.desc)}</div>
         <div class="cc-last">cmd</div>
       </div>`;
   }
   return `
-    <div class="cc-item ${sel}" data-ch="${m.id}" data-i="${i}" style="--ch-accent:${chAccent(m.id)}">
+    <div class="cc-item ${sel}" data-ch="${m.id}" data-i="${i}" ${optionAttrs(i, i === ccIndex)} style="--ch-accent:${chAccent(m.id)}">
       <div class="cc-ch"><span class="hash">#</span>${hit}</div>
       <div class="cc-desc">${escapeHtml(m.topic)}</div>
       <div class="cc-last">${lastActivity(m.id)}</div>
@@ -121,9 +124,14 @@ function renderHelp() {
     <div class="cc-item"><div class="cc-ch">g-h / g-a</div><div class="cc-desc">go home · go activity</div><div class="cc-last">2 keys</div></div>
   `;
   $cmdCC.hidden = false;
+  markHelp($cmdInput, $cmdCC);
 }
 
-function hideComplete() { $cmdCC.hidden = true; $cmdCC.innerHTML = ''; }
+function hideComplete() {
+  $cmdCC.hidden = true;
+  $cmdCC.replaceChildren();
+  collapseCombobox($cmdInput, $cmdCC);
+}
 
 function chooseFromComplete() {
   const m = currentMatches[ccIndex];
