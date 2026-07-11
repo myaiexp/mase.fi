@@ -15,7 +15,8 @@
 
 - **Projects:** Data-driven from `updates.json` `.projects` array with `channel` field for routing (e.g. `"channel": "explorer"`)
 - **Updates:** Activity entries from `updates.json` `.entries` array, routed to channels by category: `daily` → `#home`, `log` → `#activity`, `feature`/`project` → per-project channel
-- **Auto-generated entries:** `git deployboth` appends commit titles as `log` category entries. Manual `project`/`feature` entries via `mase-fi-update`.
+- **Auto-generated entries:** `git deployboth` appends commit titles as `log` category entries. Manual `project`/`feature` entries via `mase-fi-update`, which enforces sticky capacity limits server-side via `jq` (2 `project` entries, 3 `feature` entries).
+- **Channel mapping:** `entry.project` (slug) is matched case-insensitively against `project.slug`, falling back to `project.channel`.
 - **Daily summaries:** Systemd timer at 23:55 Finnish time. Groups `log` entries by project, calls **helm delegate** (`localhost:9754/api/delegate`, Nous Hermes — no OAuth token) to generate terse comma-separated highlight summaries, creates `daily` entries. Falls back to `"project: N commits"` if delegate is unavailable. Script: `~/.local/bin/mase-fi-daily-summary` (symlink → `scripts/mase-fi-daily-summary`).
 - **JSON format:** `{"entries": [...], "projects": [...]}` — single fetch provides both arrays
 - Dates: ISO in JSON, Finnish DD.MM format client-side
@@ -45,11 +46,7 @@ Shared web components library built from `src/components/` via Vite library mode
 
 - **Build:** `pnpm build:components` → `dist/base-components.js` (IIFE)
 - **URL:** `https://mase.fi/base-components.js`
-- **Components:** `<base-badge>`, `<base-modal>`, `<base-tabs>`/`<base-tab>`, `<base-dropdown>`/`<base-dropdown-item>`/`<base-dropdown-divider>`, `<base-select>`/`<base-option>`/`<base-option-group>`, `<base-text-fit>`, `<base-context-menu>`
-- **Toast:** `window.BaseToast.show(message, type, duration)` — no HTML tag, static API
-- **Text-fit:** `<base-text-fit lines="2" mode="wrap">…</base-text-fit>` — pretext-measured truncation/wrapping of its text content. Attrs: `lines` (max, default `1`; `0` = unlimited), `mode` (`fit` default = ellipsis truncate, `wrap` = balanced binary-search wrap, `justify` = word-spacing justify), `hyphenate` (no-op stub, warns once). Auto-sets `title` to full text; reflows on resize/content-change/font-load. No custom events.
-- **Context-menu:** singleton — place one `<base-context-menu>` in the DOM (it listens for `contextmenu` on `document`). Imperative API: `register(id, {selector, items})` (zone matched via `target.closest(selector)`; `items(target, selection)` callback returns an item array, or `[]`/falsy to fall through to the native menu), `unregister(id)`, `show(x, y, items)`, `close()`, `isOpen` getter. Item shape: `{label, action}`, `{separator: true}`, optional `disabled: true`. Keyboard nav (↑/↓/Enter/Esc), viewport-edge flip; closes on outside-click/scroll/blur. No custom events — selection runs the item's `action()`.
-- **Theming:** Shadow DOM with `base.css` custom properties (`--bg-raised`, `--accent`, `--green`, etc.)
+- Full per-component API (props/attrs/behavior for `<base-text-fit>`, `<base-context-menu>`, etc.): `docs/base-components.md`
 
 ## Deploy
 
@@ -58,12 +55,3 @@ Shared web components library built from `src/components/` via Vite library mode
 - **Components:** `pnpm run build` now includes `build:components` automatically (chained in the script).
 - **build-lock:** package.json's `build` and `build:components` scripts already wrap vite in `build-lock`. Do **not** double-prefix (e.g. `build-lock pnpm run build`) — invoke as plain `pnpm run build`.
 - **Dev / worktree gates:** pnpm installs devDependencies by default regardless of `NODE_ENV`, so in a fresh worktree just run `pnpm install` and the lint/test/build gates work. (The old npm-era `.npmrc` `include=dev` hack was dropped in the pnpm migration: npm auto-set `omit=dev` under `NODE_ENV=production`, but pnpm does not.)
-
-## Decisions from previous phases
-
-- **Module architecture:** `main.js` orchestrates boot/skip decision, each domain owns its module
-- **JSON shape:** `{entries: [], projects: []}` — single fetch, dual arrays. Projects have `channel` field for routing.
-- **Sticky capacity:** `mase-fi-update` enforces limits (2 project, 3 feature) server-side via jq
-- **Channel mapping:** `entry.project` (slug) matched case-insensitively against `project.slug` (falling back to `project.channel`), routed via `project.channel`
-- **Boot skip logic:** `prefers-reduced-motion` or a fresh `mase.boot.last` localStorage stamp within 7 days (force-replay via `window.MASE_FORCE_BOOT = true`)
-- **View Transitions:** Used for channel switches with direct-render fallback
