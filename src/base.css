@@ -130,6 +130,34 @@ body {
   height: 100dvh;
 }
 
+/* ===== Layout primitives — the scroll contract =====
+   Inside .app-shell, body scroll is dead. Every surface (tab, view, panel,
+   modal body) picks exactly ONE architecture:
+
+   page-scroll — content-driven pages (the default). The surface root IS the
+     single scroll region: put .scroll-region on it, .bar-sticky on bars that
+     must stay visible, and let content flow at natural height. No flex:1,
+     no inner overflow-y.
+
+   pane — viewport-bounded surfaces (chat logs, kanban, terminals, split
+     layouts). Root gets .pane (column) or .pane-row (row); fixed rows get
+     .pane-bar; exactly ONE descendant per pane gets .scroll-region.
+
+   Rules: one scroll region per pane (a .pane-row split gives each child pane
+   its own — fine; two NESTED vertical scroll regions are not). Never put a
+   flex:1 + overflow-y:auto descendant inside a page-scroll surface — if a
+   sub-view needs pane behavior, the whole surface becomes a pane. min-height:0
+   is flexbox-spec behavior in all browsers (min-height:auto blocks shrinking),
+   not a Firefox quirk. Nested panes size themselves (flex:1 or a fixed basis)
+   — the primitives don't guess. */
+.pane     { display: flex; flex-direction: column; min-height: 0; min-width: 0; overflow: hidden; }
+.pane-row { display: flex; flex-direction: row;    min-height: 0; min-width: 0; overflow: hidden; }
+.pane-bar { flex-shrink: 0; }
+.scroll-region { flex: 1 1 0; min-height: 0; overflow-y: auto; }
+.bar-sticky { position: sticky; top: 0; z-index: 5; }
+.min-h-0 { min-height: 0; }
+.min-w-0 { min-width: 0; }
+
 a {
   color: inherit;
   text-decoration: none;
