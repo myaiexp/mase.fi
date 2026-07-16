@@ -26,8 +26,9 @@ vi.mock('./data.js', () => ({
   entriesFor: vi.fn(() => []),
 }));
 
-// Re-imported fresh per test so module state (ccIndex, the lazy DOM refs) starts
-// clean and command.js binds to the same mocked-channel instance the test sees.
+// Re-imported fresh per test so module state (the `complete` popup object, the
+// lazy DOM refs) starts clean and command.js binds to the same mocked-channel
+// instance the test sees.
 let command, channels;
 
 // The DOM nodes initCommand resolves by id. cmd-input is the only <input>.
@@ -274,7 +275,7 @@ describe('chooseFromComplete', () => {
     type('/o'); // matches home + explorer (both contain "o"), in registry order
     const list = items();
     expect(list.map((el) => el.dataset.ch)).toEqual(['home', 'explorer']);
-    list[1].dispatchEvent(new MouseEvent('mouseenter', { bubbles: true })); // ccIndex → 1
+    list[1].dispatchEvent(new MouseEvent('mouseenter', { bubbles: true })); // complete.idx → 1
     list[1].dispatchEvent(new MouseEvent('click', { bubbles: true }));
     expect(channels.navigate).toHaveBeenCalledWith('explorer');
   });

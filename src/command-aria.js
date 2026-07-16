@@ -6,6 +6,8 @@
 // non-selectable info rows, so it must NOT claim listbox semantics — markHelp
 // keeps the popup announced as a note with no active descendant.
 
+// "cc" = command-complete, the #cmd-complete popup — shared with the .cc-item /
+// .cc-head / .cc-desc CSS vocabulary. cc-opt-N ids the Nth option row.
 const OPTION_ID_PREFIX = 'cc-opt-';
 
 export const optionId = (i) => `${OPTION_ID_PREFIX}${i}`;

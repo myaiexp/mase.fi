@@ -6,13 +6,14 @@ import { buildCommands } from './slash-commands.js';
 import { applySearch } from './command-search.js';
 import { optionAttrs, markListbox, setActive, markHelp, collapseCombobox } from './command-aria.js';
 
-let ccIndex = 0;
+// Autocomplete popup selection state in one object, shared by every writer
+// (renderComplete, setSelection, the keydown handler) instead of scattered
+// globals. `idx` = highlighted row (into `matches`); `matches` = current
+// channel+command match list. On a module object, not a popup-element expando,
+// so the lifecycle stays explicit.
+const complete = { idx: 0, matches: [] };
 let searchTerm = '';
 let _commands = [];
-// Current autocomplete match list, shared between renderComplete (writer) and
-// chooseFromComplete + the keydown handler (readers). Module-level, not an
-// expando on the popup element, so the data lifecycle is explicit.
-let currentMatches = [];
 
 // Run a feed search and remember the term so feed:relayout can re-apply it.
 function search(term) {
@@ -20,8 +21,9 @@ function search(term) {
   applySearch($feed, searchTerm);
 }
 
-// DOM refs — resolved lazily at init time
-let $cmd, $cmdInput, $cmdPrompt, $cmdHint, $cmdCC, $feed;
+// DOM refs — resolved lazily at init time. $cmdComplete is the #cmd-complete
+// popup; its rows use the cc- ("command-complete") CSS/ARIA vocabulary.
+let $cmd, $cmdInput, $cmdPrompt, $cmdHint, $cmdComplete, $feed;
 
 function updateMode() {
   const v = $cmdInput.value;
@@ -68,8 +70,9 @@ function renderComplete(q) {
     .sort((a, b) => b.score - a.score)
     .slice(0, 8);
   if (!matches.length) { hideComplete(); return; }
-  ccIndex = Math.min(ccIndex, matches.length - 1);
-  $cmdCC.innerHTML = `
+  complete.matches = matches;
+  complete.idx = Math.min(complete.idx, matches.length - 1);
+  $cmdComplete.innerHTML = `
     <div class="cc-head" aria-hidden="true">
       <span>jump to channel</span>
       <kbd>${matches.length}</kbd>
@@ -78,37 +81,51 @@ function renderComplete(q) {
     </div>
     ${matches.map((m, i) => renderCompleteItem(m, i, q)).join('')}
   `;
-  $cmdCC.hidden = false;
-  $cmdCC.querySelectorAll('.cc-item').forEach(el => {
-    el.addEventListener('mouseenter', () => {
-      ccIndex = Number(el.dataset.i);
-      $cmdCC.querySelectorAll('.cc-item').forEach((e2, i) => e2.classList.toggle('selected', i === ccIndex));
-      setActive($cmdInput, $cmdCC, ccIndex);
-    });
+  $cmdComplete.hidden = false;
+  $cmdComplete.querySelectorAll('.cc-item').forEach(el => {
+    el.addEventListener('mouseenter', () => setSelection(Number(el.dataset.i)));
     el.addEventListener('click', () => {
       chooseFromComplete();
     });
   });
-  currentMatches = matches;
-  markListbox($cmdInput, $cmdCC, ccIndex);
+  markListbox($cmdInput, $cmdComplete, complete.idx);
+}
+
+// Move the highlighted row to an absolute `idx` (already in range) without
+// rebuilding the popup: toggle the .selected class and sync ARIA. This is the
+// "move selection" path — a keypress (via moveSelection) or a hover moves a
+// highlight, it does NOT re-run fuzzy scoring or re-attach listeners the way
+// renderComplete does.
+function setSelection(idx) {
+  complete.idx = idx;
+  $cmdComplete.querySelectorAll('.cc-item').forEach((el, i) => el.classList.toggle('selected', i === idx));
+  setActive($cmdInput, $cmdComplete, idx);
+}
+
+// Arrow-key selection: wrap `delta` around the current match list, then move the
+// highlight cheaply via setSelection instead of re-entering updateMode.
+function moveSelection(delta) {
+  const n = complete.matches.length;
+  if (!n) return;
+  setSelection((complete.idx + delta + n) % n);
 }
 
 // Render one autocomplete row — a channel (#label, topic, recency) or a
 // slash-command (/name, description, "cmd" tag). All interpolated text is
 // escaped (highlightFuzzy escapes; escapeHtml on desc/topic; ids are slugs).
 function renderCompleteItem(m, i, q) {
-  const sel = i === ccIndex ? 'selected' : '';
+  const sel = i === complete.idx ? 'selected' : '';
   const hit = highlightFuzzy(m.label, q);
   if (m.kind === 'cmd') {
     return `
-      <div class="cc-item is-cmd ${sel}" data-i="${i}" ${optionAttrs(i, i === ccIndex)}>
+      <div class="cc-item is-cmd ${sel}" data-i="${i}" ${optionAttrs(i, i === complete.idx)}>
         <div class="cc-ch"><span class="slash">/</span>${hit}</div>
         <div class="cc-desc">${escapeHtml(m.desc)}</div>
         <div class="cc-last">cmd</div>
       </div>`;
   }
   return `
-    <div class="cc-item ${sel}" data-ch="${m.id}" data-i="${i}" ${optionAttrs(i, i === ccIndex)} style="--ch-accent:${chAccent(m.id)}">
+    <div class="cc-item ${sel}" data-ch="${m.id}" data-i="${i}" ${optionAttrs(i, i === complete.idx)} style="--ch-accent:${chAccent(m.id)}">
       <div class="cc-ch"><span class="hash">#</span>${hit}</div>
       <div class="cc-desc">${escapeHtml(m.topic)}</div>
       <div class="cc-last">${lastActivity(m.id)}</div>
@@ -116,25 +133,25 @@ function renderCompleteItem(m, i, q) {
 }
 
 function renderHelp() {
-  $cmdCC.innerHTML = `
+  $cmdComplete.innerHTML = `
     <div class="cc-head"><span>help</span></div>
     <div class="cc-item"><div class="cc-ch">/&lt;chan&gt;</div><div class="cc-desc">jump to a channel (fuzzy)</div><div class="cc-last">↵</div></div>
     <div class="cc-item"><div class="cc-ch">text</div><div class="cc-desc">highlight matching lines in this channel</div><div class="cc-last">esc</div></div>
     <div class="cc-item"><div class="cc-ch">?</div><div class="cc-desc">show this help</div><div class="cc-last"></div></div>
     <div class="cc-item"><div class="cc-ch">g-h / g-a</div><div class="cc-desc">go home · go activity</div><div class="cc-last">2 keys</div></div>
   `;
-  $cmdCC.hidden = false;
-  markHelp($cmdInput, $cmdCC);
+  $cmdComplete.hidden = false;
+  markHelp($cmdInput, $cmdComplete);
 }
 
 function hideComplete() {
-  $cmdCC.hidden = true;
-  $cmdCC.replaceChildren();
-  collapseCombobox($cmdInput, $cmdCC);
+  $cmdComplete.hidden = true;
+  $cmdComplete.replaceChildren();
+  collapseCombobox($cmdInput, $cmdComplete);
 }
 
 function chooseFromComplete() {
-  const m = currentMatches[ccIndex];
+  const m = complete.matches[complete.idx];
   if (!m) return;
   if (m.kind === 'cmd') { runCommand(m.cmd); return; }
   $cmdInput.value = '';
@@ -227,7 +244,7 @@ export function initCommand(data) {
   $cmdInput  = document.getElementById('cmd-input');
   $cmdPrompt = document.getElementById('cmd-prompt');
   $cmdHint   = document.getElementById('cmd-hint');
-  $cmdCC     = document.getElementById('cmd-complete');
+  $cmdComplete     = document.getElementById('cmd-complete');
   $feed      = document.getElementById('feed');
 
   // Build the slash-command registry, wiring the side-effect hooks commands
@@ -252,11 +269,13 @@ export function initCommand(data) {
       $cmdInput.blur();
       return;
     }
-    if (!$cmdCC.hidden && currentMatches.length) {
-      const n = currentMatches.length;
-      if (e.key === 'ArrowDown') { e.preventDefault(); ccIndex = (ccIndex + 1) % n; updateMode(); return; }
-      if (e.key === 'ArrowUp')   { e.preventDefault(); ccIndex = (ccIndex - 1 + n) % n; updateMode(); return; }
-      if (e.key === 'Tab')       { e.preventDefault(); const m = currentMatches[ccIndex]; $cmdInput.value = '/' + m.label; updateMode(); return; }
+    if (!$cmdComplete.hidden && complete.matches.length) {
+      // Arrow keys only move the highlight — moveSelection toggles classes + ARIA
+      // without rebuilding the popup. Tab rewrites the input (a genuine mode change),
+      // so it still re-renders via updateMode.
+      if (e.key === 'ArrowDown') { e.preventDefault(); moveSelection(1); return; }
+      if (e.key === 'ArrowUp')   { e.preventDefault(); moveSelection(-1); return; }
+      if (e.key === 'Tab')       { e.preventDefault(); const m = complete.matches[complete.idx]; $cmdInput.value = '/' + m.label; updateMode(); return; }
       if (e.key === 'Enter')     { e.preventDefault(); chooseFromComplete(); return; }
     }
   });
