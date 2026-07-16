@@ -25,10 +25,11 @@ beforeAll(() => {
 });
 
 // Import AFTER mocks are installed
-let BaseTextFit;
+let justifyLines, truncate, wrapOptimal;
 beforeAll(async () => {
-  await import('./text-fit.js');
-  BaseTextFit = customElements.get('base-text-fit');
+  await import('./text-fit.js'); // registers <base-text-fit>
+  // Pure layout algorithms now live in their own module — target it directly.
+  ({ justifyLines, truncate, wrapOptimal } = await import('./text-fit-layout.js'));
 });
 
 describe('base-text-fit', () => {
@@ -175,7 +176,7 @@ describe('base-text-fit mode=wrap', () => {
   });
 });
 
-describe('BaseTextFit.justifyLines (static)', () => {
+describe('justifyLines (text-fit-layout)', () => {
   const DEFAULT_FONT = '13px monospace';
   let prepareWithSegments;
 
@@ -191,13 +192,13 @@ describe('BaseTextFit.justifyLines (static)', () => {
   }
 
   it('returns empty for empty text', () => {
-    const result = BaseTextFit.justifyLines(prep(''), 200, 0);
+    const result = justifyLines(prep(''), 200, 0);
     expect(result).toEqual([]);
   });
 
   it('returns lines with wordSpacing for non-last lines', () => {
     // ~50 chars at 8px/char = 400px, maxWidth 200 -> 2+ lines
-    const result = BaseTextFit.justifyLines(prep('one two three four five six seven eight nine ten eleven twelve'), 200, 0);
+    const result = justifyLines(prep('one two three four five six seven eight nine ten eleven twelve'), 200, 0);
     expect(result.length).toBeGreaterThan(1);
     // First line should have wordSpacing
     if (result.length > 1) {
@@ -210,7 +211,7 @@ describe('BaseTextFit.justifyLines (static)', () => {
 
   it('handles single-word lines without wordSpacing', () => {
     // A line with just one word has no spaces to distribute
-    const result = BaseTextFit.justifyLines(prep('Supercalifragilisticexpialidocious is a long word'), 200, 0);
+    const result = justifyLines(prep('Supercalifragilisticexpialidocious is a long word'), 200, 0);
     // Any line with 0 spaces should not have wordSpacing
     for (const line of result) {
       const spaceCount = (line.text.match(/ /g) || []).length;
@@ -221,7 +222,7 @@ describe('BaseTextFit.justifyLines (static)', () => {
   });
 });
 
-describe('BaseTextFit.truncate (static)', () => {
+describe('truncate (text-fit-layout)', () => {
   const DEFAULT_FONT = '13px monospace';
   let prepareWithSegments;
 
@@ -239,26 +240,26 @@ describe('BaseTextFit.truncate (static)', () => {
   it('returns full text when it fits', () => {
     const prepared = prep('Hello');
     // 5 chars * 8px = 40px, maxWidth 200 -> fits
-    const result = BaseTextFit.truncate(prepared, 200, 1);
+    const result = truncate(prepared, 200, 1);
     expect(result).toBe('Hello');
   });
 
   it('truncates and adds ellipsis when text overflows', () => {
     const prepared = prep('A'.repeat(50));
     // 50 chars * 8px = 400px > 200px
-    const result = BaseTextFit.truncate(prepared, 200, 1);
+    const result = truncate(prepared, 200, 1);
     expect(result).toContain('\u2026');
     expect(result.length).toBeLessThan(50);
   });
 
   it('handles empty text', () => {
     const prepared = prep('');
-    const result = BaseTextFit.truncate(prepared, 200, 1);
+    const result = truncate(prepared, 200, 1);
     expect(result).toBe('');
   });
 });
 
-describe('BaseTextFit.wrapOptimal (static)', () => {
+describe('wrapOptimal (text-fit-layout)', () => {
   const DEFAULT_FONT = '13px monospace';
   let prepareWithSegments;
 
@@ -274,17 +275,17 @@ describe('BaseTextFit.wrapOptimal (static)', () => {
   }
 
   it('returns empty string for null prepared', () => {
-    expect(BaseTextFit.wrapOptimal(null, 200, 2)).toBe('');
+    expect(wrapOptimal(null, 200, 2)).toBe('');
   });
 
   it('returns empty string for empty text', () => {
-    expect(BaseTextFit.wrapOptimal(prep(''), 200, 2)).toBe('');
+    expect(wrapOptimal(prep(''), 200, 2)).toBe('');
   });
 
   it('balances width when text fits within maxLines (no truncation)', () => {
     // 'aaa bbb ccc' = 11 chars * 8px = 88px, fits in 1 line at 200px.
     // stats.lineCount (1) <= maxLines (3) -> balanced binary-search branch.
-    const result = BaseTextFit.wrapOptimal(prep('aaa bbb ccc'), 200, 3);
+    const result = wrapOptimal(prep('aaa bbb ccc'), 200, 3);
     expect(result).not.toContain('…');
     expect(result.split('\n').length).toBeLessThanOrEqual(3);
     for (const w of ['aaa', 'bbb', 'ccc']) expect(result).toContain(w);
@@ -292,7 +293,7 @@ describe('BaseTextFit.wrapOptimal (static)', () => {
 
   it('truncates last line with ellipsis when text exceeds maxLines', () => {
     // Far more than 2 lines of text -> overflow branch, last line truncated.
-    const result = BaseTextFit.wrapOptimal(prep('word '.repeat(100)), 200, 2);
+    const result = wrapOptimal(prep('word '.repeat(100)), 200, 2);
     expect(result.split('\n').length).toBe(2);
     expect(result).toContain('…');
   });
@@ -300,7 +301,7 @@ describe('BaseTextFit.wrapOptimal (static)', () => {
   it('wraps without truncation when maxLines is 0', () => {
     // maxLines=0 -> neither balanced nor overflow branch; collect all wrapped lines.
     // 19 chars * 8px = 152px > 100px container -> must wrap to multiple lines.
-    const result = BaseTextFit.wrapOptimal(prep('aaa bbb ccc ddd eee'), 100, 0);
+    const result = wrapOptimal(prep('aaa bbb ccc ddd eee'), 100, 0);
     expect(result).not.toContain('…');
     for (const w of ['aaa', 'bbb', 'ccc', 'ddd', 'eee']) expect(result).toContain(w);
     expect(result.split('\n').length).toBeGreaterThan(1);

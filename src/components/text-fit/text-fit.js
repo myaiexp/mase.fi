@@ -1,6 +1,8 @@
-// <base-text-fit> — pretext-based text truncation and optimal line breaking
+// <base-text-fit> — pretext-based text truncation and optimal line breaking.
+// Owns the custom-element lifecycle (observers, reflow, attribute handling) and
+// rendering; the pure layout algorithms live in text-fit-layout.js.
 
-import { prepareWithSegments, measureLineStats, layoutNextLine, materializeLineRange, walkLineRanges, measureNaturalWidth } from '@chenglou/pretext';
+import { DEFAULT_FONT, doPrepare, justifyLines, truncate, wrapOptimal } from './text-fit-layout.js';
 
 const template = document.createElement('template');
 // Template uses static literal HTML only (no user input)
@@ -14,18 +16,7 @@ template.innerHTML = [
   '<span id="text"></span>',
 ].join('\n');
 
-const DEFAULT_FONT = '13px monospace';
 let hyphenateWarned = false;
-
-function doPrepare(text, font) {
-  const result = prepareWithSegments(text, font);
-  result._font = font;
-  return result;
-}
-
-function getFont(prepared) {
-  return prepared._font || DEFAULT_FONT;
-}
 
 class BaseTextFit extends HTMLElement {
   static observedAttributes = ['lines', 'mode', 'hyphenate'];
@@ -139,14 +130,14 @@ class BaseTextFit extends HTMLElement {
     if (mode === 'justify') {
       this.#renderJustified(maxWidth, lines);
     } else if (mode === 'wrap') {
-      this.#textEl.textContent = BaseTextFit.wrapOptimal(this.#prepared, maxWidth, lines);
+      this.#textEl.textContent = wrapOptimal(this.#prepared, maxWidth, lines);
     } else {
-      this.#textEl.textContent = BaseTextFit.truncate(this.#prepared, maxWidth, lines);
+      this.#textEl.textContent = truncate(this.#prepared, maxWidth, lines);
     }
   }
 
   #renderJustified(maxWidth, maxLines) {
-    const lines = BaseTextFit.justifyLines(this.#prepared, maxWidth, maxLines);
+    const lines = justifyLines(this.#prepared, maxWidth, maxLines);
     this.#textEl.textContent = '';
     for (const line of lines) {
       const span = document.createElement('span');
@@ -158,151 +149,6 @@ class BaseTextFit extends HTMLElement {
       this.#textEl.appendChild(span);
     }
   }
-
-  static justifyLines(prepared, maxWidth, maxLines) {
-    if (!prepared) return [];
-    const segments = prepared.segments;
-    if (!segments || segments.length === 0) return [];
-    const fullText = segments.join('');
-    if (!fullText) return [];
-
-    // One walk yields each line's text AND its paint width. The width measured
-    // here is byte-identical to measureNaturalWidth(doPrepare(line.text, font))
-    // \u2014 same paint-width engine, trailing whitespace excluded the same way \u2014 so
-    // reusing it drops the N redundant per-line prepareWithSegments calls the
-    // old code paid just to re-read a width it already had.
-    const allLines = [];
-    walkLineRanges(prepared, maxWidth, (range) => {
-      const line = materializeLineRange(prepared, range);
-      allLines.push({ text: line.text, width: line.width });
-    });
-
-    const linesToShow = maxLines > 0 ? allLines.slice(0, maxLines) : allLines;
-    const isOverflow = maxLines > 0 && allLines.length > maxLines;
-    const font = getFont(prepared);
-
-    const result = [];
-    for (let i = 0; i < linesToShow.length; i++) {
-      const { text, width: naturalWidth } = linesToShow[i];
-      const isLast = i === linesToShow.length - 1;
-
-      if (isLast && isOverflow) {
-        result.push({ text: truncateLastLine(text, maxWidth, '\u2026', font) });
-      } else if (isLast) {
-        result.push({ text });
-      } else {
-        const spaceCount = (text.match(/ /g) || []).length;
-        if (spaceCount > 0 && naturalWidth < maxWidth) {
-          result.push({ text, wordSpacing: (maxWidth - naturalWidth) / spaceCount });
-        } else {
-          result.push({ text });
-        }
-      }
-    }
-    return result;
-  }
-
-  static truncate(prepared, maxWidth, maxLines, ellipsis = '\u2026') {
-    if (!prepared) return '';
-    const segments = prepared.segments;
-    if (!segments || segments.length === 0) return '';
-    const fullText = segments.join('');
-    if (!fullText) return '';
-
-    const stats = measureLineStats(prepared, maxWidth);
-    if (stats.lineCount <= maxLines) return fullText;
-
-    // Walk lines, collecting all visible lines
-    const lines = [];
-    let cursor = { segmentIndex: 0, graphemeIndex: 0 };
-    for (let i = 0; i < maxLines; i++) {
-      const line = layoutNextLine(prepared, cursor, maxWidth);
-      if (!line) break;
-      if (i < maxLines - 1) {
-        lines.push(line.text);
-      } else {
-        // Last line: truncate to fit with ellipsis
-        lines.push(truncateLastLine(line.text, maxWidth, ellipsis, getFont(prepared)));
-      }
-      cursor = line.end;
-    }
-
-    return maxLines > 1 ? lines.join('\n') : lines.join('');
-  }
-
-  static wrapOptimal(prepared, maxWidth, maxLines) {
-    if (!prepared) return '';
-    const segments = prepared.segments;
-    if (!segments || segments.length === 0) return '';
-    const fullText = segments.join('');
-    if (!fullText) return '';
-
-    const stats = measureLineStats(prepared, maxWidth);
-
-    // If text fits within maxLines at maxWidth, do balanced-width binary search
-    if (maxLines > 0 && stats.lineCount <= maxLines) {
-      let lo = 1, hi = maxWidth;
-      while (lo < hi) {
-        const mid = (lo + hi) >>> 1;
-        const midStats = measureLineStats(prepared, mid);
-        if (midStats.lineCount <= maxLines) hi = mid;
-        else lo = mid + 1;
-      }
-      return collectLines(prepared, lo);
-    }
-
-    // Text exceeds maxLines at maxWidth — wrap and truncate last line
-    if (maxLines > 0 && stats.lineCount > maxLines) {
-      const allLines = [];
-      walkLineRanges(prepared, maxWidth, (range) => {
-        allLines.push(materializeLineRange(prepared, range).text);
-      });
-
-      const kept = allLines.slice(0, maxLines);
-      kept[maxLines - 1] = truncateLastLine(
-        kept[maxLines - 1], maxWidth, '\u2026', getFont(prepared)
-      );
-      return kept.join('\n');
-    }
-
-    // maxLines = 0 or text fits naturally
-    return collectLines(prepared, maxWidth);
-  }
-}
-
-function collectLines(prepared, width) {
-  const lines = [];
-  walkLineRanges(prepared, width, (range) => {
-    lines.push(materializeLineRange(prepared, range).text);
-  });
-  return lines.join('\n');
-}
-
-function truncateLastLine(lineText, maxWidth, ellipsis, font) {
-  const ellipsisPrep = doPrepare(ellipsis, font);
-  const ellipsisWidth = measureNaturalWidth(ellipsisPrep);
-  const availWidth = maxWidth - ellipsisWidth;
-
-  if (availWidth <= 0) return ellipsis;
-
-  // width(slice(0, j).trimEnd()) is monotonic non-decreasing in j, so binary
-  // search for the largest fitting prefix in O(log N) measurements. j = 0 (the
-  // empty string, width 0) always fits, so `best` is never left unset.
-  let lo = 0;
-  let hi = lineText.length;
-  let best = 0;
-  while (lo <= hi) {
-    const mid = (lo + hi) >>> 1;
-    const candidate = lineText.slice(0, mid).trimEnd();
-    const candidateWidth = measureNaturalWidth(doPrepare(candidate, font));
-    if (candidateWidth <= availWidth) {
-      best = mid;
-      lo = mid + 1;
-    } else {
-      hi = mid - 1;
-    }
-  }
-  return lineText.slice(0, best).trimEnd() + ellipsis;
 }
 
 customElements.define('base-text-fit', BaseTextFit);
