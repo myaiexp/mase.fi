@@ -195,7 +195,8 @@ textarea { resize: none; }
 /* ===== Selection ===== */
 
 ::selection {
-  background: rgba(232, 163, 8, 0.25);
+  /* color-mix on --accent (not a frozen amber rgba) so an --accent override re-tints selection too */
+  background: color-mix(in srgb, var(--accent) 25%, transparent);
   color: var(--accent);
 }
 
@@ -342,10 +343,11 @@ pre code {
 
 .btn-primary {
   background: var(--accent-glow);
-  border-color: rgba(232, 163, 8, 0.4);
+  /* color-mix on --accent so the primary button fully follows an --accent override (border + hover, not just the bg) */
+  border-color: color-mix(in srgb, var(--accent) 40%, transparent);
   color: var(--accent-text);
 }
-.btn-primary:hover { background: rgba(232, 163, 8, 0.2); }
+.btn-primary:hover { background: color-mix(in srgb, var(--accent) 20%, transparent); }
 
 .btn-danger {
   background: rgba(239, 68, 68, 0.1);

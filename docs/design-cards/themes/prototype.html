@@ -1,0 +1,158 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>themes · prototype</title>
+<!-- Consumes the worktree's own base.css so the accent refinement renders live -->
+<link rel="stylesheet" href="src/base.css">
+<style>
+  body { padding: 24px 28px 64px; max-width: 940px; color: var(--text); }
+
+  h1 {
+    font-size: var(--text-md); color: var(--text-dim); font-weight: 500;
+    letter-spacing: 0.02em; margin-bottom: 4px;
+  }
+  .lede {
+    color: var(--text-muted); font-size: var(--text-sm);
+    max-width: 68ch; text-wrap: pretty; margin-bottom: 8px;
+  }
+  .callout {
+    color: var(--orange); font-size: var(--text-xs); text-transform: uppercase;
+    letter-spacing: 0.05em; margin-bottom: 30px;
+  }
+
+  .recipe {
+    font-size: var(--text-xs); color: var(--text-muted); text-transform: uppercase;
+    letter-spacing: 0.06em; margin-bottom: 10px;
+  }
+
+  /* Three panels, identical markup — only the scoped :root tokens differ.
+     In production the selector is [data-theme] on <html>; scoped to a panel here
+     so the mechanism shows side by side against one constant --bg. */
+  .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(270px, 1fr)); gap: 1px; background: var(--border); border: 1px solid var(--border); }
+
+  .panel { background: var(--bg); padding: 16px 16px 18px; }
+  .panel-head { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; margin-bottom: 3px; }
+  .panel-name { font-size: var(--text-sm); font-weight: 700; color: var(--fg-1); }
+  .panel-kind { font-size: var(--text-xs); color: var(--accent-text); }
+  .panel-desc { font-size: var(--text-xs); color: var(--text-muted); margin-bottom: 14px; text-wrap: pretty; min-height: 2.6em; }
+
+  .body > * + * { margin-top: 10px; }
+  .txt-1 { color: var(--fg-1); font-weight: 700; font-size: var(--text-base); }
+  .txt-2 { color: var(--fg-2); font-size: var(--text-sm); }
+  .txt-3 { color: var(--fg-3); font-size: var(--text-sm); }
+
+  .btn-row { display: flex; flex-wrap: wrap; gap: 6px; }
+  .badge-row { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+
+  /* surface stack — surface / raised / hover on the theme's own border */
+  .surfaces { display: flex; gap: 1px; border: 1px solid var(--border); }
+  .surfaces > div { flex: 1; height: 30px; display: flex; align-items: center; justify-content: center; font-size: var(--text-xs); color: var(--fg-3); }
+  .s-surface { background: var(--bg-surface); }
+  .s-raised  { background: var(--bg-raised); }
+  .s-hover   { background: var(--bg-hover); }
+
+  .held { font-size: var(--text-xs); color: var(--text-muted); margin-top: 14px; display: flex; gap: 12px; }
+  .held b { color: var(--fg-2); font-weight: 500; }
+  .held .sw { display: inline-block; width: 9px; height: 9px; vertical-align: middle; margin-right: 4px; border: 1px solid var(--border-hover); }
+
+  .foot { margin-top: 34px; font-size: var(--text-xs); color: var(--text-muted); max-width: 74ch; text-wrap: pretty; line-height: var(--leading); }
+  .foot code { color: var(--fg-2); }
+
+  /* ── scoped override demonstrations — token-only, same markup ── */
+  /* Minimal theme: one token family swapped. */
+  .panel[data-theme="demo-accent"] {
+    --accent: #a78bfa; --accent-glow: rgba(167,139,250,0.15); --accent-text: #a78bfa;
+  }
+  /* helm's shipped "frost" — full surface + semantic re-tint, --bg / --fg-1 held. */
+  .panel[data-theme="demo-frost"] {
+    --bg-surface:#0e1117; --bg-raised:#151a22; --bg-hover:#1e2530;
+    --border:#2a3040; --border-hover:#3a4858;
+    --text-dim:#9aa8b8; --text-muted:#4c5a6b; --fg-2:#9aa8b8; --fg-3:#4c5a6b;
+    --accent:#7dc4e4; --accent-glow:rgba(125,196,228,0.15); --accent-text:#7dc4e4;
+    --green:#55d48e; --red:#e85c6a; --blue:#7dc4e4; --cyan:#52d6e8; --orange:#d4a055; --purple:#a8aaee;
+  }
+</style>
+</head>
+<body>
+  <h1>themes — the override contract</h1>
+  <p class="lede">
+    One shipped theme: AMOLED-dark on <code>:root</code>. A "theme" is a consumer sheet loaded after
+    base.css that re-declares tokens under <code>[data-theme]</code> on <code>&lt;html&gt;</code> — same
+    markup, tokens only. <code>--bg</code> and primary text (<code>--fg-1</code>) are the fixed identity;
+    everything else is a re-tintable surface.
+  </p>
+  <p class="callout">The two right-hand panels demonstrate the mechanism — not proposed mase.fi themes.</p>
+
+  <p class="recipe">same component markup · only :root tokens differ · --bg &amp; --fg-1 held constant</p>
+  <div class="grid" id="grid"></div>
+
+  <p class="foot">
+    Each panel renders the identical HTML block, injected from one template. <b style="color:var(--fg-2);font-weight:500">Default</b>
+    is the bare base.css tokens. <b style="color:var(--fg-2);font-weight:500">Accent swap</b> overrides only the
+    <code>--accent</code> family — the minimal theme; watch the primary button, focus ring, and selection follow.
+    <b style="color:var(--fg-2);font-weight:500">Frost</b> is helm's shipped theme: surfaces, borders, secondary
+    text, accent, and semantics all re-tint while <code>--bg</code> and <code>--fg-1</code> stay put.
+    Focus the input or select its text to see accent-driven states track. The <code>.status</code>/<code>.tag</code>
+    badges re-tint for free because they <code>color-mix</code> on the color var — a frozen <code>rgba</code> would not.
+  </p>
+
+<script>
+  // One markup block, rendered into every panel — the "tokens only" proof.
+  function panelBody() {
+    return `
+      <div class="body">
+        <div class="txt-1">Primary heading</div>
+        <div class="txt-2">Secondary body text — the dim reading layer.</div>
+        <div class="txt-3">Muted meta · timestamps · select this text →</div>
+        <div class="btn-row">
+          <button class="btn btn-primary">Primary</button>
+          <button class="btn">Default</button>
+          <button class="btn btn-danger">Danger</button>
+          <button class="btn btn-ghost">Ghost</button>
+        </div>
+        <div class="badge-row">
+          <span class="status status-running">running</span>
+          <span class="status status-error">error</span>
+          <span class="tag tag-feature">feature</span>
+        </div>
+        <input class="input" value="focus me — accent border" aria-label="sample input">
+        <div class="surfaces">
+          <div class="s-surface">surface</div>
+          <div class="s-raised">raised</div>
+          <div class="s-hover">hover</div>
+        </div>
+      </div>`;
+  }
+
+  const PANELS = [
+    { name: 'Default',    kind: ':root',                desc: 'base.css tokens as shipped — AMOLED-dark, amber accent.' },
+    { name: 'Accent swap',kind: '[data-theme] · 3 tokens', theme: 'demo-accent', desc: 'Minimal theme: only the --accent family overridden. Amber → violet everywhere accent reaches.' },
+    { name: 'Frost',      kind: '[data-theme] · full',  theme: 'demo-frost',  desc: "helm's shipped theme — surfaces, borders, dim text, accent, semantics re-tinted." },
+  ];
+
+  const grid = document.getElementById('grid');
+  PANELS.forEach(p => {
+    const el = document.createElement('div');
+    el.className = 'panel';
+    if (p.theme) el.setAttribute('data-theme', p.theme);
+    el.innerHTML =
+      `<div class="panel-head"><span class="panel-name">${p.name}</span><span class="panel-kind">${p.kind}</span></div>` +
+      `<div class="panel-desc">${p.desc}</div>` +
+      panelBody() +
+      `<div class="held"></div>`;
+    grid.appendChild(el);
+  });
+
+  // Read each panel's live --bg / --fg-1 to show the identity layer is constant across all three.
+  document.querySelectorAll('.panel').forEach(el => {
+    const cs = getComputedStyle(el);
+    const bg = cs.getPropertyValue('--bg').trim();
+    const fg = cs.getPropertyValue('--fg-1').trim();
+    el.querySelector('.held').innerHTML =
+      `<span><span class="sw" style="background:${bg}"></span><b>--bg</b> ${bg}</span>` +
+      `<span><span class="sw" style="background:${fg}"></span><b>--fg-1</b> ${fg}</span>`;
+  });
+</script>
+</body>
+</html>
