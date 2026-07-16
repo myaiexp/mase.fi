@@ -1,3 +1,5 @@
 [
-  {"name":"Pörssisähkö","channel":"porssi","slug":"spot-price","url":"https://mase.fi/porssi.html","desc":"Finnish electricity spot prices at a glance"}
+  {"name":"Pörssisähkö","channel":"porssi","slug":"spot-price","url":"https://mase.fi/porssi.html","desc":"Finnish electricity spot prices at a glance"},
+  {"name":"Fortune Mill Solver","channel":"fortunemill","slug":"fortunemill-solver","url":"https://mase.fi/fortunemill","desc":"Upgrade-priority solver for the Fortune Mill game"},
+  {"name":"ISEPS Solver","channel":"iseps","slug":"iseps-solver","url":"https://mase.fi/iseps","desc":"Reverse-engineering solver for the ISEPS idle game"}
 ]
