@@ -3,32 +3,29 @@
 <head>
 <meta charset="utf-8">
 <title>iconography · prototype</title>
+<!-- The real design-system foundation. Everything below consumes base.css's
+     .icon / .icon-16 / .btn / .status / .form-label — no local re-definitions. -->
 <link rel="stylesheet" href="src/base.css">
 <style>
   body {
     padding: 24px 28px 64px;
-    max-width: 820px;
+    max-width: 860px;
     color: var(--text);
   }
 
   h1 {
-    font-size: var(--text-md);
+    font-size: var(--text-lg);
     color: var(--text-dim);
-    font-weight: 500;
+    font-weight: 700;
     letter-spacing: 0.02em;
     margin-bottom: 4px;
   }
-
   .lede {
     color: var(--text-muted);
     font-size: var(--text-sm);
     margin-bottom: 32px;
   }
-
-  section {
-    margin-bottom: 32px;
-  }
-
+  section { margin-bottom: 34px; }
   .recipe {
     font-size: var(--text-xs);
     color: var(--text-muted);
@@ -36,69 +33,52 @@
     letter-spacing: 0.06em;
     margin-bottom: 8px;
   }
-
   h2 {
-    font-size: var(--text-base);
-    font-weight: 500;
+    font-size: var(--text-md);
+    font-weight: 700;
     color: var(--text);
     margin-bottom: 2px;
   }
-
   .note {
     color: var(--text-muted);
     font-size: var(--text-sm);
     margin-bottom: 14px;
+    max-width: 62ch;
+    text-wrap: pretty;
   }
+  code { color: var(--text-dim); }
 
   .row {
     display: flex;
     flex-wrap: wrap;
-    gap: 18px;
-    align-items: center;
+    gap: 20px;
+    align-items: flex-end;
     padding: 12px 0;
   }
-
-  .row + .row {
-    border-top: 1px solid var(--border);
-  }
-
+  .row + .row { border-top: 1px solid var(--border); }
   .row-label {
     color: var(--text-muted);
     font-size: var(--text-xs);
     width: 84px;
     flex-shrink: 0;
+    align-self: center;
   }
 
-  /* ===== Spec defaults ===== */
-
-  .icon {
-    width: 14px; height: 14px;
-    stroke: currentColor; fill: none;
-    stroke-width: 1.5;
-    stroke-linecap: round; stroke-linejoin: round;
-    flex-shrink: 0;
-  }
-
-  .icon-16 {
-    width: 16px; height: 16px;
-  }
-
-  /* ===== Pedagogical demonstrations (banned, for contrast) ===== */
-
-  .icon-bad-12 { width: 12px; height: 12px; }
-  .icon-bad-20 { width: 20px; height: 20px; }
-  .icon-bad-24 { width: 24px; height: 24px; }
-
-  .icon-bad-stroke-1   { stroke-width: 1; }
-  .icon-bad-stroke-2   { stroke-width: 2; }
-  .icon-bad-cap-butt   { stroke-linecap: butt; stroke-linejoin: miter; }
-  .icon-bad-fill       { fill: currentColor; stroke: none; }
+  /* ---- pedagogical size/stroke overrides (drive the real --icon-size knob) ---- */
+  .icon-bad-12 { --icon-size: 12px; }
+  .icon-20     { --icon-size: 20px; }
+  .icon-bad-18 { --icon-size: 18px; }
+  .icon-bad-24 { --icon-size: 24px; }
+  .icon-bad-stroke-1 { stroke-width: 1; }
+  .icon-bad-stroke-2 { stroke-width: 2; }
+  .icon-bad-cap-butt { stroke-linecap: butt; stroke-linejoin: miter; }
+  .icon-bad-fill     { fill: currentColor; stroke: none; }
 
   .swatch {
     display: inline-flex;
     flex-direction: column;
     align-items: center;
-    gap: 6px;
+    gap: 8px;
     color: var(--text-dim);
   }
   .swatch .label {
@@ -108,12 +88,12 @@
   }
   .swatch.right .label { color: var(--green); }
   .swatch.wrong .label { color: var(--red); }
+  .reject-note { color: var(--text-muted); font-size: var(--text-sm); align-self: center; }
 
-  /* ===== Library grid ===== */
-
+  /* ---- library grid ---- */
   .grid {
     display: grid;
-    grid-template-columns: repeat(8, 1fr);
+    grid-template-columns: repeat(7, 1fr);
     gap: 1px;
     background: var(--border);
     border: 1px solid var(--border);
@@ -130,34 +110,20 @@
   .grid .cell .name {
     font-size: 9px;
     color: var(--text-muted);
-    font-family: var(--font-mono, ui-monospace, monospace);
     letter-spacing: -0.01em;
   }
 
-  /* ===== In-context mocks ===== */
+  /* ---- in-context mocks ---- */
+  .mock { background: var(--bg-surface); margin-bottom: 6px; }
 
-  .mock {
-    background: var(--bg-surface);
-    margin-bottom: 6px;
-  }
-
-  /* sidebar row */
-  .sb {
-    padding: 8px 0;
-  }
+  .sb { padding: 8px 0; }
   .sb-row {
-    display: flex;
-    align-items: center;
-    gap: 8px;
+    display: flex; align-items: center; gap: 8px;
     padding: 4px 12px;
     color: var(--text-dim);
     font-size: var(--text-base);
-    line-height: 1.4;
   }
-  .sb-row.active {
-    background: var(--accent-glow);
-    color: var(--accent);
-  }
+  .sb-row.active { background: var(--accent-glow); color: var(--accent); }
   .sb-row .count {
     margin-left: auto;
     color: var(--text-muted);
@@ -165,239 +131,169 @@
     font-variant-numeric: tabular-nums;
   }
 
-  /* toolbar */
   .tb {
-    display: flex;
-    align-items: center;
-    gap: 4px;
+    display: flex; align-items: center; gap: 4px;
     padding: 8px 10px;
     border-bottom: 1px solid var(--border);
   }
   .tb-trigger {
-    width: 28px; height: 28px;
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    color: var(--text-dim);
-    cursor: pointer;
+    width: 26px; height: 26px;
+    display: inline-flex; align-items: center; justify-content: center;
+    color: var(--text-dim); cursor: pointer;
   }
-  .tb-trigger:hover {
-    color: var(--text);
-    background: var(--border);
-  }
+  .tb-trigger:hover { color: var(--text); background: var(--bg-hover); }
   .tb-search {
     flex: 1;
-    display: inline-flex;
-    align-items: center;
-    gap: 8px;
-    padding: 0 10px;
-    height: 28px;
-    background: var(--bg);
-    color: var(--text-muted);
+    display: inline-flex; align-items: center; gap: 8px;
+    padding: 0 10px; height: 26px;
+    background: var(--bg); color: var(--text-muted);
     font-size: var(--text-sm);
   }
 
-  /* button */
-  .btn {
-    display: inline-flex;
-    align-items: center;
-    gap: 6px;
-    padding: 0 10px;
-    height: 26px;
-    background: var(--bg);
-    border: 1px solid var(--border);
-    color: var(--text);
-    font-size: var(--text-sm);
-    cursor: pointer;
-  }
-  .btn:hover { border-color: var(--border-hover); }
-  .btn-primary {
-    background: var(--accent);
-    border-color: var(--accent);
-    color: #1a1300;
-    font-weight: 500;
-  }
-
-  /* inline-in-row metadata */
   .meta {
-    display: flex;
-    align-items: center;
-    gap: 8px;
+    display: flex; align-items: center; gap: 8px;
     padding: 8px 12px;
     font-size: var(--text-sm);
     color: var(--text-dim);
   }
   .meta .sep { color: var(--text-muted); }
-  .meta .with-icon {
-    display: inline-flex;
-    align-items: center;
-    gap: 4px;
-  }
+  .meta .with-icon { display: inline-flex; align-items: center; gap: 4px; }
 
-  /* color inheritance demo */
-  .color-row .swatch.text     { color: var(--text); }
-  .color-row .swatch.dim      { color: var(--text-dim); }
-  .color-row .swatch.muted    { color: var(--text-muted); }
-  .color-row .swatch.accent   { color: var(--accent); }
-  .color-row .swatch.green    { color: var(--green); }
-  .color-row .swatch.red      { color: var(--red); }
-  .color-row .swatch.cyan     { color: var(--cyan); }
-  .color-row .swatch.purple   { color: var(--purple); }
+  /* ---- table-row composition ---- */
+  table.tbl { width: 100%; border-collapse: collapse; font-size: var(--text-sm); }
+  table.tbl td {
+    padding: 6px 12px;
+    border-bottom: 1px solid var(--border);
+    color: var(--text-dim);
+    white-space: nowrap;
+  }
+  table.tbl td .mono { color: var(--text); }
 
-  /* rejection vs right pairs */
-  .pair {
-    display: flex;
-    align-items: center;
-    gap: 12px;
-  }
-  .pair .vs {
-    color: var(--text-muted);
-    font-size: var(--text-xs);
-  }
+  /* ---- form field ---- */
+  .field { max-width: 280px; }
+
+  /* ---- color inheritance ---- */
+  .color-row .swatch.text   { color: var(--text); }
+  .color-row .swatch.dim    { color: var(--text-dim); }
+  .color-row .swatch.muted  { color: var(--text-muted); }
+  .color-row .swatch.accent { color: var(--accent); }
+  .color-row .swatch.green  { color: var(--green); }
+  .color-row .swatch.red    { color: var(--red); }
+  .color-row .swatch.cyan   { color: var(--cyan); }
+  .color-row .swatch.purple { color: var(--purple); }
+
+  /* ---- rejection pairs ---- */
+  .pair { display: inline-flex; align-items: center; gap: 12px; }
+  .pair .vs { color: var(--text-muted); font-size: var(--text-xs); }
   .reject-emoji {
-    font-size: 13px;
-    line-height: 1;
-    width: 14px;
-    height: 14px;
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-  }
-  .reject-note {
-    color: var(--text-muted);
-    font-size: var(--text-sm);
+    font-size: 13px; line-height: 1;
+    width: 14px; height: 14px;
+    display: inline-flex; align-items: center; justify-content: center;
   }
 </style>
 </head>
 <body>
 
-<!-- Lucide sprite. All paths copied verbatim from lucide.dev. -->
-<svg xmlns="http://www.w3.org/2000/svg" width="0" height="0" style="position:absolute" aria-hidden="true">
-  <defs>
-    <symbol id="i-home" viewBox="0 0 24 24"><path d="M15 21v-8a1 1 0 0 0-1-1h-4a1 1 0 0 0-1 1v8"/><path d="M3 10a2 2 0 0 1 .709-1.528l7-5.999a2 2 0 0 1 2.582 0l7 5.999A2 2 0 0 1 21 10v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></symbol>
-    <symbol id="i-search" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></symbol>
-    <symbol id="i-sliders" viewBox="0 0 24 24"><line x1="21" x2="14" y1="4" y2="4"/><line x1="10" x2="3" y1="4" y2="4"/><line x1="21" x2="12" y1="12" y2="12"/><line x1="8" x2="3" y1="12" y2="12"/><line x1="21" x2="16" y1="20" y2="20"/><line x1="12" x2="3" y1="20" y2="20"/><line x1="14" x2="14" y1="2" y2="6"/><line x1="8" x2="8" y1="10" y2="14"/><line x1="16" x2="16" y1="18" y2="22"/></symbol>
-    <symbol id="i-cog" viewBox="0 0 24 24"><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/><circle cx="12" cy="12" r="3"/></symbol>
-    <symbol id="i-inbox" viewBox="0 0 24 24"><polyline points="22 12 16 12 14 15 10 15 8 12 2 12"/><path d="M5.45 5.11 2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z"/></symbol>
-    <symbol id="i-bell" viewBox="0 0 24 24"><path d="M10.268 21a2 2 0 0 0 3.464 0"/><path d="M3.262 15.326A1 1 0 0 0 4 17h16a1 1 0 0 0 .74-1.673C19.41 13.956 18 12.499 18 8A6 6 0 0 0 6 8c0 4.499-1.411 5.956-2.738 7.326"/></symbol>
-    <symbol id="i-user" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="10" r="3"/><path d="M7 20.662V19a2 2 0 0 1 2-2h6a2 2 0 0 1 2 2v1.662"/></symbol>
-    <symbol id="i-terminal" viewBox="0 0 24 24"><polyline points="4 17 10 11 4 5"/><line x1="12" x2="20" y1="19" y2="19"/></symbol>
-    <symbol id="i-branch" viewBox="0 0 24 24"><line x1="6" x2="6" y1="3" y2="15"/><circle cx="18" cy="6" r="3"/><circle cx="6" cy="18" r="3"/><path d="M18 9a9 9 0 0 1-9 9"/></symbol>
-    <symbol id="i-check" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="m9 12 2 2 4-4"/></symbol>
-    <symbol id="i-x-circle" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="m15 9-6 6"/><path d="m9 9 6 6"/></symbol>
-    <symbol id="i-alert" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><line x1="12" x2="12" y1="8" y2="12"/><line x1="12" x2="12.01" y1="16" y2="16"/></symbol>
-    <symbol id="i-info" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4"/><path d="M12 8h.01"/></symbol>
-    <symbol id="i-chev-right" viewBox="0 0 24 24"><path d="m9 18 6-6-6-6"/></symbol>
-    <symbol id="i-chev-down" viewBox="0 0 24 24"><path d="m6 9 6 6 6-6"/></symbol>
-    <symbol id="i-arrow-right" viewBox="0 0 24 24"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></symbol>
-    <symbol id="i-plus" viewBox="0 0 24 24"><path d="M5 12h14"/><path d="M12 5v14"/></symbol>
-    <symbol id="i-x" viewBox="0 0 24 24"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></symbol>
-    <symbol id="i-hash" viewBox="0 0 24 24"><line x1="4" x2="20" y1="9" y2="9"/><line x1="4" x2="20" y1="15" y2="15"/><line x1="10" x2="8" y1="3" y2="21"/><line x1="16" x2="14" y1="3" y2="21"/></symbol>
-    <symbol id="i-play" viewBox="0 0 24 24"><polygon points="6 3 20 12 6 21 6 3"/></symbol>
-    <symbol id="i-pause" viewBox="0 0 24 24"><rect x="14" y="4" width="4" height="16" rx="1"/><rect x="6" y="4" width="4" height="16" rx="1"/></symbol>
-    <symbol id="i-download" viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" x2="12" y1="15" y2="3"/></symbol>
-    <symbol id="i-copy" viewBox="0 0 24 24"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></symbol>
-    <symbol id="i-trash" viewBox="0 0 24 24"><path d="M3 6h18"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></symbol>
-    <symbol id="i-pencil" viewBox="0 0 24 24"><path d="M21.174 6.812a1 1 0 0 0-3.986-3.987L3.842 16.174a2 2 0 0 0-.5.83l-1.321 4.352a.5.5 0 0 0 .623.622l4.353-1.32a2 2 0 0 0 .83-.497z"/><path d="m15 5 4 4"/></symbol>
-    <symbol id="i-external" viewBox="0 0 24 24"><path d="M15 3h6v6"/><path d="M10 14 21 3"/><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/></symbol>
-    <symbol id="i-link" viewBox="0 0 24 24"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></symbol>
-    <symbol id="i-clock" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></symbol>
-    <symbol id="i-folder" viewBox="0 0 24 24"><path d="M20 20a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.93a2 2 0 0 1-1.66-.9l-.82-1.2A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2Z"/></symbol>
-  </defs>
-</svg>
+<!-- Reference set: Lucide, 24-grid. Paths copied verbatim from lucide.dev.
+     No stroke-width / cap attributes here — .icon supplies the whole contract. -->
+<svg xmlns="http://www.w3.org/2000/svg" width="0" height="0" style="position:absolute" aria-hidden="true"><defs>
+  <symbol id="i-home" viewBox="0 0 24 24"><path d="M15 21v-8a1 1 0 0 0-1-1h-4a1 1 0 0 0-1 1v8"/><path d="M3 10a2 2 0 0 1 .709-1.528l7-5.999a2 2 0 0 1 2.582 0l7 5.999A2 2 0 0 1 21 10v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></symbol>
+  <symbol id="i-search" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></symbol>
+  <symbol id="i-sliders" viewBox="0 0 24 24"><line x1="21" x2="14" y1="4" y2="4"/><line x1="10" x2="3" y1="4" y2="4"/><line x1="21" x2="12" y1="12" y2="12"/><line x1="8" x2="3" y1="12" y2="12"/><line x1="21" x2="16" y1="20" y2="20"/><line x1="12" x2="3" y1="20" y2="20"/><line x1="14" x2="14" y1="2" y2="6"/><line x1="8" x2="8" y1="10" y2="14"/><line x1="16" x2="16" y1="18" y2="22"/></symbol>
+  <symbol id="i-cog" viewBox="0 0 24 24"><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/><circle cx="12" cy="12" r="3"/></symbol>
+  <symbol id="i-inbox" viewBox="0 0 24 24"><polyline points="22 12 16 12 14 15 10 15 8 12 2 12"/><path d="M5.45 5.11 2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z"/></symbol>
+  <symbol id="i-bell" viewBox="0 0 24 24"><path d="M10.268 21a2 2 0 0 0 3.464 0"/><path d="M3.262 15.326A1 1 0 0 0 4 17h16a1 1 0 0 0 .74-1.673C19.41 13.956 18 12.499 18 8A6 6 0 0 0 6 8c0 4.499-1.411 5.956-2.738 7.326"/></symbol>
+  <symbol id="i-user" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="10" r="3"/><path d="M7 20.662V19a2 2 0 0 1 2-2h6a2 2 0 0 1 2 2v1.662"/></symbol>
+  <symbol id="i-terminal" viewBox="0 0 24 24"><polyline points="4 17 10 11 4 5"/><line x1="12" x2="20" y1="19" y2="19"/></symbol>
+  <symbol id="i-branch" viewBox="0 0 24 24"><line x1="6" x2="6" y1="3" y2="15"/><circle cx="18" cy="6" r="3"/><circle cx="6" cy="18" r="3"/><path d="M18 9a9 9 0 0 1-9 9"/></symbol>
+  <symbol id="i-check" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="m9 12 2 2 4-4"/></symbol>
+  <symbol id="i-x-circle" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="m15 9-6 6"/><path d="m9 9 6 6"/></symbol>
+  <symbol id="i-alert" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><line x1="12" x2="12" y1="8" y2="12"/><line x1="12" x2="12.01" y1="16" y2="16"/></symbol>
+  <symbol id="i-info" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4"/><path d="M12 8h.01"/></symbol>
+  <symbol id="i-chev-right" viewBox="0 0 24 24"><path d="m9 18 6-6-6-6"/></symbol>
+  <symbol id="i-chev-down" viewBox="0 0 24 24"><path d="m6 9 6 6 6-6"/></symbol>
+  <symbol id="i-arrow-right" viewBox="0 0 24 24"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></symbol>
+  <symbol id="i-plus" viewBox="0 0 24 24"><path d="M5 12h14"/><path d="M12 5v14"/></symbol>
+  <symbol id="i-x" viewBox="0 0 24 24"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></symbol>
+  <symbol id="i-hash" viewBox="0 0 24 24"><line x1="4" x2="20" y1="9" y2="9"/><line x1="4" x2="20" y1="15" y2="15"/><line x1="10" x2="8" y1="3" y2="21"/><line x1="16" x2="14" y1="3" y2="21"/></symbol>
+  <symbol id="i-play" viewBox="0 0 24 24"><polygon points="6 3 20 12 6 21 6 3"/></symbol>
+  <symbol id="i-pause" viewBox="0 0 24 24"><rect x="14" y="4" width="4" height="16" rx="1"/><rect x="6" y="4" width="4" height="16" rx="1"/></symbol>
+  <symbol id="i-download" viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" x2="12" y1="15" y2="3"/></symbol>
+  <symbol id="i-copy" viewBox="0 0 24 24"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></symbol>
+  <symbol id="i-trash" viewBox="0 0 24 24"><path d="M3 6h18"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></symbol>
+  <symbol id="i-pencil" viewBox="0 0 24 24"><path d="M21.174 6.812a1 1 0 0 0-3.986-3.987L3.842 16.174a2 2 0 0 0-.5.83l-1.321 4.352a.5.5 0 0 0 .623.622l4.353-1.32a2 2 0 0 0 .83-.497z"/><path d="m15 5 4 4"/></symbol>
+  <symbol id="i-external" viewBox="0 0 24 24"><path d="M15 3h6v6"/><path d="M10 14 21 3"/><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/></symbol>
+  <symbol id="i-link" viewBox="0 0 24 24"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></symbol>
+  <symbol id="i-clock" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></symbol>
+  <symbol id="i-folder" viewBox="0 0 24 24"><path d="M20 20a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.93a2 2 0 0 1-1.66-.9l-.82-1.2A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2Z"/></symbol>
+  <symbol id="i-lock" viewBox="0 0 24 24"><rect width="18" height="11" x="3" y="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></symbol>
+
+  <!-- helm's own set: 20-grid, hand-drawn (web/icons.js) — same contract, different grid. -->
+  <symbol id="h-kanban" viewBox="0 0 20 20"><rect x="2" y="3" width="4" height="14" rx="1"/><rect x="8" y="3" width="4" height="9" rx="1"/><rect x="14" y="3" width="4" height="11" rx="1"/></symbol>
+  <symbol id="h-terminal" viewBox="0 0 20 20"><rect x="2" y="3" width="16" height="14" rx="2"/><polyline points="5,8 8,11 5,14"/><line x1="10" y1="14" x2="15" y2="14"/></symbol>
+</defs></svg>
 
 <h1>Iconography</h1>
-<p class="lede">One family. One weight. <strong>Lucide</strong> · 14px · 1.5-stroke · round caps. The grid below should look like one hand drew it.</p>
+<p class="lede">One family. One weight. Line icons at text weight — <strong>currentColor · fill:none · 1.5 stroke · round caps</strong>, on a 20- or 24-grid. Every glyph below is a raw <code>&lt;svg class="icon"&gt;</code> driven entirely by <code>base.css</code>.</p>
 
 <section>
-  <div class="recipe">Defaults</div>
-  <h2>The two allowed sizes</h2>
-  <p class="note">14px for sidebar rows and inline-in-copy. 16px for toolbar triggers. That is the entire scale.</p>
+  <div class="recipe">Sizes</div>
+  <h2>Few fixed steps</h2>
+  <p class="note"><code>.icon</code> is 14px (inline, sidebar, table cells). <code>.icon-16</code> steps up for toolbars and icon-only buttons. helm's sidebar runs 20px via <code>--icon-size</code>. That is the whole scale — no arbitrary sizes in between.</p>
 
   <div class="row">
-    <span class="row-label">14px</span>
-    <span class="swatch right">
-      <svg class="icon"><use href="#i-home"/></svg>
-      <span class="label">14 · sidebar</span>
-    </span>
-    <span class="swatch right">
-      <svg class="icon"><use href="#i-hash"/></svg>
-      <span class="label">14 · inline</span>
-    </span>
-    <span class="swatch right">
-      <svg class="icon"><use href="#i-check"/></svg>
-      <span class="label">14 · status</span>
-    </span>
+    <span class="row-label">allowed</span>
+    <span class="swatch right"><svg class="icon"><use href="#i-home"/></svg><span class="label">14 · .icon</span></span>
+    <span class="swatch right"><svg class="icon icon-16"><use href="#i-search"/></svg><span class="label">16 · .icon-16</span></span>
+    <span class="swatch right"><svg class="icon icon-20"><use href="#i-sliders"/></svg><span class="label">20 · helm</span></span>
   </div>
-
-  <div class="row">
-    <span class="row-label">16px</span>
-    <span class="swatch right">
-      <svg class="icon icon-16"><use href="#i-search"/></svg>
-      <span class="label">16 · toolbar</span>
-    </span>
-    <span class="swatch right">
-      <svg class="icon icon-16"><use href="#i-sliders"/></svg>
-      <span class="label">16 · toolbar</span>
-    </span>
-    <span class="swatch right">
-      <svg class="icon icon-16"><use href="#i-plus"/></svg>
-      <span class="label">16 · toolbar</span>
-    </span>
-  </div>
-
   <div class="row">
     <span class="row-label">— banned —</span>
-    <span class="swatch wrong">
-      <svg class="icon icon-bad-12"><use href="#i-home"/></svg>
-      <span class="label">12 · too small</span>
-    </span>
-    <span class="swatch wrong">
-      <svg class="icon icon-bad-20"><use href="#i-home"/></svg>
-      <span class="label">20 · between</span>
-    </span>
-    <span class="swatch wrong">
-      <svg class="icon icon-bad-24"><use href="#i-home"/></svg>
-      <span class="label">24 · too big</span>
-    </span>
-    <span class="reject-note">— if a slot needs another size, the slot is wrong, not the size.</span>
+    <span class="swatch wrong"><svg class="icon icon-bad-12"><use href="#i-home"/></svg><span class="label">12 · too small</span></span>
+    <span class="swatch wrong"><svg class="icon icon-bad-18"><use href="#i-home"/></svg><span class="label">18 · arbitrary</span></span>
+    <span class="swatch wrong"><svg class="icon icon-bad-24"><use href="#i-home"/></svg><span class="label">24 · too big</span></span>
+    <span class="reject-note">— if a slot needs an off-scale size, the slot is wrong, not the size.</span>
   </div>
 </section>
 
 <section>
-  <div class="recipe">Stroke</div>
-  <h2>1.5 only</h2>
-  <p class="note">2 over-prints at 14px. 1 vanishes on dense rows. 1.5 sits between.</p>
+  <div class="recipe">Weight</div>
+  <h2>1.5 stroke, round caps</h2>
+  <p class="note">2 over-prints at small sizes. 1 vanishes on dense rows. Butt caps and miter joins harden the corners. 1.5 + round is the fleet weight.</p>
 
   <div class="row">
     <span class="row-label">right</span>
-    <span class="swatch right">
-      <svg class="icon"><use href="#i-search"/></svg>
-      <span class="label">1.5</span>
-    </span>
+    <span class="swatch right"><svg class="icon icon-16"><use href="#i-search"/></svg><span class="label">1.5 · round</span></span>
   </div>
-
   <div class="row">
     <span class="row-label">— banned —</span>
-    <span class="swatch wrong">
-      <svg class="icon icon-bad-stroke-1"><use href="#i-search"/></svg>
-      <span class="label">1 · thin</span>
-    </span>
-    <span class="swatch wrong">
-      <svg class="icon icon-bad-stroke-2"><use href="#i-search"/></svg>
-      <span class="label">2 · heavy</span>
-    </span>
-    <span class="swatch wrong">
-      <svg class="icon icon-bad-cap-butt"><use href="#i-search"/></svg>
-      <span class="label">butt caps</span>
-    </span>
+    <span class="swatch wrong"><svg class="icon icon-16 icon-bad-stroke-1"><use href="#i-search"/></svg><span class="label">1 · thin</span></span>
+    <span class="swatch wrong"><svg class="icon icon-16 icon-bad-stroke-2"><use href="#i-search"/></svg><span class="label">2 · heavy</span></span>
+    <span class="swatch wrong"><svg class="icon icon-16 icon-bad-cap-butt"><use href="#i-sliders"/></svg><span class="label">butt · miter</span></span>
+  </div>
+</section>
+
+<section>
+  <div class="recipe">One family, two grids</div>
+  <h2>20-grid and 24-grid read as one hand</h2>
+  <p class="note">mase.fi draws with Lucide (24-grid); helm ships a hand-drawn 20-grid set. Both keep <code>stroke-width: 1.5</code> + round caps, so at the same rendered size they land within a hair of each other — 6.25% vs 7.5% optical stroke. A 16-grid at 1.5 (9.4%) would read visibly heavier — that's the one grid to avoid.</p>
+
+  <div class="row">
+    <span class="row-label">Lucide 24</span>
+    <span class="swatch"><svg class="icon icon-16"><use href="#i-terminal"/></svg><span class="label">terminal</span></span>
+    <span class="swatch"><svg class="icon icon-16"><use href="#i-sliders"/></svg><span class="label">sliders</span></span>
+  </div>
+  <div class="row">
+    <span class="row-label">helm 20</span>
+    <span class="swatch"><svg class="icon icon-16"><use href="#h-terminal"/></svg><span class="label">terminal</span></span>
+    <span class="swatch"><svg class="icon icon-16"><use href="#h-kanban"/></svg><span class="label">kanban</span></span>
   </div>
 </section>
 
 <section>
   <div class="recipe">Library</div>
-  <h2>Sidebar &amp; inline · 14px</h2>
-  <p class="note">All Lucide. All 1.5-stroke, round caps, <code>fill: none</code>. Rendered uniformly so visual rhythm holds across rows.</p>
+  <h2>Lucide · the reference set · 14px</h2>
+  <p class="note">All Lucide, all driven by <code>.icon</code> — uniform weight and caps, so the visual rhythm holds down every column.</p>
 
   <div class="grid">
     <div class="cell"><svg class="icon"><use href="#i-home"/></svg><span class="name">home</span></div>
@@ -432,100 +328,66 @@
 </section>
 
 <section>
-  <div class="recipe">In context</div>
-  <h2>Where icons live</h2>
-  <p class="note">Sidebar rows, toolbar triggers, button leading-icons, inline metadata. All inherit color from their parent.</p>
+  <div class="recipe">In context · real base.css classes</div>
+  <h2>Alignment falls out of the class</h2>
+  <p class="note">Sidebar rows and buttons are flex — the parent centers, the icon just drops in. Table cells and labels are inline text — <code>.icon</code>'s <code>vertical-align</code> centers it on the baseline. No <code>vertical-align:-2px</code> hacks anywhere below.</p>
 
   <div class="mock sb">
-    <div class="sb-row">
-      <svg class="icon"><use href="#i-home"/></svg>
-      <span>home</span>
-    </div>
-    <div class="sb-row active">
-      <svg class="icon"><use href="#i-hash"/></svg>
-      <span>explorer</span>
-      <span class="count">12</span>
-    </div>
-    <div class="sb-row">
-      <svg class="icon"><use href="#i-terminal"/></svg>
-      <span>activity</span>
-      <span class="count">42</span>
-    </div>
-    <div class="sb-row">
-      <svg class="icon"><use href="#i-user"/></svg>
-      <span>about</span>
-    </div>
+    <div class="sb-row"><svg class="icon"><use href="#i-home"/></svg><span>home</span></div>
+    <div class="sb-row active"><svg class="icon"><use href="#i-hash"/></svg><span>explorer</span><span class="count">12</span></div>
+    <div class="sb-row"><svg class="icon"><use href="#i-terminal"/></svg><span>activity</span><span class="count">42</span></div>
+    <div class="sb-row"><svg class="icon"><use href="#i-user"/></svg><span>about</span></div>
   </div>
 
   <div class="mock">
     <div class="tb">
-      <span class="tb-search">
-        <svg class="icon"><use href="#i-search"/></svg>
-        search channels…
-      </span>
-      <span class="tb-trigger" title="filters">
-        <svg class="icon icon-16"><use href="#i-sliders"/></svg>
-      </span>
-      <span class="tb-trigger" title="notifications">
-        <svg class="icon icon-16"><use href="#i-bell"/></svg>
-      </span>
-      <span class="tb-trigger" title="new">
-        <svg class="icon icon-16"><use href="#i-plus"/></svg>
-      </span>
+      <span class="tb-search"><svg class="icon"><use href="#i-search"/></svg>search channels…</span>
+      <span class="tb-trigger" title="filters"><svg class="icon icon-16"><use href="#i-sliders"/></svg></span>
+      <span class="tb-trigger" title="notifications"><svg class="icon icon-16"><use href="#i-bell"/></svg></span>
+      <span class="tb-trigger" title="new"><svg class="icon icon-16"><use href="#i-plus"/></svg></span>
     </div>
   </div>
 
-  <div class="row" style="padding: 12px 0; border-top: 0;">
-    <span class="row-label">buttons</span>
-    <button class="btn">
-      <svg class="icon"><use href="#i-copy"/></svg>
-      copy SHA
-    </button>
-    <button class="btn">
-      <svg class="icon"><use href="#i-download"/></svg>
-      export
-    </button>
-    <button class="btn btn-primary">
-      <svg class="icon"><use href="#i-arrow-right"/></svg>
-      deploy
-    </button>
+  <div class="row" style="border-top:0;">
+    <span class="row-label">.btn</span>
+    <button class="btn"><svg class="icon"><use href="#i-copy"/></svg>copy SHA</button>
+    <button class="btn"><svg class="icon"><use href="#i-download"/></svg>export</button>
+    <button class="btn btn-primary"><svg class="icon"><use href="#i-arrow-right"/></svg>deploy</button>
+    <button class="btn btn-danger"><svg class="icon"><use href="#i-trash"/></svg>delete</button>
+    <button class="btn" title="settings" style="padding:0;width:22px;"><svg class="icon icon-16"><use href="#i-sliders"/></svg></button>
   </div>
 
   <div class="mock">
-    <div class="meta">
-      <span class="with-icon">
-        <svg class="icon"><use href="#i-branch"/></svg>
-        master
-      </span>
-      <span class="sep">·</span>
-      <span class="with-icon">
-        <svg class="icon"><use href="#i-clock"/></svg>
-        17s ago
-      </span>
-      <span class="sep">·</span>
-      <span class="with-icon" style="color: var(--green);">
-        <svg class="icon"><use href="#i-check"/></svg>
-        passed
-      </span>
-      <span class="sep">·</span>
-      <a class="with-icon" style="color: var(--text-dim); text-decoration: none;" href="#">
-        view
-        <svg class="icon"><use href="#i-external"/></svg>
-      </a>
+    <table class="tbl">
+      <tr>
+        <td><svg class="icon"><use href="#i-branch"/></svg> <span class="mono">master</span></td>
+        <td><svg class="icon"><use href="#i-clock"/></svg> 17s ago</td>
+        <td style="color:var(--green)"><svg class="icon"><use href="#i-check"/></svg> passed</td>
+        <td><a href="#" style="color:var(--text-dim)">view <svg class="icon"><use href="#i-external"/></svg></a></td>
+      </tr>
+      <tr>
+        <td><svg class="icon"><use href="#i-branch"/></svg> <span class="mono">card</span></td>
+        <td><svg class="icon"><use href="#i-clock"/></svg> 4m ago</td>
+        <td style="color:var(--red)"><svg class="icon"><use href="#i-x-circle"/></svg> failed</td>
+        <td><a href="#" style="color:var(--text-dim)">view <svg class="icon"><use href="#i-external"/></svg></a></td>
+      </tr>
+    </table>
+  </div>
+
+  <div class="row">
+    <span class="row-label">.form-label</span>
+    <div class="field">
+      <label class="form-label"><svg class="icon"><use href="#i-lock"/></svg> access token</label>
+      <input class="input" type="password" value="············" readonly>
     </div>
   </div>
 
-  <div class="row" style="padding: 12px 0;">
+  <div class="row">
     <span class="row-label">inline copy</span>
     <span style="color: var(--text-dim); font-size: var(--text-sm);">
-      <svg class="icon"><use href="#i-info"/></svg>
-      pushed
-      <span style="color: var(--text);">
-        <svg class="icon" style="vertical-align: -2px;"><use href="#i-branch"/></svg>
-        master
-      </span>
-      to
-      <span style="color: var(--text);">helm</span>.
+      <svg class="icon"><use href="#i-info"/></svg> pushed
+      <span style="color: var(--text);"><svg class="icon"><use href="#i-branch"/></svg> master</span>
+      to <span style="color: var(--text);">helm</span> · <svg class="icon" style="color:var(--green)"><use href="#i-check"/></svg> deployed.
     </span>
   </div>
 </section>
@@ -533,21 +395,21 @@
 <section>
   <div class="recipe">Color</div>
   <h2><code>currentColor</code> · no exceptions</h2>
-  <p class="note">Same icon, eight contexts. The icon never carries a color of its own — the surrounding text role does.</p>
+  <p class="note">Same icon, eight contexts. The icon never carries a color of its own — the surrounding text role does, so it re-tints under any theme for free.</p>
 
   <div class="row color-row">
     <span class="row-label">on text</span>
-    <span class="swatch text"><svg class="icon"><use href="#i-bell"/></svg><span class="label">--text</span></span>
-    <span class="swatch dim"><svg class="icon"><use href="#i-bell"/></svg><span class="label">--text-dim</span></span>
-    <span class="swatch muted"><svg class="icon"><use href="#i-bell"/></svg><span class="label">--text-muted</span></span>
+    <span class="swatch text"><svg class="icon icon-16"><use href="#i-bell"/></svg><span class="label">--fg-1</span></span>
+    <span class="swatch dim"><svg class="icon icon-16"><use href="#i-bell"/></svg><span class="label">--fg-2</span></span>
+    <span class="swatch muted"><svg class="icon icon-16"><use href="#i-bell"/></svg><span class="label">--fg-3</span></span>
   </div>
   <div class="row color-row">
     <span class="row-label">on accent</span>
-    <span class="swatch accent"><svg class="icon"><use href="#i-bell"/></svg><span class="label">--accent</span></span>
-    <span class="swatch green"><svg class="icon"><use href="#i-bell"/></svg><span class="label">--green</span></span>
-    <span class="swatch red"><svg class="icon"><use href="#i-bell"/></svg><span class="label">--red</span></span>
-    <span class="swatch cyan"><svg class="icon"><use href="#i-bell"/></svg><span class="label">--cyan</span></span>
-    <span class="swatch purple"><svg class="icon"><use href="#i-bell"/></svg><span class="label">--purple</span></span>
+    <span class="swatch accent"><svg class="icon icon-16"><use href="#i-bell"/></svg><span class="label">--accent</span></span>
+    <span class="swatch green"><svg class="icon icon-16"><use href="#i-bell"/></svg><span class="label">--green</span></span>
+    <span class="swatch red"><svg class="icon icon-16"><use href="#i-bell"/></svg><span class="label">--red</span></span>
+    <span class="swatch cyan"><svg class="icon icon-16"><use href="#i-bell"/></svg><span class="label">--cyan</span></span>
+    <span class="swatch purple"><svg class="icon icon-16"><use href="#i-bell"/></svg><span class="label">--purple</span></span>
   </div>
 </section>
 
@@ -558,56 +420,33 @@
 
   <div class="row">
     <span class="row-label">❌ emoji</span>
-    <div class="pair">
-      <span class="reject-emoji" style="color: var(--text-dim);">🔔</span>
-      <span class="vs">→</span>
-      <svg class="icon" style="color: var(--text-dim);"><use href="#i-bell"/></svg>
-    </div>
-    <span class="reject-note">— breaks color, scale, weight. Not on the table.</span>
+    <div class="pair"><span class="reject-emoji" style="color:var(--text-dim)">🔔</span><span class="vs">→</span><svg class="icon icon-16" style="color:var(--text-dim)"><use href="#i-bell"/></svg></div>
+    <span class="reject-note">— breaks color, scale, weight at once. Never on the table.</span>
   </div>
-
   <div class="row">
     <span class="row-label">❌ filled</span>
-    <div class="pair">
-      <svg class="icon icon-bad-fill" style="color: var(--text-dim);"><use href="#i-bell"/></svg>
-      <span class="vs">→</span>
-      <svg class="icon" style="color: var(--text-dim);"><use href="#i-bell"/></svg>
-    </div>
-    <span class="reject-note">— solid mass overpowers stroked UI.</span>
+    <div class="pair"><svg class="icon icon-16 icon-bad-fill" style="color:var(--text-dim)"><use href="#i-bell"/></svg><span class="vs">→</span><svg class="icon icon-16" style="color:var(--text-dim)"><use href="#i-bell"/></svg></div>
+    <span class="reject-note">— a solid mass overpowers stroked UI. (A tiny node-dot is the only fill allowed.)</span>
   </div>
-
   <div class="row">
     <span class="row-label">❌ cog</span>
-    <div class="pair">
-      <svg class="icon" style="color: var(--text-dim);"><use href="#i-cog"/></svg>
-      <span class="vs">→</span>
-      <svg class="icon" style="color: var(--text-dim);"><use href="#i-sliders"/></svg>
-    </div>
-    <span class="reject-note">— cog is too detailed at 14px. Use <code>sliders-horizontal</code>.</span>
+    <div class="pair"><svg class="icon icon-16" style="color:var(--text-dim)"><use href="#i-cog"/></svg><span class="vs">→</span><svg class="icon icon-16" style="color:var(--text-dim)"><use href="#i-sliders"/></svg></div>
+    <span class="reject-note">— cog is too detailed small. Use <code>sliders-horizontal</code>.</span>
   </div>
-
   <div class="row">
     <span class="row-label">❌ hardcoded</span>
-    <div class="pair">
-      <svg class="icon" style="stroke: #58a6ff !important; color: var(--text-dim);"><use href="#i-bell"/></svg>
-      <span class="vs">→</span>
-      <svg class="icon" style="color: var(--text-dim);"><use href="#i-bell"/></svg>
-    </div>
+    <div class="pair"><svg class="icon icon-16" style="stroke:#58a6ff!important;color:var(--text-dim)"><use href="#i-bell"/></svg><span class="vs">→</span><svg class="icon icon-16" style="color:var(--text-dim)"><use href="#i-bell"/></svg></div>
     <span class="reject-note">— stroke must be <code>currentColor</code>; the parent decides hue.</span>
   </div>
-
   <div class="row">
     <span class="row-label">❌ bespoke</span>
     <div class="pair">
-      <!-- intentionally hand-drawn, off-style -->
-      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" style="color: var(--text-dim);">
-        <path d="M4 6 L20 6 L18 18 L6 18 Z"/>
-        <path d="M9 10 L15 10"/>
-      </svg>
+      <!-- intentionally hand-drawn, off-contract: stroke 2.4, miter joins -->
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" style="color:var(--text-dim)"><path d="M4 6 L20 6 L18 18 L6 18 Z"/><path d="M9 10 L15 10"/></svg>
       <span class="vs">→</span>
-      <svg class="icon" style="color: var(--text-dim);"><use href="#i-inbox"/></svg>
+      <svg class="icon icon-16" style="color:var(--text-dim)"><use href="#i-inbox"/></svg>
     </div>
-    <span class="reject-note">— no custom drawings. Pick the closest Lucide metaphor.</span>
+    <span class="reject-note">— no one-off drawings. Pick the closest Lucide metaphor.</span>
   </div>
 </section>
 

@@ -308,14 +308,34 @@ pre code {
 .tag-security { color: var(--red);      background: color-mix(in srgb, var(--red)      8%, transparent); }
 .tag-chore    { color: var(--text-dim); background: color-mix(in srgb, var(--text-dim) 4%, transparent); }
 
-/* ===== Icons (Lucide, 14px, 1.5 stroke, round caps) ===== */
+/* ===== Icons — line-icon sizing + alignment primitive =====
+   The shared class for inline SVG line icons — see the iconography design card.
+   base.css owns the SIZING + ALIGNMENT contract only; icon PATHS ship per-app as
+   inline <svg> (Lucide's 24-grid is the reference set for new work; helm draws a
+   20-grid set to the same rules — both land ~6-7.5% optical stroke, one family).
+   Geometry contract every icon follows: currentColor stroke, fill:none,
+   stroke-width 1.5, round caps/joins, on a square viewBox.
+
+   --icon-size drives both dimensions so a surface sizes once: 14px inline/sidebar
+   (default), .icon-16 for toolbar + icon-only-button affordances. Need another
+   fixed size (helm's 20px sidebar)? set --icon-size at the call site; don't scatter
+   raw width/height.
+
+   vertical-align optically centers a 14px icon on a text run and is IGNORED in flex
+   rows (.btn / .status / sidebar), where the parent's align-items owns alignment —
+   so one class works inline AND in flex with no inline-only modifier or per-call hack. */
 .icon {
-  width: 14px; height: 14px;
+  width: var(--icon-size, 14px);
+  height: var(--icon-size, 14px);
   stroke: currentColor; fill: none;
   stroke-width: 1.5;
   stroke-linecap: round; stroke-linejoin: round;
   flex-shrink: 0;
+  vertical-align: -0.2em;
 }
+
+/* Toolbar / icon-only-button size — the sanctioned step up from 14px inline. */
+.icon-16 { --icon-size: 16px; }
 
 /* ===== Buttons ===== */
 /* One size, three variants — see the buttons design card.
