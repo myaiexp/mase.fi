@@ -15,38 +15,45 @@ selectTemplate.innerHTML = `${selectStyles}
 class BaseSelect extends HTMLElement {
   static observedAttributes = ['value', 'placeholder', 'searchable', 'disabled', 'size'];
 
+  // Member convention (library-wide — see docs/base-components.md): `#member` is
+  // hard-private internal state; `_member` is deliberately reachable by a friend
+  // module or test. Here select-menu.js is a friend module that reads `_menu` and
+  // calls `_selectOption` — those two stay `_`; everything else is #private.
   #open = false;
   #highlightIdx = -1;
   #blurTimeout = null;
   #lastJumpKey = '';
   #lastJumpCycleIdx = -1;
+  #triggerWrap = null;
+  #observer = null;
+  #trigger = null;
 
   constructor() {
     super();
     this.attachShadow({ mode: 'open', delegatesFocus: true });
     this.shadowRoot.appendChild(selectTemplate.content.cloneNode(true));
     this._menu = this.shadowRoot.querySelector('[part="menu"]');
-    this._triggerWrap = this.shadowRoot.querySelector('[part="trigger-wrap"]');
+    this.#triggerWrap = this.shadowRoot.querySelector('[part="trigger-wrap"]');
   }
 
   connectedCallback() {
-    this._buildTrigger();
+    this.#buildTrigger();
     buildMenu(this);
-    this._observer = new MutationObserver(() => buildMenu(this));
-    this._observer.observe(this, { childList: true, subtree: true });
+    this.#observer = new MutationObserver(() => buildMenu(this));
+    this.#observer.observe(this, { childList: true, subtree: true });
   }
 
   disconnectedCallback() {
     removeOverlayListeners(this);
-    this._observer?.disconnect();
+    this.#observer?.disconnect();
     if (this.#blurTimeout) clearTimeout(this.#blurTimeout);
   }
 
   attributeChangedCallback(name) {
-    if (name === 'value') this._syncTriggerText();
-    if (name === 'placeholder') this._syncTriggerText();
-    if (name === 'size') this._applySize();
-    if (name === 'searchable') { this._buildTrigger(); buildMenu(this); }
+    if (name === 'value') this.#syncTriggerText();
+    if (name === 'placeholder') this.#syncTriggerText();
+    if (name === 'size') this.#applySize();
+    if (name === 'searchable') { this.#buildTrigger(); buildMenu(this); }
   }
 
   // --- Public API ---
@@ -61,7 +68,7 @@ class BaseSelect extends HTMLElement {
 
   get isOpen() { return this.#open; }
 
-  get _searchable() { return this.hasAttribute('searchable'); }
+  get #searchable() { return this.hasAttribute('searchable'); }
 
   open() {
     if (this.hasAttribute('disabled')) return;
@@ -71,11 +78,11 @@ class BaseSelect extends HTMLElement {
 
     this._menu.hidden = false;
 
-    const opts = this._enabledOptionDivs();
+    const opts = this.#enabledOptionDivs();
     this.#highlightIdx = opts.length ? 0 : -1;
-    this._applyHighlight();
+    this.#applyHighlight();
 
-    this._addDocListeners();
+    this.#addDocListeners();
   }
 
   close() {
@@ -88,17 +95,17 @@ class BaseSelect extends HTMLElement {
     // AND clears the filter, so the abandoned query leaves no trace — a fresh
     // open shows every option, not the stale filtered subset (which could even
     // hide the selected option the input now displays).
-    if (this._searchable) {
-      this._syncTriggerText();
+    if (this.#searchable) {
+      this.#syncTriggerText();
       resetFilter(this);
     }
   }
 
   // --- Trigger ---
 
-  _buildTrigger() {
-    this._triggerWrap.textContent = '';
-    if (this._searchable) {
+  #buildTrigger() {
+    this.#triggerWrap.textContent = '';
+    if (this.#searchable) {
       const input = document.createElement('input');
       input.setAttribute('type', 'text');
       input.setAttribute('part', 'trigger');
@@ -113,10 +120,10 @@ class BaseSelect extends HTMLElement {
       input.setAttribute('data-form-type', 'other'); // Dashlane
       input.addEventListener('click', () => { if (!this.#open) this.open(); });
       input.addEventListener('focus', () => { if (!this.#open) this.open(); });
-      input.addEventListener('input', () => this._onFilter());
-      input.addEventListener('keydown', (e) => this._onKeydown(e));
-      this._triggerWrap.appendChild(input);
-      this._trigger = input;
+      input.addEventListener('input', () => this.#onFilter());
+      input.addEventListener('keydown', (e) => this.#onKeydown(e));
+      this.#triggerWrap.appendChild(input);
+      this.#trigger = input;
     } else {
       const btn = document.createElement('button');
       btn.setAttribute('type', 'button');
@@ -126,44 +133,44 @@ class BaseSelect extends HTMLElement {
         if (this.hasAttribute('disabled')) return;
         this.#open ? this.close() : this.open();
       });
-      btn.addEventListener('keydown', (e) => this._onKeydown(e));
-      this._triggerWrap.appendChild(btn);
-      this._trigger = btn;
+      btn.addEventListener('keydown', (e) => this.#onKeydown(e));
+      this.#triggerWrap.appendChild(btn);
+      this.#trigger = btn;
     }
-    this._applySize();
-    this._syncTriggerText();
+    this.#applySize();
+    this.#syncTriggerText();
   }
 
-  _syncTriggerText() {
-    if (!this._trigger) return;
+  #syncTriggerText() {
+    if (!this.#trigger) return;
     const sel = this.selectedOption;
 
-    if (this._searchable) {
-      this._trigger.value = sel ? sel.label : '';
-      this._trigger.setAttribute('placeholder', this.getAttribute('placeholder') ?? '');
+    if (this.#searchable) {
+      this.#trigger.value = sel ? sel.label : '';
+      this.#trigger.setAttribute('placeholder', this.getAttribute('placeholder') ?? '');
       return;
     }
 
     if (sel) {
-      this._trigger.textContent = sel.label;
+      this.#trigger.textContent = sel.label;
       return;
     }
 
     const ph = this.getAttribute('placeholder') ?? '';
-    this._trigger.textContent = '';
-    if (ph) this._trigger.appendChild(this._makePlaceholderSpan(ph));
+    this.#trigger.textContent = '';
+    if (ph) this.#trigger.appendChild(this.#makePlaceholderSpan(ph));
   }
 
-  _makePlaceholderSpan(text) {
+  #makePlaceholderSpan(text) {
     const span = document.createElement('span');
     span.className = 'placeholder';
     span.textContent = text;
     return span;
   }
 
-  _applySize() {
-    if (!this._trigger) return;
-    this._trigger.classList.toggle('sm', this.getAttribute('size') === 'sm');
+  #applySize() {
+    if (!this.#trigger) return;
+    this.#trigger.classList.toggle('sm', this.getAttribute('size') === 'sm');
   }
 
   // --- Selection ---
@@ -174,14 +181,14 @@ class BaseSelect extends HTMLElement {
     const label = div.dataset.label;
     this.setAttribute('value', value);
     markSelected(this);
-    this._syncTriggerText();
+    this.#syncTriggerText();
     this.dispatchEvent(new CustomEvent('change', { bubbles: true, detail: { value, label } }));
     this.close();
   }
 
   // --- Keyboard ---
 
-  _onKeydown(e) {
+  #onKeydown(e) {
     if (!this.#open && (e.key === 'ArrowDown' || e.key === 'ArrowUp')) {
       e.preventDefault();
       this.open();
@@ -189,17 +196,17 @@ class BaseSelect extends HTMLElement {
     }
     if (!this.#open) return;
 
-    const opts = this._enabledOptionDivs();
+    const opts = this.#enabledOptionDivs();
     if (!opts.length) return;
 
     if (e.key === 'ArrowDown') {
       e.preventDefault();
       this.#highlightIdx = wrapIndex(this.#highlightIdx, 1, opts.length);
-      this._applyHighlight();
+      this.#applyHighlight();
     } else if (e.key === 'ArrowUp') {
       e.preventDefault();
       this.#highlightIdx = wrapIndex(this.#highlightIdx, -1, opts.length);
-      this._applyHighlight();
+      this.#applyHighlight();
     } else if (e.key === 'Enter') {
       e.preventDefault();
       if (this.#highlightIdx >= 0 && this.#highlightIdx < opts.length) {
@@ -209,12 +216,12 @@ class BaseSelect extends HTMLElement {
       // Handled by doc listener
     } else if (e.key === 'Tab') {
       this.close();
-    } else if (!this._searchable && e.key.length === 1 && /[a-z]/i.test(e.key)) {
-      this._letterJump(e.key, opts);
+    } else if (!this.#searchable && e.key.length === 1 && /[a-z]/i.test(e.key)) {
+      this.#letterJump(e.key, opts);
     }
   }
 
-  _letterJump(letter, opts) {
+  #letterJump(letter, opts) {
     const lower = letter.toLowerCase();
     const matches = [];
     for (let i = 0; i < opts.length; i++) {
@@ -233,18 +240,18 @@ class BaseSelect extends HTMLElement {
       this.#lastJumpKey = lower;
       this.#lastJumpCycleIdx = 0;
     }
-    this._applyHighlight();
+    this.#applyHighlight();
   }
 
-  _enabledOptionDivs() {
+  #enabledOptionDivs() {
     return [...this._menu.querySelectorAll('.option:not(.disabled)')].filter(
       d => d.style.display !== 'none'
     );
   }
 
-  _applyHighlight() {
+  #applyHighlight() {
     const allOpts = [...this._menu.querySelectorAll('.option')];
-    const enabled = this._enabledOptionDivs();
+    const enabled = this.#enabledOptionDivs();
     for (const o of allOpts) o.classList.remove('active');
     if (this.#highlightIdx >= 0 && this.#highlightIdx < enabled.length) {
       enabled[this.#highlightIdx].classList.add('active');
@@ -256,16 +263,16 @@ class BaseSelect extends HTMLElement {
   // Apply the search filter to the menu DOM, then move the highlight to the
   // first still-visible option (or clear it). The DOM filtering itself lives in
   // select-menu.js; the highlight is this component's keyboard concern.
-  _onFilter() {
-    filterMenu(this, this._trigger.value.toLowerCase());
-    const enabled = this._enabledOptionDivs();
+  #onFilter() {
+    filterMenu(this, this.#trigger.value.toLowerCase());
+    const enabled = this.#enabledOptionDivs();
     this.#highlightIdx = enabled.length ? 0 : -1;
-    this._applyHighlight();
+    this.#applyHighlight();
   }
 
   // --- Document listeners ---
 
-  _addDocListeners() {
+  #addDocListeners() {
     addOverlayListeners(this, (e) => !this.contains(e.target) && !this.shadowRoot.contains(e.target));
   }
 }

@@ -32,27 +32,29 @@ itemTemplate.innerHTML = `<style>
 class BaseDropdownItem extends HTMLElement {
   static observedAttributes = ['variant', 'disabled'];
 
+  #span = null;
+
   constructor() {
     super();
     this.attachShadow({ mode: 'open' });
     this.shadowRoot.appendChild(itemTemplate.content.cloneNode(true));
-    this._span = this.shadowRoot.querySelector('span');
+    this.#span = this.shadowRoot.querySelector('span');
   }
 
   connectedCallback() {
     this.setAttribute('tabindex', '-1');
-    this._syncClasses();
+    this.#syncClasses();
   }
 
   attributeChangedCallback() {
-    this._syncClasses();
+    this.#syncClasses();
   }
 
-  _syncClasses() {
+  #syncClasses() {
     const variant = this.getAttribute('variant');
     const disabled = this.hasAttribute('disabled');
-    this._span.classList.toggle('danger', variant === 'danger');
-    this._span.classList.toggle('disabled', disabled);
+    this.#span.classList.toggle('danger', variant === 'danger');
+    this.#span.classList.toggle('disabled', disabled);
   }
 
   get disabled() {
@@ -119,69 +121,76 @@ dropdownTemplate.innerHTML = `<style>
 </div>`;
 
 class BaseDropdown extends HTMLElement {
+  // Member convention (library-wide — see docs/base-components.md): `#member` is
+  // hard-private internal state; `_member` is deliberately reachable by a friend
+  // module or test. This component has no friend module, so every member is #.
   #open = false;
   // Items already wired with click/keydown listeners. A WeakSet keyed on the
   // element avoids stamping a bookkeeping flag onto the public DOM node (which
   // would survive detach/reattach and leak into the element's namespace) and
   // lets GC reclaim removed items.
   #boundItems = new WeakSet();
+  #menu = null;
+  #observer = null;
+  #trigger = null;
+  #onTriggerClick = null;
 
   constructor() {
     super();
     this.attachShadow({ mode: 'open' });
     this.shadowRoot.appendChild(dropdownTemplate.content.cloneNode(true));
-    this._menu = this.shadowRoot.querySelector('[part="menu"]');
+    this.#menu = this.shadowRoot.querySelector('[part="menu"]');
   }
 
   connectedCallback() {
     // Scan for trigger element — slotchange doesn't fire in jsdom
-    this._bindTrigger();
+    this.#bindTrigger();
 
     // Also bind items — forward keydown events for arrow/enter navigation
-    this._bindItems();
+    this.#bindItems();
 
     // Watch for dynamically added children (items added after connectedCallback)
-    this._observer = new MutationObserver(() => {
-      this._bindTrigger();
-      this._bindItems();
+    this.#observer = new MutationObserver(() => {
+      this.#bindTrigger();
+      this.#bindItems();
     });
-    this._observer.observe(this, { childList: true });
+    this.#observer.observe(this, { childList: true });
   }
 
   disconnectedCallback() {
     removeOverlayListeners(this);
-    this._observer?.disconnect();
+    this.#observer?.disconnect();
   }
 
-  _bindTrigger() {
+  #bindTrigger() {
     const trigger = this.querySelector('[slot="trigger"]');
-    if (trigger && trigger !== this._trigger) {
-      this._trigger?.removeEventListener('click', this._onTriggerClick);
-      this._trigger = trigger;
-      this._onTriggerClick = (e) => {
+    if (trigger && trigger !== this.#trigger) {
+      this.#trigger?.removeEventListener('click', this.#onTriggerClick);
+      this.#trigger = trigger;
+      this.#onTriggerClick = (e) => {
         e.stopPropagation();
         this.isOpen ? this.close() : this.open();
       };
-      this._trigger.addEventListener('click', this._onTriggerClick);
+      this.#trigger.addEventListener('click', this.#onTriggerClick);
     }
   }
 
-  _bindItems() {
-    const items = this._items();
+  #bindItems() {
+    const items = this.#items();
     for (const item of items) {
       if (!this.#boundItems.has(item)) {
         this.#boundItems.add(item);
-        item.addEventListener('click', () => this._selectItem(item));
-        item.addEventListener('keydown', (e) => this._onItemKeydown(e, item));
+        item.addEventListener('click', () => this.#selectItem(item));
+        item.addEventListener('keydown', (e) => this.#onItemKeydown(e, item));
       }
     }
   }
 
-  _items() {
+  #items() {
     return [...this.querySelectorAll('base-dropdown-item')];
   }
 
-  _selectItem(item) {
+  #selectItem(item) {
     if (item.disabled) return;
     this.dispatchEvent(new CustomEvent('select', {
       bubbles: true,
@@ -190,11 +199,11 @@ class BaseDropdown extends HTMLElement {
     this.close();
   }
 
-  _onItemKeydown(e, item) {
+  #onItemKeydown(e, item) {
     // Pre-filtered to enabled items, so wrapIndex alone lands on a valid target
     // (no skip loop). A disabled item is not in the list, so its idx of -1 wraps
     // to the first/last enabled item — the same convention menu-nav documents.
-    const items = this._items().filter(i => !i.disabled);
+    const items = this.#items().filter(i => !i.disabled);
     const idx = items.indexOf(item);
 
     if (e.key === 'ArrowDown') {
@@ -205,19 +214,19 @@ class BaseDropdown extends HTMLElement {
       if (items.length) items[wrapIndex(idx, -1, items.length)].focus();
     } else if (e.key === 'Enter') {
       e.preventDefault();
-      this._selectItem(item);
+      this.#selectItem(item);
     }
   }
 
   open() {
     this.#open = true;
 
-    applyMenuFlip(this, this._menu);
+    applyMenuFlip(this, this.#menu);
 
-    this._menu.hidden = false;
+    this.#menu.hidden = false;
 
     // Focus first enabled item
-    const first = this._items().find(i => !i.disabled);
+    const first = this.#items().find(i => !i.disabled);
     first?.focus();
 
     addOverlayListeners(this, (e) => !this.contains(e.target));
@@ -225,7 +234,7 @@ class BaseDropdown extends HTMLElement {
 
   close() {
     this.#open = false;
-    this._menu.hidden = true;
+    this.#menu.hidden = true;
     removeOverlayListeners(this);
   }
 

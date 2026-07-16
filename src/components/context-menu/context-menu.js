@@ -40,21 +40,25 @@ contextMenuTemplate.innerHTML = `<style>
 <div part="menu" hidden></div>`;
 
 class BaseContextMenu extends HTMLElement {
+  // Member convention (library-wide — see docs/base-components.md): `#member` is
+  // hard-private internal state; `_member` is deliberately reachable by a friend
+  // module or test. This component has no friend module, so every member is #.
   #zones = new Map();
   #open = false;
   #highlightIdx = -1;
   #items = [];
   #onContextMenu = null;
+  #menu = null;
 
   constructor() {
     super();
     this.attachShadow({ mode: 'open' });
     this.shadowRoot.appendChild(contextMenuTemplate.content.cloneNode(true));
-    this._menu = this.shadowRoot.querySelector('[part="menu"]');
+    this.#menu = this.shadowRoot.querySelector('[part="menu"]');
   }
 
   connectedCallback() {
-    this.#onContextMenu = (e) => this._handleContextMenu(e);
+    this.#onContextMenu = (e) => this.#handleContextMenu(e);
     document.addEventListener('contextmenu', this.#onContextMenu);
   }
 
@@ -81,13 +85,13 @@ class BaseContextMenu extends HTMLElement {
     this.#highlightIdx = -1;
     this.#open = true;
 
-    while (this._menu.firstChild) this._menu.firstChild.remove();
+    while (this.#menu.firstChild) this.#menu.firstChild.remove();
     for (let i = 0; i < items.length; i++) {
       const item = items[i];
       if (item.separator) {
         const hr = document.createElement('hr');
         hr.dataset.index = i;
-        this._menu.appendChild(hr);
+        this.#menu.appendChild(hr);
       } else {
         const span = document.createElement('span');
         span.className = 'item';
@@ -96,33 +100,33 @@ class BaseContextMenu extends HTMLElement {
         if (item.disabled) span.classList.add('disabled');
         span.addEventListener('click', (e) => {
           e.stopPropagation();
-          this._onItemClick(i);
+          this.#onItemClick(i);
         });
-        this._menu.appendChild(span);
+        this.#menu.appendChild(span);
       }
     }
 
-    this._menu.style.left = x + 'px';
-    this._menu.style.top = y + 'px';
-    this._menu.hidden = false;
+    this.#menu.style.left = x + 'px';
+    this.#menu.style.top = y + 'px';
+    this.#menu.hidden = false;
 
-    const rect = this._menu.getBoundingClientRect();
+    const rect = this.#menu.getBoundingClientRect();
     if (rect.right > window.innerWidth) {
-      this._menu.style.left = (x - rect.width) + 'px';
+      this.#menu.style.left = (x - rect.width) + 'px';
     }
     if (rect.bottom > window.innerHeight) {
-      this._menu.style.top = (y - rect.height) + 'px';
+      this.#menu.style.top = (y - rect.height) + 'px';
     }
 
-    this._addDocListeners();
+    this.#addDocListeners();
   }
 
   close() {
     this.#open = false;
     this.#highlightIdx = -1;
     this.#items = [];
-    this._menu.hidden = true;
-    while (this._menu.firstChild) this._menu.firstChild.remove();
+    this.#menu.hidden = true;
+    while (this.#menu.firstChild) this.#menu.firstChild.remove();
     removeOverlayListeners(this);
   }
 
@@ -130,7 +134,7 @@ class BaseContextMenu extends HTMLElement {
     return this.#open;
   }
 
-  _handleContextMenu(e) {
+  #handleContextMenu(e) {
     if (this.#open) this.close();
 
     for (const zone of this.#zones.values()) {
@@ -148,7 +152,7 @@ class BaseContextMenu extends HTMLElement {
     // No match — native menu shows
   }
 
-  _onItemClick(index) {
+  #onItemClick(index) {
     const item = this.#items[index];
     if (!item || item.separator || item.disabled) return;
     item.action();
@@ -158,12 +162,12 @@ class BaseContextMenu extends HTMLElement {
   // Shared lifecycle (close-on-outside-click + Escape + cleanup) comes from
   // overlay-utils; the arrow/enter nav and scroll/blur-to-close are this
   // component's extras layered on top via the same descriptor registry.
-  _addDocListeners() {
+  #addDocListeners() {
     addOverlayListeners(
       this,
-      (e) => !e.composedPath().includes(this._menu),
+      (e) => !e.composedPath().includes(this.#menu),
       [
-        { target: document, type: 'keydown', handler: (e) => this._onNavKeydown(e) },
+        { target: document, type: 'keydown', handler: (e) => this.#onNavKeydown(e) },
         { target: window, type: 'scroll', handler: () => this.close(), options: { passive: true, capture: true } },
         { target: window, type: 'blur', handler: () => this.close() },
       ],
@@ -171,22 +175,22 @@ class BaseContextMenu extends HTMLElement {
   }
 
   // Escape is handled by overlay-utils; this covers menu navigation only.
-  _onNavKeydown(e) {
+  #onNavKeydown(e) {
     if (e.key === 'ArrowDown') {
       e.preventDefault();
-      this._moveHighlight(1);
+      this.#moveHighlight(1);
     } else if (e.key === 'ArrowUp') {
       e.preventDefault();
-      this._moveHighlight(-1);
+      this.#moveHighlight(-1);
     } else if (e.key === 'Enter') {
       e.preventDefault();
       if (this.#highlightIdx >= 0) {
-        this._onItemClick(this.#highlightIdx);
+        this.#onItemClick(this.#highlightIdx);
       }
     }
   }
 
-  _moveHighlight(direction) {
+  #moveHighlight(direction) {
     const items = this.#items;
     if (!items.length) return;
 
@@ -199,14 +203,14 @@ class BaseContextMenu extends HTMLElement {
       const item = items[idx];
       if (!item.separator && !item.disabled) {
         this.#highlightIdx = idx;
-        this._updateHighlight();
+        this.#updateHighlight();
         return;
       }
     }
   }
 
-  _updateHighlight() {
-    const spans = this._menu.querySelectorAll('.item');
+  #updateHighlight() {
+    const spans = this.#menu.querySelectorAll('.item');
     for (const span of spans) {
       const i = parseInt(span.dataset.index, 10);
       span.classList.toggle('highlighted', i === this.#highlightIdx);
