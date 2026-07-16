@@ -97,10 +97,10 @@ clean_lines() {
         if (low ~ /^(here (are|is)|these |output:|summary:|changes:|note:)/) next  # preamble
         if (line ~ /^[0-9]+ characters/) next          # self-check meta
         if (line ~ /:[[:space:]]*$/) next              # trailing-colon lead-in
-        # drop narration about the commits / the day / the model's own process,
-        # which Sonnet occasionally prepends ("two lines, one per project.",
-        # "commits are all from one day", "let me write the changelog") — the real
-        # changelog lines that follow it survive.
+        # drop narration about the commits, the day, or the model itself, which
+        # Sonnet occasionally prepends (two-lines-one-per-project, commits-are-
+        # all-from-one-day, let-me-write-the-changelog) — the real changelog
+        # lines that follow it survive.
         if (low ~ /^(one|two|three|four|five|six|seven|eight|nine|ten|[0-9]+) lines?\b/) next
         if (low ~ /^(the )?commits (are|were|show|span|look|appear)/) next
         if (low ~ /^today.?s (git )?(log|commits|work)/) next
