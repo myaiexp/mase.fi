@@ -21,9 +21,9 @@ vi.mock('./feed.js', () => ({ renderFeed: vi.fn() }));
 vi.mock('./transition.js', () => ({ playSwitchTransition: vi.fn((cb) => cb && cb()) }));
 vi.mock('./sidebar.js', () => ({ setActiveChannel: vi.fn() }));
 
-// Re-imported fresh per test (see beforeEach) so module state — currentId,
-// CHANNELS, byId — starts clean and the mocked deps resolve to the same fresh
-// instances channels.js sees.
+// Re-imported fresh per test (see beforeEach) so module state — currentId plus
+// the private channel registry — starts clean and the mocked deps resolve to the
+// same fresh instances channels.js sees.
 let channels, sidebar, pinned, feed, transition;
 
 // navigate() writes directly to these DOM nodes; recreate them each test.
@@ -36,13 +36,14 @@ function setupDom() {
   }
 }
 
-// Populate byId in place (the same path initChannels uses) WITHOUT wiring a
-// hashchange listener — keeps navigate-direct tests free of global side effects.
+// Seed the registry the way production does — through initChannels — but capture
+// the hashchange listener so it doesn't leak across tests. initChannels always
+// frames the list as [home, ...projects, activity], so one project yields the
+// home/explorer/activity trio these navigate-direct tests rely on.
 function seed() {
-  Object.assign(channels.byId, {
-    home: { id: 'home', group: 'system', label: 'home', topic: 'daily logbook' },
-    explorer: { id: 'explorer', group: 'projects', label: 'explorer', topic: 'explorer topic', project: { heat: 0.7 } },
-    activity: { id: 'activity', group: 'system', label: 'activity', topic: 'commit stream' },
+  initCapturing({
+    projects: [{ channel: 'explorer', description: 'explorer topic', heat: 0.7 }],
+    entries: [],
   });
 }
 
@@ -88,7 +89,7 @@ describe('getCurrentChannelId', () => {
 
 describe('chHeat', () => {
   it('project channel returns its project.heat', () => {
-    channels.byId.explorer = { id: 'explorer', project: { heat: 0.73 } };
+    initCapturing({ projects: [{ channel: 'explorer', heat: 0.73 }], entries: [] });
     expect(channels.chHeat('explorer')).toBe(0.73);
   });
 
@@ -97,7 +98,7 @@ describe('chHeat', () => {
   });
 
   it('home present in registry but without a project → still 1.0', () => {
-    channels.byId.home = { id: 'home', label: 'home' };
+    initCapturing({ projects: [], entries: [] }); // home added as a project-less system channel
     expect(channels.chHeat('home')).toBe(1.0);
   });
 
@@ -110,9 +111,10 @@ describe('chHeat', () => {
   });
 
   it('project.heat wins over the id-based branches (precedence)', () => {
-    // An id literally named "home" but carrying a project must use project.heat,
+    // A project literally named "home" overwrites the system-home entry, so the
+    // registry's home entry carries a project — chHeat must use project.heat,
     // proving the project check runs before the id === 'home' branch.
-    channels.byId.home = { id: 'home', project: { heat: 0.2 } };
+    initCapturing({ projects: [{ channel: 'home', heat: 0.2 }], entries: [] });
     expect(channels.chHeat('home')).toBe(0.2);
   });
 });
@@ -134,8 +136,7 @@ describe('chAccent', () => {
   });
 
   it('hotter channel yields higher lightness than a colder one', () => {
-    channels.byId.hot = { id: 'hot', project: { heat: 1 } };
-    channels.byId.cold = { id: 'cold', project: { heat: 0 } };
+    initCapturing({ projects: [{ channel: 'hot', heat: 1 }, { channel: 'cold', heat: 0 }], entries: [] });
     const lightness = (s) => parseFloat(s.match(/oklch\(([\d.]+)/)[1]);
     expect(lightness(channels.chAccent('hot'))).toBeGreaterThan(lightness(channels.chAccent('cold')));
   });
@@ -202,7 +203,7 @@ describe('navigate', () => {
 // ---- initChannels --------------------------------------------------------
 
 describe('initChannels', () => {
-  it('builds CHANNELS as [home, ...projects, activity]', () => {
+  it('builds the channel registry as [home, ...projects, activity]', () => {
     initCapturing({
       projects: [
         { channel: 'a', description: 'da' },
@@ -210,21 +211,19 @@ describe('initChannels', () => {
       ],
       entries: [],
     });
-    expect(channels.CHANNELS.map((c) => c.id)).toEqual(['home', 'a', 'b', 'activity']);
-    expect(channels.CHANNELS[0].group).toBe('system');
-    expect(channels.CHANNELS[1].group).toBe('projects');
-    expect(channels.byId.a.topic).toBe('da');
-    expect(channels.byId.a.project).toBeTruthy();
+    expect(channels.getChannels().map((c) => c.id)).toEqual(['home', 'a', 'b', 'activity']);
+    expect(channels.getChannels()[0].group).toBe('system');
+    expect(channels.getChannels()[1].group).toBe('projects');
+    expect(channels.channelById('a').topic).toBe('da');
+    expect(channels.channelById('a').project).toBeTruthy();
   });
 
-  it('rebuilds byId IN PLACE, preserving the exported object identity', () => {
-    const ref = channels.byId;
+  it('re-init replaces the registry, dropping stale channels', () => {
     initCapturing({ projects: [{ channel: 'a', description: 'da' }], entries: [] });
-    expect(channels.byId).toBe(ref); // same object → live consumers keep working
+    expect(channels.channelById('a')).toBeTruthy();
     initCapturing({ projects: [{ channel: 'b', description: 'db' }], entries: [] });
-    expect(channels.byId).toBe(ref);
-    expect(channels.byId.a).toBeUndefined(); // stale keys cleared on re-init
-    expect(channels.byId.b).toBeTruthy();
+    expect(channels.channelById('a')).toBeUndefined(); // stale channel gone after rebuild
+    expect(channels.channelById('b')).toBeTruthy();
   });
 
   it('wires hashchange so a hash change drives navigate(parseHash, fromHash)', () => {

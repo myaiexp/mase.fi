@@ -1,5 +1,5 @@
 // Command input — slash-jump, ?-help, plain-text search; global / ? g-leader shortcuts.
-import { CHANNELS, chAccent, navigate } from './channels.js';
+import { getChannels, chAccent, navigate } from './channels.js';
 import { entriesFor, parseEntryDate } from './data.js';
 import { escapeHtml } from './html.js';
 import { buildCommands } from './commands.js';
@@ -52,7 +52,7 @@ function updateMode() {
 
 function renderComplete(q) {
   q = q.toLowerCase();
-  const chMatches = CHANNELS
+  const chMatches = getChannels()
     .map(c => ({ kind: 'channel', id: c.id, label: c.label, topic: c.topic, score: fuzzyScore(c.label, q) }))
     .filter(x => q === '' || x.score > 0);
   // Commands stay hidden on a bare "/" — they're easter eggs, surfaced only

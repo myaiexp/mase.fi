@@ -12,12 +12,13 @@
 // of the production bundle.
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 
-// command.js needs CHANNELS/chAccent/navigate from the routing layer and
+// command.js needs getChannels/chAccent/navigate from the routing layer and
 // entriesFor from the data adapter. Stub both so these tests exercise only what
 // command.js OWNS: ranking, autocomplete rendering, and search highlighting.
-// CHANNELS is mutated per test via setChannels(); navigate is a spy.
+// The channel list is set per test via setChannels() (stubbing the accessor);
+// navigate is a spy.
 vi.mock('./channels.js', () => ({
-  CHANNELS: [],
+  getChannels: vi.fn(() => []),
   chAccent: vi.fn(() => 'oklch(0.620 0.140 78.0)'),
   navigate: vi.fn(),
 }));
@@ -40,11 +41,9 @@ function setupDom() {
   }
 }
 
-// Replace the mocked CHANNELS contents in place (command.js holds the same array
-// reference via its live import binding).
+// Point the mocked getChannels() accessor at a fresh channel list for this test.
 function setChannels(list) {
-  channels.CHANNELS.length = 0;
-  channels.CHANNELS.push(...list);
+  channels.getChannels.mockReturnValue(list);
 }
 
 function ch(id, label = id, topic = `${id} topic`) {

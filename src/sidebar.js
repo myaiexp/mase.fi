@@ -1,5 +1,5 @@
 // Sidebar channel list + mobile tabbar rendering, plus active-channel highlight.
-import { chAccent, chHeat, CHANNELS, byId } from './channels.js';
+import { chAccent, chHeat, getChannels, channelById } from './channels.js';
 import { escapeHtml } from './html.js';
 
 function chanRow(c) {
@@ -26,7 +26,7 @@ export function renderChanlist(data, navigate) {
 
   const groups = [['system', 'server'], ['projects', 'projects']];
   const html = groups.map(([key, title]) => {
-    const chans = CHANNELS.filter(c => c.group === key);
+    const chans = getChannels().filter(c => c.group === key);
     return `<div class="chan-group">${title}</div>` +
       chans.map(c => chanRow(c)).join('');
   }).join('');
@@ -34,8 +34,8 @@ export function renderChanlist(data, navigate) {
 
   // Mobile tabs: home + activity + first 4 projects
   const primary = [
-    byId.home, byId.activity,
-    ...data.projects.slice(0, 4).map(p => byId[p.channel]),
+    channelById('home'), channelById('activity'),
+    ...data.projects.slice(0, 4).map(p => channelById(p.channel)),
   ].filter(Boolean);
   $tabbar.innerHTML = primary.map(c => `
     <button class="tab" data-ch="${escapeHtml(c.id)}" aria-label="${escapeHtml(c.label)} channel" style="--ch-accent:${chAccent(c.id)}">

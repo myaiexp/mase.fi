@@ -5,11 +5,25 @@ import { renderFeed } from './feed.js';
 import { playSwitchTransition } from './transition.js';
 import { setActiveChannel } from './sidebar.js';
 
-export let CHANNELS = [];
-export let byId = {};
+// Registry state is module-private: consumers read it through getChannels() /
+// channelById() rather than holding a live export binding. That keeps ownership
+// here — initChannels rebuilds the registry by plain reassignment, and no
+// external module can splice or reassign it out from under us.
+let _channels = [];
+let _byId = {};
+
+/** The ordered channel list [home, ...projects, activity]. Frozen — read-only to callers. */
+export function getChannels() {
+  return _channels;
+}
+
+/** Look up a channel by id, or undefined when it isn't in the registry. */
+export function channelById(id) {
+  return _byId[id];
+}
 
 export function chHeat(id) {
-  const c = byId[id];
+  const c = _byId[id];
   if (c?.project) return c.project.heat;
   if (id === 'home') return 1.0;
   if (id === 'activity') return 0.85;
@@ -46,7 +60,7 @@ function setTopicMeta(id) {
 }
 
 export function navigate(id, { fromHash = false } = {}) {
-  if (!byId[id]) id = 'home';
+  if (!_byId[id]) id = 'home';
   if (id === currentId) return;
   const prevId = currentId;
   currentId = id;
@@ -55,7 +69,7 @@ export function navigate(id, { fromHash = false } = {}) {
   document.getElementById('pane').style.setProperty('--ch-accent', chAccent(id));
   setActiveChannel(id);
 
-  const c = byId[id];
+  const c = _byId[id];
   document.getElementById('topic-hash').textContent = '#' + c.label;
   document.getElementById('topic-text').textContent = c.topic;
   setTopicMeta(id);
@@ -80,19 +94,17 @@ function parseHash() {
 /** Build channel registry from data and wire hashchange. Caller drives the initial navigate. */
 export function initChannels(data) {
   _data = data;
-  CHANNELS = [
+  // Reassign wholesale — consumers read through getChannels()/channelById(), so
+  // there are no live references to keep alive and no in-place surgery needed.
+  _channels = Object.freeze([
     { id: 'home', group: 'system', label: 'home', topic: 'daily logbook \xb7 appended nightly \xb7 autoscroll on' },
     ...data.projects.map(p => ({
       id: p.channel, group: 'projects', label: p.channel, topic: p.description, project: p,
     })),
     { id: 'activity', group: 'system', label: 'activity', topic: 'raw commit stream across all projects' },
-  ];
-  // Rebuild byId IN-PLACE (clear keys, then repopulate) — do NOT reassign.
-  // Other modules (e.g. sidebar.js) import the byId object reference and read
-  // through it (byId.home, byId[p.channel]). Mutating the same object keeps
-  // their reference live; `byId = {...}` would orphan their now-stale copies.
-  Object.keys(byId).forEach(k => delete byId[k]);
-  CHANNELS.forEach(c => { byId[c.id] = c; });
+  ]);
+  _byId = {};
+  for (const c of _channels) _byId[c.id] = c;
 
   window.addEventListener('hashchange', () => navigate(parseHash(), { fromHash: true }));
 }
