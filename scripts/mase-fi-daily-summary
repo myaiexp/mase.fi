@@ -65,12 +65,14 @@ if [[ "$LOG_COUNT" -eq 0 ]]; then
     exit 0
 fi
 
-# Take the model's answer as a single clean line. Sonnet in `-p` mode with an
-# "output ONLY" instruction returns exactly the list, so this only needs the
-# first non-empty line, trimmed, with one wrapping pair of quotes/backticks
-# stripped. (The old aggressive tag/refusal/JSON scrubber existed for Hermes'
-# leaky output; Sonnet doesn't need it — and its `<`/`>` rule wrongly nuked any
-# valid summary containing an arrow like `a -> b`, forcing a fallback.)
+# Reduce the model's reply to the one clean summary line. Sonnet mostly returns
+# exactly the list, but on harder inputs it can append a self-check line like
+# "84 characters, within budget." — so among non-empty lines pick the one with
+# the most commas (the real comma-separated list), trimming and unwrapping a
+# wrapping pair of quotes/backticks, with the first line as a single-theme
+# fallback. (The old Hermes scrubber also dropped lines by tag/refusal/JSON
+# shape; that over-filtering is gone — its `<`/`>` rule wrongly nuked summaries
+# containing an arrow like `a -> b`.)
 clean_output() {
     awk '
     {
@@ -83,19 +85,27 @@ clean_output() {
             line = substr(line, 2, length(line) - 2)
             sub(/^[[:space:]]+/, "", line); sub(/[[:space:]]+$/, "", line)
         }
-        print line
-        exit
+        if (line == "") next
+        commas = gsub(/,/, ",", line)     # gsub returns the match count
+        if (first == "") first = line
+        if (commas > bestn) { bestn = commas; best = line }
     }
+    END { if (best != "") print best; else if (first != "") print first }
     '
 }
 
 # A highlight list is short by design; clamp a rambling reply to the last whole
 # item under ~110 chars rather than dumping an over-long line on the homepage.
+# If the clamp lands mid-parenthetical, drop the dangling "(fragment" too so the
+# line doesn't end on an unclosed paren.
 truncate_summary() {
     local s="$1" max=110
-    [[ ${#s} -le $max ]] && { printf '%s' "$s"; return; }
-    local head="${s:0:$max}"
-    if [[ "$head" == *,* ]]; then printf '%s' "${head%,*}"; else printf '%s…' "${head% *}"; fi
+    if (( ${#s} > max )); then
+        local head="${s:0:$max}"
+        if [[ "$head" == *,* ]]; then s="${head%,*}"; else s="${head% *}…"; fi
+    fi
+    if [[ "$s" == *"("* && "$s" != *")"* ]]; then s="${s% (*}"; fi
+    printf '%s' "$s"
 }
 
 # Generate a one-line themed summary of a project's commits via the Claude Code
@@ -114,7 +124,7 @@ generate_summary() {
     # rather than enumerating one line per commit. The few-shot anchors the output
     # to a terse, lowercase, comma-separated shape and a short length.
     local prompt
-    prompt="You are writing a one-line daily changelog for a software project from its git commits. Group the related commits into 3-5 short THEMES (not one-per-commit). Synthesize; drop trivial noise like version bumps and lint unless that is all there is. Output ONLY a terse, lowercase, comma-separated list on a single line, max 90 characters. No project name, no preamble, no tags, no quotes.
+    prompt="You are writing a one-line daily changelog for a software project from its git commits. Group the related commits into 3-5 short THEMES (not one-per-commit). Synthesize; drop trivial noise like version bumps and lint unless that is all there is. Output ONLY a terse, lowercase, comma-separated list on a single line, max 90 characters. No project name, no preamble, no tags, no quotes, and no trailing commentary or character counts — output the list line only.
 Example commits:
 feat(auth): add OAuth login
 fix(auth): handle token refresh
@@ -125,15 +135,17 @@ Example output: oauth login + token refresh, dep bumps, auth tests
 Commits:
 ${commits_text}"
 
-    # `|| true` keeps a single failed/timed-out call from aborting the whole run
-    # under `set -e` — this project falls back, the rest still get summarized.
+    # `</dev/null` skips claude's 3s "no stdin" wait; `|| true` keeps a single
+    # failed/timed-out call from aborting the whole run under `set -e` — this
+    # project falls back, the rest still get summarized.
     local response
-    response=$(timeout "$CLAUDE_TIMEOUT" "$CLAUDE_BIN" -p "$prompt" --model "$CLAUDE_MODEL" 2>/dev/null) || true
+    response=$(timeout "$CLAUDE_TIMEOUT" "$CLAUDE_BIN" -p "$prompt" --model "$CLAUDE_MODEL" </dev/null 2>/dev/null) || true
 
     local summary
     summary=$(printf '%s' "$response" | clean_output)
 
     if [[ -n "$summary" ]]; then
+        summary="${summary#"$project": }"   # drop a redundant leading "project:" the model sometimes adds
         truncate_summary "$summary"; echo
     else
         # Log the failed/empty reply to the journal so a fallback is diagnosable
