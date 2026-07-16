@@ -10,8 +10,19 @@ TODAY=$(TZ="Europe/Helsinki" date +%Y-%m-%d)
 CLAUDE_BIN="${CLAUDE_BIN:-/home/mase/.local/bin/claude}"
 CLAUDE_MODEL="${CLAUDE_MODEL:-sonnet}"
 CLAUDE_TIMEOUT="${CLAUDE_TIMEOUT:-120}"
+# Ceiling on daily lines a single busy project can post. The model judges how
+# many distinct notable threads a day held (default one); this only stops a huge
+# day from flooding #home. Not derived from commit count — a 60-commit refactor
+# sweep is still one line, a feature-packed day earns several.
+MAX_LINES="${MAX_LINES:-3}"
 NTFY_URL="${NTFY_URL:-https://ntfy.mase.fi/kelo}"
 HELM_ENV="${HELM_ENV:-/home/mase/Projects/helm/.env}"
+# Run claude from a throwaway empty dir. Invoked inside a project checkout it
+# would auto-load that repo's CLAUDE.md + recent-commit context into its prompt,
+# which leaks into the summary (e.g. describing today's commits instead of the
+# ones passed in). An empty dir has neither, so output depends only on the prompt
+# regardless of where the script runs. Removed in the exit trap.
+CLAUDE_CWD="$(mktemp -d)"
 
 # Best-effort ntfy push, isolated in a subshell so `set +e` and any failing
 # command here can't propagate into the script's `set -e`. Token from $NTFY_TOKEN
@@ -38,6 +49,7 @@ ntfy_send() (
 # so a normal no-op run stays quiet.
 on_exit() {
   local rc=$?
+  [[ -n "${CLAUDE_CWD:-}" && -d "${CLAUDE_CWD:-}" ]] && rm -rf "$CLAUDE_CWD"
   if [[ $rc -ne 0 ]]; then
     ntfy_send "mase.fi daily-summary FAILED (exit $rc)" \
       "${TODAY}: daily-summary aborted (exit $rc) — check: journalctl --user -u mase-fi-daily-summary"
@@ -65,32 +77,29 @@ if [[ "$LOG_COUNT" -eq 0 ]]; then
     exit 0
 fi
 
-# Reduce the model's reply to the one clean summary line. Sonnet mostly returns
-# exactly the list, but on harder inputs it can append a self-check line like
-# "84 characters, within budget." — so among non-empty lines pick the one with
-# the most commas (the real comma-separated list), trimming and unwrapping a
-# wrapping pair of quotes/backticks, with the first line as a single-theme
-# fallback. (The old Hermes scrubber also dropped lines by tag/refusal/JSON
-# shape; that over-filtering is gone — its `<`/`>` rule wrongly nuked summaries
-# containing an arrow like `a -> b`.)
-clean_output() {
-    awk '
+# Keep the model's real summary lines and drop the noise. The prompt asks for one
+# line per notable thread with nothing else, so per line: strip CR + a leading
+# bullet/number marker + a wrapping pair of quotes/backticks, then drop blanks,
+# obvious preamble/meta ("here are…", "N characters", trailing-colon lead-ins).
+# Emit up to MAX_LINES survivors, in order. (Sonnet needs little scrubbing; this
+# is a light net, not the heavy Hermes-era filter — no `<`/`>` rule, which used
+# to wrongly nuke summaries containing an arrow like `a -> b`.)
+clean_lines() {
+    awk -v max="$MAX_LINES" '
+    function trim(s) { sub(/^[[:space:]]+/, "", s); sub(/[[:space:]]+$/, "", s); return s }
     {
         line = $0
-        gsub(/\r/, "", line)
-        sub(/^[[:space:]]+/, "", line); sub(/[[:space:]]+$/, "", line)
+        gsub(/\r/, "", line); line = trim(line)
+        sub(/^([0-9]+[.)]|[-*•—])[[:space:]]+/, "", line); line = trim(line)  # list marker
+        if (line ~ /^".*"$/ || line ~ /^`.*`$/ || line ~ /^'\''.*'\''$/) line = trim(substr(line, 2, length(line) - 2))
         if (line == "") next
-        # strip a single pair of wrapping quotes/backticks around the whole line
-        if (line ~ /^".*"$/ || line ~ /^`.*`$/ || line ~ /^'\''.*'\''$/) {
-            line = substr(line, 2, length(line) - 2)
-            sub(/^[[:space:]]+/, "", line); sub(/[[:space:]]+$/, "", line)
-        }
-        if (line == "") next
-        commas = gsub(/,/, ",", line)     # gsub returns the match count
-        if (first == "") first = line
-        if (commas > bestn) { bestn = commas; best = line }
+        low = tolower(line)
+        if (low ~ /^(here (are|is)|these |output:|summary:|changes:|note:)/) next  # preamble
+        if (line ~ /^[0-9]+ characters/) next          # self-check meta
+        if (line ~ /:[[:space:]]*$/) next              # trailing-colon lead-in
+        print line
+        if (++n >= max) exit
     }
-    END { if (best != "") print best; else if (first != "") print first }
     '
 }
 
@@ -108,45 +117,72 @@ truncate_summary() {
     printf '%s' "$s"
 }
 
-# Generate a one-line themed summary of a project's commits via the Claude Code
-# CLI (`claude -p`, Sonnet) in headless print mode. No tools are needed for pure
+# Summarize a project's day into 1..MAX_LINES legible lines via the Claude Code
+# CLI (`claude -p`, Sonnet) in headless print mode. The model judges how many
+# distinct notable threads the day held — most days are one line; a day that
+# ships several separate things earns a line each. No tools are needed for pure
 # text generation; the `timeout` wrapper is the backstop if the model ever stalls
-# or attempts a tool in the unattended 23:55 run. Falls back to
-# "project: N commits" on any non-zero exit, timeout, or empty reply — the same
-# silent-degradation signal the main loop counts and alerts on.
+# or attempts a tool in the unattended 23:55 run. Prints one cleaned+truncated
+# summary per line; falls back to a single "project: N commits" line on any
+# non-zero exit, timeout, or empty reply — the silent-degradation signal the main
+# loop counts and alerts on.
 generate_summary() {
     local project="$1"
     local commits_text="$2"
     local count="$3"
     local fallback="${project}: ${count} commits"
 
-    # Group-into-themes prompt: synthesize related commits into a few themes
-    # rather than enumerating one line per commit. The few-shot anchors the output
-    # to a terse, lowercase, comma-separated shape and a short length.
+    # "What did the developer do today" for a semi-technical reader — terse and
+    # technical is fine, just legible. Output is one line per genuinely distinct
+    # notable thread (default ONE line); internal churn rides as a trailing
+    # mention or drops, since the raw commits live in the activity feed. The two
+    # examples anchor the split: a maintenance day → one line; a two-feature day
+    # → two lines. Char target is soft (Sonnet doesn't need Hermes-era clamping).
     local prompt
-    prompt="You are writing a one-line daily changelog for a software project from its git commits. Group the related commits into 3-5 short THEMES (not one-per-commit). Synthesize; drop trivial noise like version bumps and lint unless that is all there is. Output ONLY a terse, lowercase, comma-separated list on a single line, max 90 characters. No project name, no preamble, no tags, no quotes, and no trailing commentary or character counts — output the list line only.
-Example commits:
-feat(auth): add OAuth login
-fix(auth): handle token refresh
+    prompt="You are writing a short daily changelog for ONE software project from its git commits — a legible \"what did the developer do today\". Terse and technical is fine; do not dumb it down, do not pad it.
+
+Output 1 to ${MAX_LINES} lines, one line per genuinely distinct, notable thread of work, most significant first. MOST DAYS ARE ONE LINE. Use more only when the day clearly holds separate significant efforts (e.g. two unrelated features, or a feature plus a notable fix). A line reads as what happened, and may include the why when the commits make it clear. Internal churn — refactors, audits, tests, dependency bumps, lint — is NOT worth its own line: fold it into a trailing mention on another line, or drop it. The full commit list is available elsewhere.
+
+Each line: lowercase, terse, under ~110 characters. Output ONLY the lines — no numbering, no bullets, no preamble, no quotes, no project name, no commentary.
+
+Example — a maintenance-heavy day, one line:
+Commits:
+refactor(auth): extract token helper
+test(auth): cover refresh flow
 chore(deps): bump axios
-test(auth): cover login flow
-Example output: oauth login + token refresh, dep bumps, auth tests
+fix(auth): handle expired token
+Output:
+auth token handling hardened + refresh test coverage
+
+Example — a day with two distinct features, two lines:
+Commits:
+feat(map): directory picker for saves
+feat(map): bounded BFS path resolver
+refactor(save): split orchestration module
+feat(ui): dark mode toggle
+Output:
+directory-picker saves with a bounded path resolver
+added a dark mode toggle
 
 Commits:
 ${commits_text}"
 
+    # Run from the neutral CLAUDE_CWD so no ambient repo context leaks in.
     # `</dev/null` skips claude's 3s "no stdin" wait; `|| true` keeps a single
     # failed/timed-out call from aborting the whole run under `set -e` — this
     # project falls back, the rest still get summarized.
     local response
-    response=$(timeout "$CLAUDE_TIMEOUT" "$CLAUDE_BIN" -p "$prompt" --model "$CLAUDE_MODEL" </dev/null 2>/dev/null) || true
+    response=$(cd "$CLAUDE_CWD" && timeout "$CLAUDE_TIMEOUT" "$CLAUDE_BIN" -p "$prompt" --model "$CLAUDE_MODEL" </dev/null 2>/dev/null) || true
 
-    local summary
-    summary=$(printf '%s' "$response" | clean_output)
+    local lines
+    lines=$(printf '%s' "$response" | clean_lines)
 
-    if [[ -n "$summary" ]]; then
-        summary="${summary#"$project": }"   # drop a redundant leading "project:" the model sometimes adds
-        truncate_summary "$summary"; echo
+    if [[ -n "$lines" ]]; then
+        local l
+        while IFS= read -r l; do
+            l="${l#"$project": }"   # drop a redundant leading "project:" the model sometimes adds
+            truncate_summary "$l"; echo
+        done <<< "$lines"
     else
         # Log the failed/empty reply to the journal so a fallback is diagnosable
         # (the delegate era discarded the reply, leaving every fallback a black box).
@@ -173,22 +209,26 @@ for i in $(jq -r 'range(length)' /tmp/daily_groups.json); do
     commits_json=$(jq -c ".[$i].commits" /tmp/daily_groups.json)
 
     if [[ "$count" -eq 1 ]]; then
-        summary=$(jq -r ".[$i].commits[0]" /tmp/daily_groups.json)
+        summaries=$(jq -r ".[$i].commits[0]" /tmp/daily_groups.json)   # single commit → verbatim, one line
     else
         commits_text=$(jq -r ".[$i].commits[]" /tmp/daily_groups.json)
-        summary=$(generate_summary "$project" "$commits_text" "$count")
+        summaries=$(generate_summary "$project" "$commits_text" "$count")   # 1..MAX_LINES lines
         SUMMARIZED_COUNT=$((SUMMARIZED_COUNT + 1))
-        # generate_summary echoes exactly this string when claude fails/times out
+        # generate_summary echoes exactly this one line when claude fails/times out
         # or its reply cleans to nothing — the silent-degradation signal. The model
         # prompt forbids the "project: N" shape, so a real summary can't collide.
-        [[ "$summary" == "${project}: ${count} commits" ]] && FALLBACK_COUNT=$((FALLBACK_COUNT + 1))
+        [[ "$summaries" == "${project}: ${count} commits" ]] && FALLBACK_COUNT=$((FALLBACK_COUNT + 1))
     fi
 
-    jq --arg date "$TODAY" --arg project "$project" --arg summary "$summary" \
-       --argjson commits "$commits_json" \
-       '. + [{date: $date, category: "daily", project: $project, summary: $summary, commits: $commits}]' \
-       /tmp/daily_entries.json > /tmp/daily_entries.json.tmp \
-    && mv /tmp/daily_entries.json.tmp /tmp/daily_entries.json
+    # One daily entry per summary line (a busy project can post several).
+    while IFS= read -r summary; do
+        [[ -z "$summary" ]] && continue
+        jq --arg date "$TODAY" --arg project "$project" --arg summary "$summary" \
+           --argjson commits "$commits_json" \
+           '. + [{date: $date, category: "daily", project: $project, summary: $summary, commits: $commits}]' \
+           /tmp/daily_entries.json > /tmp/daily_entries.json.tmp \
+        && mv /tmp/daily_entries.json.tmp /tmp/daily_entries.json
+    done <<< "$summaries"
 done
 
 rm -f /tmp/daily_groups.json
