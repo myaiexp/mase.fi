@@ -3,15 +3,10 @@
 <head>
 <meta charset="utf-8">
 <title>elevation · prototype</title>
+<!-- tokens + shared primitives (.btn, .input, .modal, base-modal contract) all
+     resolve from the real sheet — this specimen adds only layout scaffolding. -->
 <link rel="stylesheet" href="src/base.css">
 <style>
-  /* Spec-proposed tokens, not yet in base.css */
-  :root {
-    --bg-overlay:      #1f1f24;
-    --bg-overlay-rim:  #26262c;
-    --border-overlay:  #3f3f46;
-  }
-
   body {
     padding: 24px 28px 64px;
     max-width: 880px;
@@ -33,9 +28,7 @@
     max-width: 56ch;
   }
 
-  section {
-    margin-bottom: 40px;
-  }
+  section { margin-bottom: 40px; }
 
   .recipe {
     font-size: var(--text-xs);
@@ -56,8 +49,9 @@
     color: var(--text-muted);
     font-size: var(--text-sm);
     margin-bottom: 14px;
-    max-width: 56ch;
+    max-width: 60ch;
   }
+  .note code { font-size: 0.92em; }
 
   /* ===== Ladder — five surfaces side by side ===== */
 
@@ -83,22 +77,16 @@
   .rung[data-bg="bg-overlay"]    { background: var(--bg-overlay); }
   .rung[data-bg="bg-overlay-rim"]{ background: var(--bg-overlay-rim); }
 
-  .rung-token {
-    font-size: var(--text-sm);
-    color: var(--text);
-  }
-  .rung-hex {
-    font-size: var(--text-xs);
-    color: var(--text-muted);
-  }
-  .rung-role {
+  .rung-token { font-size: var(--text-sm); color: var(--text); }
+  .rung-hex   { font-size: var(--text-xs); color: var(--text-muted); }
+  .rung-role  {
     font-size: var(--text-xs);
     color: var(--text-dim);
     margin-top: 6px;
     line-height: 1.35;
   }
 
-  /* ===== App + modal anatomy scene ===== */
+  /* ===== App + modal-over-content scene ===== */
 
   .scene {
     position: relative;
@@ -133,73 +121,56 @@
     font-size: var(--text-sm);
     color: var(--text-dim);
   }
-  .panel .panel-title {
-    color: var(--text);
-    margin-bottom: 6px;
-  }
-  .panel input {
-    width: 100%;
-    background: var(--bg-raised);
-    border: 1px solid var(--border);
-    color: var(--text);
-    font-family: inherit;
-    font-size: var(--text-sm);
-    padding: 4px 6px;
+  .panel .panel-title { color: var(--text); margin-bottom: 6px; }
+  .panel .field-label {
+    display: block;
+    font-size: var(--text-xs);
+    color: var(--text-muted);
+    margin-bottom: 4px;
   }
 
-  /* Inline modal anatomy — same structure as <base-modal>, pinned for annotation */
-  .modal-anatomy {
-    position: relative;
-    margin: 24px auto 0;
-    width: 420px;
+  /* The scene-local scrim — same rgba(0,0,0,0.6) as .modal-backdrop, scoped to the
+     scene (not fixed/inset:0) so the specimen shows the app dimmed behind the modal. */
+  .scene .scrim {
+    position: absolute;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.6);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  /* Modal — same structure as <base-modal>'s shadow DOM, driven by the same tokens
+     the shipped base-modal {} contract re-points. Body → --bg-overlay, header/footer
+     → --bg-overlay-rim, all borders → --border-overlay. */
+  .modal-box {
+    width: 380px;
     background: var(--bg-overlay);
     border: 1px solid var(--border-overlay);
     color: var(--text);
     font-size: var(--text-sm);
   }
-
-  .modal-anatomy [data-header],
-  .modal-anatomy [data-footer] {
+  .modal-box [data-header],
+  .modal-box [data-footer] {
     background: var(--bg-overlay-rim);
     padding: 10px 14px;
     display: flex;
     align-items: center;
     justify-content: space-between;
   }
-  .modal-anatomy [data-header] { border-bottom: 1px solid var(--border-overlay); }
-  .modal-anatomy [data-footer] { border-top:    1px solid var(--border-overlay); }
-
-  .modal-anatomy [data-body] {
+  .modal-box [data-header] { border-bottom: 1px solid var(--border-overlay); }
+  .modal-box [data-footer] { border-top:    1px solid var(--border-overlay); }
+  .modal-box [data-body] {
     padding: 16px 14px;
     color: var(--text-dim);
     line-height: 1.45;
   }
+  .modal-box .title { color: var(--text); }
+  .modal-box .x     { color: var(--text-muted); }
+  .modal-box [data-footer] .row { display: flex; gap: 6px; margin-left: auto; }
 
-  .modal-anatomy .title { color: var(--text); }
-  .modal-anatomy .x { color: var(--text-muted); }
+  /* ===== Anatomy — annotated modal + shipped contract ===== */
 
-  .modal-anatomy .btn {
-    display: inline-flex;
-    align-items: center;
-    height: 22px;
-    padding: 0 10px;
-    font-size: var(--text-sm);
-    font-weight: 500;
-    background: var(--bg-raised);
-    color: var(--text);
-    border: 1px solid var(--border-overlay);
-  }
-  .modal-anatomy .btn-primary {
-    background: var(--accent-glow);
-    border-color: rgba(232, 163, 8, 0.4);
-    color: var(--accent-text);
-  }
-  .modal-anatomy [data-footer] .row {
-    display: flex; gap: 6px; margin-left: auto;
-  }
-
-  /* Annotation labels — each pinned to its own modal row so it always tracks
-     that row's vertical center; no hand-tuned offsets to drift out of sync. */
   .annotated { position: relative; width: 420px; }
   .annotated [data-header],
   .annotated [data-body],
@@ -215,10 +186,7 @@
     white-space: nowrap;
     pointer-events: none;
   }
-  .ann::before {
-    content: "← ";
-    color: var(--text-muted);
-  }
+  .ann::before { content: "← "; color: var(--text-muted); }
   .ann-rim {
     margin-top: 8px;
     font-size: var(--text-xs);
@@ -227,6 +195,17 @@
     line-height: 1.4;
   }
   .ann-rim b { color: var(--accent); font-weight: 500; }
+
+  .code {
+    margin-top: 18px;
+    background: var(--bg-surface);
+    padding: 10px 12px;
+    font-size: var(--text-sm);
+    color: var(--text-dim);
+    line-height: 1.5;
+    overflow-x: auto;
+  }
+  .code .c { color: var(--text-muted); }
 
   /* ===== Hover-is-additive demo ===== */
 
@@ -257,13 +236,8 @@
     cursor: default;
     transition: background var(--transition);
   }
-  .hover-row + .hover-row {
-    border-top: 1px solid var(--border);
-  }
-  .hover-row:hover {
-    background: var(--bg-hover);
-    color: var(--text);
-  }
+  .hover-row + .hover-row { border-top: 1px solid var(--border); }
+  .hover-row:hover { background: var(--bg-hover); color: var(--text); }
 
   /* ===== Anti-patterns ===== */
 
@@ -287,59 +261,35 @@
   .verdict.no  { color: var(--red); }
   .verdict.yes { color: var(--green); }
 
-  .bad .modal-shadow {
+  .bad .demo {
     width: 280px;
     margin: 0 auto;
-    background: var(--bg-raised);
-    border: none;
-    box-shadow: 0 10px 40px rgba(0, 0, 0, 0.9), 0 2px 6px rgba(0, 0, 0, 0.6);
     padding: 14px 16px;
     color: var(--text);
     font-size: var(--text-sm);
   }
-  .bad .modal-norim {
-    width: 280px;
-    margin: 0 auto;
-    background: var(--bg-overlay);
-    border: none;
-    padding: 14px 16px;
-    color: var(--text);
-    font-size: var(--text-sm);
-  }
-  .bad .modal-extra {
-    width: 280px;
-    margin: 0 auto;
-    background: #2c2c33; /* invented intermediate */
-    border: 1px solid var(--border-overlay);
-    padding: 14px 16px;
-    color: var(--text);
-    font-size: var(--text-sm);
-  }
-  .bad .modal-good {
-    width: 280px;
-    margin: 0 auto;
-    background: var(--bg-overlay);
-    border: 1px solid var(--border-overlay);
-    color: var(--text);
-    font-size: var(--text-sm);
-  }
-  .bad .modal-good .h {
-    background: var(--bg-overlay-rim);
-    padding: 8px 12px;
-    border-bottom: 1px solid var(--border-overlay);
-  }
-  .bad .modal-good .b { padding: 12px; color: var(--text-dim); }
+  .bad .demo .sub { color: var(--text-dim); font-size: var(--text-sm); margin-top: 6px; }
+  /* ✗ drop shadow standing in for elevation */
+  .bad .shadow { background: var(--bg-raised); box-shadow: 0 10px 40px rgba(0,0,0,0.9), 0 2px 6px rgba(0,0,0,0.6); }
+  /* ✗ overlay color, no rim */
+  .bad .norim  { background: var(--bg-overlay); }
+  /* ✗ invented sixth rung */
+  .bad .extra  { background: #2c2c33; border: 1px solid var(--border-overlay); }
+  /* ✓ tokens as written */
+  .bad .good   { padding: 0; background: var(--bg-overlay); border: 1px solid var(--border-overlay); }
+  .bad .good .h { background: var(--bg-overlay-rim); padding: 8px 12px; border-bottom: 1px solid var(--border-overlay); }
+  .bad .good .b { padding: 12px; color: var(--text-dim); }
 </style>
 </head>
 <body>
 
 <h1>elevation</h1>
-<p class="lede">On AMOLED-black, a single-step bump is invisible. Elevation is structural: each layer has a named role, overlays jump two steps and add a stronger rim.</p>
+<p class="lede">On AMOLED-black, a single-step bump is invisible. Elevation is structural: each layer has a named role, overlays jump two steps and add a stronger rim. No drop shadows.</p>
 
 <section>
   <div class="recipe">The ladder</div>
   <h2>Five surfaces, one rim</h2>
-  <p class="note">Three app-level surfaces, two overlay surfaces. Hover sits on top of any of them — it's not a layer, it's a state.</p>
+  <p class="note">Three app-level surfaces, two overlay surfaces — all shipped as tokens in <code>base.css</code>. Hover sits on top of any of them; it's not a layer, it's a state.</p>
 
   <div class="ladder">
     <div class="rung" data-bg="bg">
@@ -372,8 +322,8 @@
 
 <section>
   <div class="recipe">In situ</div>
-  <h2>App + modal, all five layers visible</h2>
-  <p class="note">Topbar on <code>--bg-surface</code>, panels on <code>--bg-raised</code>, page on <code>--bg</code>, modal on <code>--bg-overlay</code>, modal header/footer on <code>--bg-overlay-rim</code>.</p>
+  <h2>Modal over content, all layers at once</h2>
+  <p class="note">Page on <code>--bg</code>, topbar on <code>--bg-surface</code>, panels on <code>--bg-raised</code>. The modal sits on <code>--bg-overlay</code> over a <code>rgba(0,0,0,0.6)</code> backdrop scrim that dims the app behind it — the rim and the scrim are the two separation signals.</p>
 
   <div class="scene">
     <div class="topbar">
@@ -392,23 +342,25 @@
         a1b4c77 — audit base-components
       </div>
       <div class="panel">
-        <div class="panel-title">commit message</div>
-        <input type="text" value="design(elevation): structural surfaces">
+        <label class="field-label" for="cm">commit message</label>
+        <input class="input" id="cm" type="text" value="design(elevation): structural surfaces">
       </div>
     </div>
 
-    <div class="modal-anatomy" style="margin-bottom: 16px;">
-      <div data-header>
-        <span class="title">archive card?</span>
-        <span class="x">[x]</span>
-      </div>
-      <div data-body>
-        Worktree at <code>~/helm/worktrees/mase.fi/design-elevation</code> will be removed. The branch <code>card</code> is preserved.
-      </div>
-      <div data-footer>
-        <div class="row">
-          <button class="btn">cancel</button>
-          <button class="btn btn-primary">archive</button>
+    <div class="scrim">
+      <div class="modal-box">
+        <div data-header>
+          <span class="title">archive card?</span>
+          <span class="x">[x]</span>
+        </div>
+        <div data-body>
+          Worktree at <code>~/helm/worktrees/mase.fi/design-elevation</code> will be removed. The branch <code>card</code> is preserved.
+        </div>
+        <div data-footer>
+          <div class="row">
+            <button class="btn">cancel</button>
+            <button class="btn btn-danger">archive</button>
+          </div>
         </div>
       </div>
     </div>
@@ -417,11 +369,11 @@
 
 <section>
   <div class="recipe">Anatomy</div>
-  <h2>Modal contract</h2>
-  <p class="note">The <code>&lt;base-modal&gt;</code> selector remaps three tokens. The component already uses <code>--bg-raised</code> for the body and <code>--bg-surface</code> for header/footer — overriding those at <code>base-modal {}</code> swaps the whole stack up to the overlay rung.</p>
+  <h2>The base-modal contract</h2>
+  <p class="note">The <code>&lt;base-modal&gt;</code> shadow DOM reads <code>--bg-raised</code> (body), <code>--bg-surface</code> (header/footer) and <code>--border-color</code> (borders). The shipped <code>base.css</code> selector re-points those three on the host, lifting the whole component to the overlay rung — header/footer land <em>one tick above</em> the body, not below it.</p>
 
   <div class="annotated">
-    <div class="modal-anatomy" style="margin: 0;">
+    <div class="modal-box" style="width: 420px;">
       <div data-header>
         <span class="title">archive card?</span>
         <span class="x">[x]</span>
@@ -434,7 +386,7 @@
       <div data-footer>
         <div class="row">
           <button class="btn">cancel</button>
-          <button class="btn btn-primary">archive</button>
+          <button class="btn btn-danger">archive</button>
         </div>
         <span class="ann">--bg-overlay-rim &nbsp;(footer)</span>
       </div>
@@ -442,18 +394,18 @@
     <p class="ann-rim">1px <b>--border-overlay</b> wraps the whole overlay — the same value draws the header and footer dividers.</p>
   </div>
 
-  <pre style="margin-top: 18px; background: var(--bg-surface); padding: 10px 12px; font-size: var(--text-sm); color: var(--text-dim); line-height: 1.5;"><span style="color: var(--text-muted);">/* base.css */</span>
+  <pre class="code"><span class="c">/* base.css — shipped this card */</span>
 base-modal {
-  --bg-raised:    var(--bg-overlay);       <span style="color: var(--text-muted);">/* [data-content] */</span>
-  --bg-surface:   var(--bg-overlay-rim);   <span style="color: var(--text-muted);">/* [data-header], [data-footer] */</span>
-  --border-color: var(--border-overlay);   <span style="color: var(--text-muted);">/* perimeter + dividers */</span>
+  --bg-raised:    var(--bg-overlay);       <span class="c">/* [data-content] body */</span>
+  --bg-surface:   var(--bg-overlay-rim);   <span class="c">/* [data-header], [data-footer] */</span>
+  --border-color: var(--border-overlay);   <span class="c">/* perimeter + dividers */</span>
 }</pre>
 </section>
 
 <section>
   <div class="recipe">Hover</div>
   <h2>Additive, not a replacement</h2>
-  <p class="note">Same <code>--bg-hover</code> on every parent surface. The hover row reads as "lit up," not "promoted to a different layer."</p>
+  <p class="note">The same <code>--bg-hover</code> on every parent surface. The hover row reads as "lit up," not "promoted to a different layer."</p>
 
   <div class="hover-grid">
     <div class="hover-card" data-on="bg">
@@ -484,31 +436,31 @@ base-modal {
 
   <div class="bad">
     <figure>
-      <div class="modal-shadow">
-        <div style="margin-bottom: 6px;">archive card?</div>
-        <div style="color: var(--text-dim); font-size: var(--text-sm);">drop shadow standing in for elevation</div>
+      <div class="demo shadow">
+        archive card?
+        <div class="sub">drop shadow standing in for elevation</div>
       </div>
       <figcaption><span class="verdict no">✗</span><strong style="color: var(--text-dim); font-weight: 500;">drop shadows</strong> — invisible on pure-black, not our aesthetic.</figcaption>
     </figure>
 
     <figure>
-      <div class="modal-norim">
-        <div style="margin-bottom: 6px;">archive card?</div>
-        <div style="color: var(--text-dim); font-size: var(--text-sm);">overlay color, no border</div>
+      <div class="demo norim">
+        archive card?
+        <div class="sub">overlay color, no border</div>
       </div>
       <figcaption><span class="verdict no">✗</span><strong style="color: var(--text-dim); font-weight: 500;">no rim</strong> — bleeds into the void; reads as a faint stain, not a surface.</figcaption>
     </figure>
 
     <figure>
-      <div class="modal-extra">
-        <div style="margin-bottom: 6px;">archive card?</div>
-        <div style="color: var(--text-dim); font-size: var(--text-sm);">invented intermediate (#2c2c33)</div>
+      <div class="demo extra">
+        archive card?
+        <div class="sub">invented intermediate (#2c2c33)</div>
       </div>
       <figcaption><span class="verdict no">✗</span><strong style="color: var(--text-dim); font-weight: 500;">extra rung</strong> — the system has five surfaces. Don't add a sixth.</figcaption>
     </figure>
 
     <figure>
-      <div class="modal-good">
+      <div class="demo good">
         <div class="h">archive card?</div>
         <div class="b">tokens used as specified</div>
       </div>

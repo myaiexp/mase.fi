@@ -520,8 +520,17 @@ pre code {
   50% { opacity: 0.4; }
 }
 
-/* ===== Modal ===== */
+/* ===== Elevation — overlays =====
+   On AMOLED-true-black a single-step surface bump is invisible, so elevation is
+   STRUCTURAL, not shadow. An overlay jumps two steps to --bg-overlay and adds the
+   escalated --border-overlay rim so it reads as floating above the app. There are
+   NO drop shadows anywhere in the system — box-shadow doesn't render on pure black
+   and isn't the aesthetic; the rim plus the backdrop scrim carry separation
+   instead. Never reach for box-shadow to fake elevation. See the elevation card. */
 
+/* Backdrop — a neutral pure-black luminance scrim, deliberately NOT tokenized: it
+   darkens the whole app uniformly and is theme-independent (a theme re-tints
+   surfaces, never this scrim). The second separation signal after the rim. */
 .modal-backdrop {
   position: fixed;
   inset: 0;
@@ -532,12 +541,27 @@ pre code {
   z-index: 100;
 }
 
+/* Plain-CSS overlay box. Body on --bg-overlay, perimeter on the escalated
+   --border-overlay — the two-step lift, not --bg-surface. (The <base-modal> web
+   component gets the identical lift via the base-modal {} contract below.) */
 .modal {
-  background: var(--bg-surface);
-  border: 1px solid var(--border);
+  background: var(--bg-overlay);
+  border: 1px solid var(--border-overlay);
   width: 480px;
   max-width: 90vw;
   padding: var(--space-5);
+}
+
+/* <base-modal> contract — the component's shadow DOM reads --bg-raised (body),
+   --bg-surface (header/footer), and --border-color (perimeter + dividers). Re-point
+   those three on the host and custom-property inheritance re-tints the whole shadow
+   tree up to the overlay rung: body → --bg-overlay, header/footer → the brighter
+   --bg-overlay-rim, all borders → --border-overlay. Header/footer sit ONE tick
+   ABOVE the body, not below it (the component's raw defaults invert this). */
+base-modal {
+  --bg-raised:    var(--bg-overlay);       /* [data-content] body          */
+  --bg-surface:   var(--bg-overlay-rim);   /* [data-header], [data-footer]  */
+  --border-color: var(--border-overlay);   /* perimeter + dividers          */
 }
 
 /* ===== Toast / Notification ===== */
