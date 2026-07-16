@@ -318,28 +318,32 @@ pre code {
 }
 
 /* ===== Buttons ===== */
+/* One size, three variants — see the buttons design card.
+   Fixed 22px control height + line-height:1 so vertical size is deterministic
+   regardless of font load (same box model as .status/.tag). Tints track their
+   color var via color-mix so an --accent / --red override (or a theme) re-tints
+   primary and danger for free. */
 
 .btn {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  padding: var(--space-1) var(--space-3);
+  gap: var(--space-2);
+  height: 22px;
+  padding: 0 var(--space-3);
   border: 1px solid var(--border);
   font-size: var(--text-sm);
   font-weight: 500;
+  line-height: 1;
   background: var(--bg-raised);
   color: var(--text);
   white-space: nowrap;
+  cursor: pointer;
   transition: background var(--transition);
 }
 
 .btn:hover { background: var(--bg-hover); }
 .btn:disabled { opacity: 0.5; cursor: not-allowed; }
-
-.btn-sm {
-  padding: 1px 6px;
-  font-size: var(--text-xs);
-}
 
 .btn-primary {
   background: var(--accent-glow);
@@ -350,11 +354,21 @@ pre code {
 .btn-primary:hover { background: color-mix(in srgb, var(--accent) 20%, transparent); }
 
 .btn-danger {
-  background: rgba(239, 68, 68, 0.1);
-  border-color: rgba(239, 68, 68, 0.3);
+  /* color-mix on --red (not frozen rgba) so danger tracks a --red override / theme — resolves idea #2467 */
+  background: color-mix(in srgb, var(--red) 8%, transparent);
+  border-color: color-mix(in srgb, var(--red) 40%, transparent);
   color: var(--red);
 }
-.btn-danger:hover { background: rgba(239, 68, 68, 0.2); }
+.btn-danger:hover { background: color-mix(in srgb, var(--red) 16%, transparent); }
+
+/* Legacy variants — deprecated, not part of the one-size/three-variant vocabulary.
+   Retained for backward compat: ~250 .btn-sm and ~24 .btn-ghost usages across the
+   fleet consume this sheet. Removing them is a separate migration (see spec). */
+.btn-sm {
+  height: 18px;
+  padding: 0 var(--space-2);
+  font-size: var(--text-xs);
+}
 
 .btn-ghost {
   background: transparent;
