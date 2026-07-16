@@ -379,15 +379,31 @@ pre code {
 .btn-ghost:hover { color: var(--text); background: var(--bg-hover); }
 
 /* ===== Form Inputs ===== */
+/* Controls share the button box model — fixed 22px height + line-height:1 so an
+   input, select, and button line up in one row regardless of font load (see the
+   inputs + buttons design cards). Text is the Body role (12px / 400 / --fg-1).
+   Border carries every state: --accent on focus, --red on invalid. No glow, no
+   bg shift, no shake. */
 
 .input, .textarea, .select {
   width: 100%;
-  padding: var(--space-1) var(--space-2);
+  height: 22px;
+  padding: 0 var(--space-3);
   background: var(--bg-raised);
   border: 1px solid var(--border);
   color: var(--text);
   font-size: var(--text-base);
+  line-height: 1;
   transition: border-color var(--transition);
+}
+
+/* Multi-line variant — height grows with content; prose line-height for readability. */
+.textarea {
+  height: auto;
+  min-height: 60px;
+  padding: var(--space-2) var(--space-3);
+  line-height: var(--leading);
+  resize: vertical;
 }
 
 .input::placeholder, .textarea::placeholder {
@@ -407,7 +423,7 @@ pre code {
 .helper {
   font-size: var(--text-sm);
   color: var(--text-muted);
-  margin-top: var(--space-1);
+  margin-top: var(--space-2);
 }
 .helper-error { color: var(--red); }
 
@@ -418,7 +434,7 @@ pre code {
   font-size: var(--text-xs);
   font-weight: 500;
   color: var(--text-dim);
-  margin-bottom: var(--space-1);
+  margin-bottom: var(--space-2);
   text-transform: uppercase;
   letter-spacing: 0.03em;
 }

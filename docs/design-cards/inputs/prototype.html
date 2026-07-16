@@ -1,0 +1,303 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>inputs · prototype</title>
+<!-- Living specimen: consumes the REAL shipped rules from base.css.
+     .form-label / .input / .textarea / .helper / .btn are NOT redefined here —
+     every field below renders exactly what the design system serves. The only
+     local CSS is prototype chrome (layout) and the "what not to do" overrides. -->
+<link rel="stylesheet" href="src/base.css">
+<style>
+  /* ===== Prototype chrome — layout only, no component styling ===== */
+
+  body {
+    padding: 24px 28px 48px;
+    max-width: 760px;
+    color: var(--text);
+  }
+
+  h1 {
+    font-size: var(--text-lg);
+    color: var(--text-dim);
+    font-weight: 500;
+    letter-spacing: 0.02em;
+    margin-bottom: 4px;
+  }
+
+  .lede {
+    color: var(--text-muted);
+    font-size: var(--text-sm);
+    margin-bottom: 32px;
+    text-wrap: pretty;
+  }
+
+  section {
+    margin-bottom: 32px;
+  }
+
+  .section-tag {
+    font-size: var(--text-xs);
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    margin-bottom: 8px;
+  }
+
+  h2 {
+    font-size: var(--text-base);
+    font-weight: 500;
+    color: var(--text);
+    margin-bottom: 2px;
+  }
+
+  .note {
+    color: var(--text-muted);
+    font-size: var(--text-sm);
+    margin-bottom: 14px;
+    text-wrap: pretty;
+  }
+
+  /* Field grid — labelled rows, two columns on wide */
+  .grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 16px 20px;
+  }
+  .grid-1 { grid-template-columns: 1fr; }
+
+  .field {
+    min-width: 0;
+  }
+
+  /* Inline row — input + button, both 22px, aligned by the shared box model */
+  .row {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+  .row .input { flex: 1; min-width: 0; }
+
+  /* Anatomy callout — pin part names to the side */
+  .anatomy {
+    display: grid;
+    grid-template-columns: 90px 1fr;
+    gap: 10px 14px;
+    align-items: center;
+    padding: 14px 16px;
+    background: var(--bg-surface);
+    border: 1px solid var(--border);
+  }
+  .anatomy .row-label {
+    font-size: var(--text-xs);
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+  }
+
+  /* "What not to do" — render the wrong version inline so the rule is visible.
+     These are DELIBERATELY off-spec overrides (raw values, glows) demonstrating
+     anti-patterns; they are prototype-only and never ship. */
+  .bad-glow {
+    box-shadow: 0 0 0 3px rgba(232, 163, 8, 0.25);
+    border-color: var(--accent) !important;
+  }
+  .bad-bg-error {
+    background: rgba(239, 68, 68, 0.12) !important;
+    border-color: var(--red) !important;
+  }
+  .bad-tall {
+    height: 32px !important;
+  }
+  .bad-rounded {
+    border-radius: 4px !important;
+  }
+
+  .bad-row {
+    display: grid;
+    grid-template-columns: 90px 1fr 1fr;
+    gap: 8px 14px;
+    align-items: center;
+    padding: 10px 0;
+  }
+  .bad-row + .bad-row { border-top: 1px solid var(--border); }
+  .bad-row .row-label {
+    color: var(--text-muted);
+    font-size: var(--text-xs);
+  }
+  .bad-row .why {
+    color: var(--text-muted);
+    font-size: var(--text-sm);
+    text-wrap: pretty;
+  }
+</style>
+</head>
+<body>
+
+<h1>inputs &amp; labels</h1>
+<p class="lede">Text input, textarea, and form label. One fixed height (22px) so inputs, selects, and buttons align in a single row. The border carries every state — no glow, no background shift, no shake.</p>
+
+<section>
+  <div class="section-tag">Anatomy</div>
+  <h2>Label · input · helper</h2>
+  <p class="note">Three pieces, stacked with a 4px gap. Label is micro-caps (<code>.form-label</code>). Helper only appears when there's something to say.</p>
+
+  <div class="anatomy">
+    <span class="row-label">label</span>
+    <label class="form-label" for="anat-1">Branch</label>
+
+    <span class="row-label">input</span>
+    <input class="input" id="anat-1" value="helm/new-feature">
+
+    <span class="row-label">helper</span>
+    <div class="helper">Used as the working-tree branch name.</div>
+  </div>
+</section>
+
+<section>
+  <div class="section-tag">States</div>
+  <h2>Empty · filled · focus · disabled · invalid</h2>
+  <p class="note">Border carries every state. Placeholder is <code>--fg-3</code> (a hint, not content). Focus is an amber border; invalid is a red border plus a <code>.helper-error</code> line.</p>
+
+  <div class="grid">
+    <div class="field">
+      <label class="form-label" for="s-empty">Empty</label>
+      <input class="input" id="s-empty" placeholder="branch name">
+    </div>
+
+    <div class="field">
+      <label class="form-label" for="s-filled">Filled</label>
+      <input class="input" id="s-filled" value="helm/design-inputs">
+    </div>
+
+    <div class="field">
+      <label class="form-label" for="s-focus">Focus (click in)</label>
+      <input class="input" id="s-focus" value="helm/design-inputs" autofocus>
+    </div>
+
+    <div class="field">
+      <label class="form-label" for="s-disabled">Disabled</label>
+      <input class="input" id="s-disabled" value="readonly value" disabled>
+    </div>
+
+    <div class="field" style="grid-column: 1 / -1;">
+      <label class="form-label" for="s-invalid">Invalid</label>
+      <input class="input" id="s-invalid" value="not-a-real-project" aria-invalid="true">
+      <div class="helper helper-error">Project does not exist.</div>
+    </div>
+  </div>
+</section>
+
+<section>
+  <div class="section-tag">Textarea</div>
+  <h2>Multi-line variant</h2>
+  <p class="note">Same border, same focus rule. Height grows from a 60px floor, resizes vertically, and switches to 1.4 line-height for readable multi-line text.</p>
+
+  <div class="grid grid-1">
+    <div class="field">
+      <label class="form-label" for="ta-prompt">Prompt</label>
+      <textarea class="input textarea" id="ta-prompt">Investigate the failing test in src/components/select.test.js — it passes locally but fails in CI on the merge from helm/design-inputs.</textarea>
+      <div class="helper">Sent verbatim to the agent. Markdown is rendered.</div>
+    </div>
+  </div>
+</section>
+
+<section>
+  <div class="section-tag">Composition</div>
+  <h2>Inline with buttons</h2>
+  <p class="note">Input + button in one row — both 22px, no jump, no baseline drift. This shared height is the whole reason inputs are a fixed-height control.</p>
+
+  <div class="grid grid-1" style="max-width: 480px;">
+    <div class="field">
+      <label class="form-label" for="row-branch">Create worktree</label>
+      <div class="row">
+        <input class="input" id="row-branch" value="helm/design-inputs">
+        <button class="btn">Create</button>
+      </div>
+    </div>
+
+    <div class="field">
+      <label class="form-label" for="row-name">Project name</label>
+      <div class="row">
+        <input class="input" id="row-name" placeholder="my-app">
+        <button class="btn btn-primary">Add</button>
+        <button class="btn">Cancel</button>
+      </div>
+      <div class="helper">Lowercase, hyphenated. Becomes the channel slug.</div>
+    </div>
+  </div>
+</section>
+
+<section>
+  <div class="section-tag">Form</div>
+  <h2>Full example</h2>
+  <p class="note">A realistic field stack — labels, helper text, one error, one textarea, and a primary/neutral button pair.</p>
+
+  <div style="padding: 16px 18px; background: var(--bg-surface); border: 1px solid var(--border); max-width: 480px;">
+    <div class="field" style="margin-bottom: 14px;">
+      <label class="form-label" for="f-name">Project name</label>
+      <input class="input" id="f-name" value="kelo">
+    </div>
+
+    <div class="field" style="margin-bottom: 14px;">
+      <label class="form-label" for="f-channel">Channel slug</label>
+      <input class="input" id="f-channel" value="kelo">
+      <div class="helper">Used in the URL hash, e.g. <code>#/kelo</code>.</div>
+    </div>
+
+    <div class="field" style="margin-bottom: 14px;">
+      <label class="form-label" for="f-repo">Repo URL</label>
+      <input class="input" id="f-repo" value="https://github.com/mase/not-a-real-project" aria-invalid="true">
+      <div class="helper helper-error">Repository not reachable (404).</div>
+    </div>
+
+    <div class="field" style="margin-bottom: 16px;">
+      <label class="form-label" for="f-desc">Description</label>
+      <textarea class="input textarea" id="f-desc">Persistent AI agent — semantic memory, health monitoring, autonomous dispatch.</textarea>
+    </div>
+
+    <div class="row" style="justify-content: flex-end;">
+      <button class="btn">Cancel</button>
+      <button class="btn btn-primary">Save project</button>
+    </div>
+  </div>
+</section>
+
+<section>
+  <div class="section-tag">Rules</div>
+  <h2>What not to do</h2>
+  <p class="note">Each row renders the wrong version next to the rule it breaks.</p>
+
+  <div class="bad-row">
+    <span class="row-label">❌ glow</span>
+    <input class="input bad-glow" value="helm/new-feature">
+    <span class="why">Border shift is enough. A glow competes with the amber focus rings used everywhere else.</span>
+  </div>
+
+  <div class="bad-row">
+    <span class="row-label">❌ red bg</span>
+    <input class="input bad-bg-error" value="not-a-real-project">
+    <span class="why">Invalid is a border + helper line. A tinted background reads like a destructive action.</span>
+  </div>
+
+  <div class="bad-row">
+    <span class="row-label">❌ tall</span>
+    <input class="input bad-tall" value="helm/new-feature">
+    <span class="why">32px breaks alignment with the 22px buttons and selects it shares a row with.</span>
+  </div>
+
+  <div class="bad-row">
+    <span class="row-label">❌ rounded</span>
+    <input class="input bad-rounded" value="helm/new-feature">
+    <span class="why"><code>--radius</code> is 0. Rounded corners read as "from another design system."</span>
+  </div>
+
+  <div class="bad-row">
+    <span class="row-label">❌ no label</span>
+    <input class="input" placeholder="Branch">
+    <span class="why">A placeholder is not a label — it vanishes the moment a value is typed.</span>
+  </div>
+</section>
+
+</body>
+</html>
