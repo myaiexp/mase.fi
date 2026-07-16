@@ -4,6 +4,24 @@ import { logStats } from './data.js';
 import { mountBeam } from './beam.js';
 import { escapeHtml } from './html.js';
 
+// heat → status business rule. Single source for the >0.6 / >0.3 breakpoints so
+// the desktop hero card and the mobile hero line can't silently diverge.
+//   label: cardHead status dot   text: desktop status line   short: mobile status
+function heatStatus(heat) {
+  if (heat > 0.6) return { label: '● shipping', text: 'actively shipping', short: 'shipping' };
+  if (heat > 0.3) return { label: '● steady', text: 'steady', short: 'steady' };
+  return { label: '○ idle', text: 'maintenance only', short: 'idle' };
+}
+
+// "try demo" anchor when this channel has a published demo (demos/<channel>/).
+// Single source for the /demos/ URL shape. Returns '' when there's no demo;
+// `arrow` appends the → glyph (desktop card only).
+function demoLinkHtml(channel, demos, { arrow = false } = {}) {
+  if (!(demos || []).includes(channel)) return '';
+  return '<a class="demo-link" href="/demos/' + escapeHtml(channel) + '/">try demo' +
+    (arrow ? ' →' : '') + '</a>';
+}
+
 function cardHead(meta, right) {
   const chips = meta
     .map(([k, v]) => '<span class="ch-meta"><i>' + k + '</i><b>' + v + '</b></span>')
@@ -46,21 +64,17 @@ function pinnedHome(data) {
 function pinnedProject(p, data) {
   const art = PROJECT_ART[p.channel] || '';
   const commits = data.entries.filter(e => e.ch === p.channel && e.cat === 'log').length;
-  const statusLabel = p.heat > 0.6 ? '● shipping' : p.heat > 0.3 ? '● steady' : '○ idle';
-  const statusText = p.heat > 0.6 ? 'actively shipping' : p.heat > 0.3 ? 'steady' : 'maintenance only';
-  // "try demo →" when this channel has a published demo (demos/<channel>/).
-  const demoLink = (data.demos || []).includes(p.channel)
-    ? '<a class="demo-link" href="/demos/' + escapeHtml(p.channel) + '/">try demo →</a>'
-    : '';
+  const status = heatStatus(p.heat);
+  const demoLink = demoLinkHtml(p.channel, data.demos, { arrow: true });
   return '<div class="card">' +
-    cardHead([['heat', (p.heat * 100 | 0) + '%'], ['commits', String(commits)]], statusLabel) +
+    cardHead([['heat', (p.heat * 100 | 0) + '%'], ['commits', String(commits)]], status.label) +
     '<div class="card-body pin-grid">' +
     '<pre class="ascii">' + escapeHtml(art) + '</pre>' +
     '<div>' +
     '<p class="pin-tagline">' + escapeHtml(p.description) + '</p>' +
     '<dl class="pin-meta">' +
     '<dt>activity</dt><dd>' + commits + ' commits in feed \xb7 heat ' + (p.heat * 100 | 0) + '%</dd>' +
-    '<dt>status</dt><dd class="accent">' + statusText + '</dd>' +
+    '<dt>status</dt><dd class="accent">' + status.text + '</dd>' +
     '<dt>links</dt><dd class="links">' + demoLink +
     p.links.map(l => '<a href="' + escapeHtml(l.href) + '">' + escapeHtml(l.label) + '</a>').join('') +
     '</dd>' +
@@ -123,20 +137,19 @@ export function renderHeroLine(id, data) {
       '<span class="sep">\xb7</span> ' +
       '<a href="https://github.com/myaiexp">github</a>';
   } else if (project) {
-    const statusText = project.heat > 0.6 ? 'shipping' : project.heat > 0.3 ? 'steady' : 'idle';
-    const demoLink = (data.demos || []).includes(id)
-      ? '<a class="demo-link" href="/demos/' + escapeHtml(id) + '/">try demo</a> <span class="sep">\xb7</span> '
-      : '';
+    const status = heatStatus(project.heat);
+    const demo = demoLinkHtml(id, data.demos);
+    const demoLink = demo ? demo + ' <span class="sep">\xb7</span> ' : '';
     if (project.links && project.links.length > 0) {
       html =
         '<span class="arr">→</span> ' + demoLink +
         '<a href="' + escapeHtml(project.links[0].href) + '">' + escapeHtml(project.links[0].label) + '</a> ' +
         '<span class="sep">\xb7</span> ' +
-        '<span class="status">' + statusText + '</span>';
+        '<span class="status">' + status.short + '</span>';
     } else {
       html =
         '<span class="arr">→</span> ' + demoLink +
-        '<span class="status">' + statusText + '</span>';
+        '<span class="status">' + status.short + '</span>';
     }
   }
   // activity and unmatched channels: empty string — CSS :empty hides the element
