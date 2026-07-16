@@ -1,143 +1,291 @@
-/** Data layer: project maps, channel lists, entry filtering. */
+// Data adapter: fetches updates.json and normalizes it to the shape the UI expects.
 
-import { relativeDate } from './terminal.js';
+const SOURCE_URL = '/updates.json';
+const DEMOS_MANIFEST_URL = '/demos/manifest.json';
 
 /**
- * Build lookup: project.name (lowercase) -> project object.
- * @param {Array} projects
- * @returns {Map<string, object>}
+ * Fetch the list of project channels that have a published demo, from the demos
+ * repo's manifest (written by its post-deploy from synced-dirs.txt). Tolerant of
+ * absence (no demos dir, local dev, 404) — returns [] so callers can always
+ * `.includes(channel)` without guarding. Returns a string[] of channel slugs.
  */
-export function buildProjectMap(projects) {
-  const map = new Map();
-  for (const p of projects) {
-    map.set(p.name.toLowerCase(), p);
+export async function fetchDemos() {
+  try {
+    const r = await fetch(DEMOS_MANIFEST_URL);
+    if (!r.ok) return [];
+    const list = await r.json();
+    return Array.isArray(list) ? list.filter((s) => typeof s === 'string') : [];
+  } catch {
+    return [];
   }
-  return map;
 }
 
 /**
- * Get the most recent entry date for a project.
- * Matches entry.project against project.slug (falls back to channel).
+ * Fetch + normalize the live updates.json into the canonical shape used by the UI:
+ *   { meta:{nick,server,bootTime}, projects:[{name,channel,description,tag,links[],heat}], entries:[{ch,date,cat,nick,text,project?}], demos:[channelSlug] }
+ *
+ * The real /updates.json carries a different shape — see README — so we map here.
+ *  - entry.category → cat
+ *  - entry.project (slug) → ch (via project.slug or project.channel match)
+ *  - entry.text || entry.summary → text
+ *  - project.heat is computed from last-30d entry count, normalized 0..1
+ *  - project.tag, project.links don't exist live — we synthesize: tag = "" (dropped chip), links = [project.url]
+ *  - demos: channel slugs with a published demo (from /demos/manifest.json via fetchDemos),
+ *    fetched in parallel and folded in here so the shape is complete in one place — no
+ *    consumer has to staple it on or guard against its absence.
  */
-function getLastActivity(entries, project) {
-  const slug = (project.slug || project.channel).toLowerCase();
-  let latest = null;
-  for (const e of entries) {
-    if (e.project?.toLowerCase() === slug) {
-      if (!latest || e.date > latest) latest = e.date;
-    }
-  }
-  return latest;
-}
-
-/**
- * Check if a project has a category=project entry within the last 14 days.
- */
-function isNewProject(entries, project) {
-  const slug = (project.slug || project.channel).toLowerCase();
-  const cutoff = new Date();
-  cutoff.setDate(cutoff.getDate() - 14);
-  const cutoffISO = cutoff.toISOString().slice(0, 10);
-
-  return entries.some(
-    (e) =>
-      e.category === 'project' &&
-      e.project?.toLowerCase() === slug &&
-      e.date >= cutoffISO,
-  );
-}
-
-/**
- * Get structured channel list for sidebar rendering.
- * @param {Array} entries
- * @param {Array} projects
- * @returns {Array<{group: string, channels: Array}>}
- */
-export function getChannels(entries, projects) {
-  const projectChannels = projects
-    .map((p) => ({
-      id: p.channel,
-      label: `#${p.channel}`,
-      lastActivity: getLastActivity(entries, p),
-      isNew: isNewProject(entries, p),
-    }))
-    .sort((a, b) => {
-      if (!a.lastActivity && !b.lastActivity) return 0;
-      if (!a.lastActivity) return 1;
-      if (!b.lastActivity) return -1;
-      return b.lastActivity.localeCompare(a.lastActivity);
+export async function fetchData() {
+  // Kick the demos-manifest fetch off up front so it overlaps the updates fetch.
+  // fetchDemos never rejects (it degrades to [] on any failure), so awaiting it in
+  // either branch below is safe and never masks an updates.json error.
+  const demosPromise = fetchDemos();
+  // Single error boundary around fetch + the full normalization pipeline. A
+  // network/parse failure OR a structural error while normalizing (e.g. a null
+  // element in entries making e.project throw, a non-array field) both degrade to
+  // the same empty fallback instead of escaping as an unhandled rejection — main.js
+  // awaits this without a catch, so an escape would silently stall the app shell.
+  try {
+    const raw = await fetch(SOURCE_URL).then((r) => {
+      // Assert a 2xx before parsing: a 4xx/5xx with a JSON error body (e.g. from a
+      // reverse proxy) would otherwise parse as data and degrade silently to empty
+      // state. Throwing routes it to the catch below, which is the same fallback.
+      if (!r.ok) throw new Error('updates.json HTTP ' + r.status);
+      return r.json();
     });
 
-  return [
-    { group: 'home', channels: [{ id: 'home', label: '#home' }] },
-    { group: 'projects', channels: projectChannels },
-    {
-      group: 'meta',
-      channels: [
-        { id: 'activity', label: '#activity' },
-        { id: 'about', label: '#about' },
-      ],
-    },
-  ];
+    const rawProjects = Array.isArray(raw.projects) ? raw.projects : [];
+    const rawEntries = Array.isArray(raw.entries) ? raw.entries : [];
+
+    const slugToChannel = buildSlugToChannel(rawProjects);
+    const { counts, lastActivity } = aggregateActivity(rawEntries);
+    const projects = normalizeProjects(rawProjects, counts, lastActivity);
+    const entries = normalizeEntries(rawEntries, slugToChannel);
+
+    return {
+      meta: { nick: 'mase', server: 'irc.mase.fi', bootTime: Date.now() },
+      projects,
+      entries,
+      demos: await demosPromise,
+    };
+  } catch (err) {
+    // Deliberate degrade-to-empty so the app shell still renders, but this catch
+    // also traps any programming bug thrown in the normalization pipeline — warn
+    // so a real bug surfaces in the console instead of masquerading as the benign
+    // "server returned no data" case.
+    console.warn('fetchData: failed to load/normalize updates.json, degrading to empty state', err);
+    return {
+      meta: { nick: 'mase', server: 'irc.mase.fi', bootTime: Date.now() },
+      projects: [],
+      entries: [],
+      demos: await demosPromise,
+    };
+  }
 }
 
 /**
- * Get entries for a specific channel, sorted date ascending (oldest first).
- * @param {string} channelId
- * @param {Array} entries
- * @param {Array} projects
- * @returns {Array}
+ * Build the entry-slug → channel lookup. Entries reference a project by slug
+ * (matched case-insensitively); channels are keyed by `channel`. A project's slug
+ * defaults to its channel when not given explicitly.
  */
-export function getChannelEntries(channelId, entries, projects) {
-  let filtered;
+function buildSlugToChannel(rawProjects) {
+  const slugToChannel = new Map();
+  for (const p of rawProjects) {
+    const slug = (p.slug || p.channel || '').toLowerCase();
+    if (slug) slugToChannel.set(slug, p.channel);
+  }
+  return slugToChannel;
+}
 
+/**
+ * Aggregate per-project activity from raw entries in a single pass:
+ *  - counts:       last-30d log|feature entry count per slug (drives heat)
+ *  - lastActivity: newest activity timestamp (ms) per slug (drives recency sort)
+ * Only finite-dated, project-bearing log/feature entries contribute.
+ */
+function aggregateActivity(rawEntries) {
+  const cutoff = Date.now() - 30 * 86400000;
+  const counts = new Map();
+  const lastActivity = new Map();
+  for (const e of rawEntries) {
+    if (!e.project) continue;
+    if (e.category !== 'log' && e.category !== 'feature') continue;
+    const t = Date.parse(e.date);
+    if (!Number.isFinite(t)) continue;
+    const slug = e.project.toLowerCase();
+    if (t >= cutoff) counts.set(slug, (counts.get(slug) || 0) + 1);
+    if (t > (lastActivity.get(slug) || 0)) lastActivity.set(slug, t);
+  }
+  return { counts, lastActivity };
+}
+
+/**
+ * Normalize raw projects into the UI shape: synthesize http(s)-only links,
+ * compute 0..1 heat from last-30d counts, and sort most-recently-active first.
+ * Pure over (rawProjects, counts, lastActivity).
+ */
+function normalizeProjects(rawProjects, counts, lastActivity) {
+  // Reduce instead of spreading into Math.max: a large map would exceed the
+  // engine's argument-count limit (~65k) and throw. Floor of 1 avoids a
+  // divide-by-zero on an empty map (heat = count / maxCount below).
+  let maxCount = 1;
+  for (const c of counts.values()) if (c > maxCount) maxCount = c;
+
+  const projects = rawProjects.map((p) => {
+    const slug = (p.slug || p.channel || '').toLowerCase();
+    const heat = Math.min(1, (counts.get(slug) || 0) / maxCount);
+    const links = [];
+    if (p.url) {
+      try {
+        const u = new URL(p.url);
+        // Only surface http(s) links. Non-special schemes (javascript:, data:,
+        // vbscript:) parse successfully with an empty host and would otherwise
+        // pass straight through to escapeHtml(), which doesn't strip protocols —
+        // a protocol-based XSS vector. Drop anything that isn't http/https.
+        if (u.protocol === 'http:' || u.protocol === 'https:') {
+          const host = u.host.replace(/^www\./, '');
+          links.push({ label: host, href: p.url });
+        }
+      } catch {
+        // URL() throws only on schemeless/relative inputs (e.g. "/explorer"),
+        // which are inherently same-origin and safe to link as-is.
+        links.push({ label: 'open', href: p.url });
+      }
+    }
+    return {
+      name: p.name,
+      channel: p.channel,
+      slug,
+      description: p.desc || '',
+      tag: '', // not present in live data; renderers should drop the "stack" chip
+      url: p.url || '',
+      links,
+      heat,
+      lastActivity: lastActivity.get(slug) || 0,
+    };
+  });
+  // Sort by most-recently-active first. The sidebar projects group, the
+  // mobile tabbar's "first 4", and any other order-sensitive consumer all
+  // see the same recency order.
+  projects.sort((a, b) => b.lastActivity - a.lastActivity);
+  return projects;
+}
+
+/**
+ * Normalize raw entries into the UI shape: map category + project-slug → channel
+ * (falling back to daily→home, log→activity), drop unroutable entries, normalize
+ * the date, pick a nick, and sort by date ascending. Entries keep the project's
+ * own `ch`; the #activity firehose re-selects all `log` entries separately in
+ * entriesFor(), so there's no duplication to strip here.
+ * Pure over (rawEntries, slugToChannel).
+ */
+function normalizeEntries(rawEntries, slugToChannel) {
+  return rawEntries
+    .map((e) => {
+      const slug = (e.project || '').toLowerCase();
+      const mappedChannel = slugToChannel.get(slug);
+      const ch = mappedChannel
+        || (e.category === 'daily' ? 'home' : e.category === 'log' ? 'activity' : null);
+      if (!ch) return null;
+      const date = normalizeDate(e.date);
+      const text = e.text || e.summary || '';
+      const nick = pickNick(e);
+      return {
+        ch,
+        cat: e.category,
+        date,
+        nick,
+        text,
+        project: slug || undefined,
+        mappedChannel,
+        sticky: !!e.sticky,
+      };
+    })
+    .filter(Boolean)
+    .sort((a, b) => a.date.localeCompare(b.date));
+}
+
+/**
+ * Parse an entry date into a Date. Entry dates are wall-clock Finnish-server
+ * strings with no zone marker, so the 'Z' makes the parse explicitly UTC rather
+ * than viewer-local — otherwise the same entry would land on a different day
+ * depending on who's reading. The input is normalizeDate's output shape
+ * ("YYYY-MM-DDTHH:MM", no zone suffix); keep the two in step if that changes.
+ */
+export function parseEntryDate(d) {
+  return new Date(d + 'Z');
+}
+
+/** Normalize a date string to "YYYY-MM-DDTHH:MM" form used by the UI. */
+function normalizeDate(s) {
+  if (!s || typeof s !== 'string') return '1970-01-01T00:00';
+  // Already has time component
+  if (/T\d{2}:\d{2}/.test(s)) return s.slice(0, 16);
+  // Bare YYYY-MM-DD → append T00:00
+  if (/^\d{4}-\d{2}-\d{2}$/.test(s)) return s + 'T00:00';
+  // Anything else is malformed: don't let unbounded/garbage strings reach e.date
+  // (downstream renderers slice and inject it into innerHTML). Bound to the epoch
+  // fallback so the function always returns a known, ASCII-only date string.
+  return '1970-01-01T00:00';
+}
+
+/**
+ * Pick a nick for an entry based on category.
+ * - log → 'git' (commit firehose)
+ * - daily → the project slug, so #home reads as a per-project standup: each
+ *   project "speaks" its own colour-coded line (nick colours are name-hashed),
+ *   which is the channel's subject identity. Project-less daily → 'mase'.
+ * - feature/project → 'mase' (these live in a project channel that already
+ *   names the subject, so the nick stays the author).
+ */
+function pickNick(e) {
+  if (e.category === 'log') return 'git';
+  if (e.category === 'daily' && e.project) return String(e.project).toLowerCase();
+  return 'mase';
+}
+
+/**
+ * Return entries for a given channel id, sorted ascending (oldest first).
+ * - home     → daily summaries
+ * - activity → all log entries across projects (firehose)
+ * - <slug>   → entries matching that project channel (any category)
+ */
+export function entriesFor(channelId, data) {
   if (channelId === 'home') {
-    filtered = entries.filter((e) => e.category === 'daily');
-  } else if (channelId === 'activity') {
-    filtered = entries.filter((e) => e.category === 'log');
-  } else if (channelId === 'about') {
-    return [];
-  } else {
-    // Find the project by channel id
-    const project = projects.find((p) => p.channel === channelId);
-    if (!project) return [];
-
-    const slug = (project.slug || project.channel).toLowerCase();
-    filtered = entries.filter(
-      (e) =>
-        (e.category === 'feature' || e.category === 'project') &&
-        e.project?.toLowerCase() === slug,
-    );
+    return data.entries.filter((e) => e.cat === 'daily');
   }
-
-  // Sort ascending (oldest first — chat order)
-  return [...filtered].sort((a, b) => a.date.localeCompare(b.date));
+  if (channelId === 'activity') {
+    return data.entries.filter((e) => e.cat === 'log');
+  }
+  return data.entries.filter((e) => e.ch === channelId && e.cat !== 'log');
 }
 
 /**
- * Compute stats for #about channel.
- * @param {Array} entries
- * @param {Array} projects
- * @returns {{ projectCount: number, featuresThisMonth: number, lastDeploy: string }}
+ * Single-pass log aggregate for the pinned cards. Walks data.entries once:
+ *   - totalCommits: count of every `log` entry
+ *   - buckets:      last-`days` per-day counts, oldest first (finite, in-range
+ *                   dates only) — the #home heatstrip and the #activity rate
+ *   - last:         newest `log` entry by date string, or null
+ * The finite-date guard is a nested branch (not `continue`) so a malformed date
+ * still counts toward totalCommits and the newest-entry comparison — only the
+ * day bucket needs a parseable date.
  */
-export function getAboutStats(entries, projects) {
-  const now = new Date();
-  const currentMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
-
-  const featuresThisMonth = entries.filter(
-    (e) =>
-      (e.category === 'feature' || e.category === 'project') &&
-      e.date.startsWith(currentMonth),
-  ).length;
-
-  let latestDate = null;
-  for (const e of entries) {
-    if (!latestDate || e.date > latestDate) latestDate = e.date;
+export function logStats(data, days = 28) {
+  const buckets = new Array(days).fill(0);
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const start = today.getTime() - (days - 1) * 86400000;
+  let totalCommits = 0;
+  let last = null;
+  for (const e of data.entries) {
+    if (e.cat !== 'log') continue;
+    totalCommits++;
+    const t = Date.parse(e.date);
+    if (Number.isFinite(t)) {
+      const idx = Math.floor((t - start) / 86400000);
+      if (idx >= 0 && idx < days) buckets[idx]++;
+    }
+    if (!last || e.date > last.date) last = e;
   }
-
-  return {
-    projectCount: projects.length,
-    featuresThisMonth,
-    lastDeploy: latestDate ? relativeDate(latestDate) : 'unknown',
-  };
+  return { totalCommits, buckets, last };
 }
+

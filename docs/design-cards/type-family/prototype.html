@@ -1,0 +1,207 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>type family · prototype</title>
+<!-- Consumes the worktree's own base.css: the @font-face + --font token render live -->
+<link rel="stylesheet" href="src/base.css">
+<style>
+  body { padding: 24px 28px 64px; max-width: 880px; color: var(--text); }
+
+  h1 { font-size: var(--text-md); color: var(--text-dim); font-weight: 500; letter-spacing: 0.02em; margin-bottom: 4px; }
+  .lede { color: var(--text-muted); font-size: var(--text-sm); margin-bottom: 8px; max-width: 66ch; text-wrap: pretty; }
+  .live { font-size: var(--text-xs); color: var(--text-muted); margin-bottom: 32px; }
+  .live b { color: var(--text-dim); font-weight: 500; }
+  .live .ok { color: var(--green); }
+  .live .fb { color: var(--orange); }
+
+  section { margin-bottom: 34px; }
+  .recipe { font-size: var(--text-xs); color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 8px; }
+  h2 { font-size: var(--text-base); font-weight: 500; color: var(--text); margin-bottom: 2px; }
+  .note { color: var(--text-muted); font-size: var(--text-sm); margin-bottom: 14px; max-width: 68ch; text-wrap: pretty; }
+  .note code, .live code { color: var(--text-dim); background: var(--bg-surface); padding: 0 3px; }
+
+  /* The face */
+  .specimen { font-size: 44px; line-height: 1.05; color: var(--text); letter-spacing: -0.01em; }
+  .pangram { font-size: var(--text-md); color: var(--text-dim); margin-top: 10px; }
+  .glyphs { font-size: 22px; color: var(--text); margin-top: 12px; letter-spacing: 0.04em; }
+  .glyph-note { font-size: var(--text-xs); color: var(--text-muted); margin-top: 6px; }
+
+  /* Weight ramp */
+  .w-row { display: flex; align-items: baseline; gap: 18px; padding: 9px 0; }
+  .w-row + .w-row { border-top: 1px solid var(--border); }
+  .w-sample { flex: 1; font-size: 20px; color: var(--text); }
+  .w-meta { font-size: var(--text-xs); color: var(--text-muted); white-space: nowrap; text-align: right; }
+  .w-meta b { color: var(--text-dim); font-weight: 500; }
+  .w-file { color: var(--text-muted); }
+
+  /* Feature panels */
+  .panels { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+  .panel { border: 1px solid var(--border); }
+  .panel-head { padding: 5px 10px; background: var(--bg-surface); border-bottom: 1px solid var(--border); font-size: var(--text-xs); color: var(--text-dim); text-transform: uppercase; letter-spacing: 0.05em; }
+  .panel-head .off { color: var(--orange); }
+  .panel-head .on { color: var(--green); }
+  .panel-body { padding: 12px 10px; font-size: 18px; color: var(--text); line-height: 1.7; }
+  .no-liga { font-feature-settings: "ss01", "ss02", "calt" 0; }
+
+  /* Numerics */
+  .nums { display: flex; gap: 28px; align-items: flex-start; }
+  .nums table { border-collapse: collapse; font-size: var(--text-md); }
+  .nums caption { font-size: var(--text-xs); color: var(--text-muted); text-align: left; padding-bottom: 4px; text-transform: uppercase; letter-spacing: 0.05em; }
+  .nums td { padding: 1px 0; color: var(--text-dim); text-align: right; }
+  .tnum { font-variant-numeric: tabular-nums; }
+
+  /* Fallback */
+  .fb-row { display: grid; grid-template-columns: 88px 1fr; align-items: baseline; gap: 14px; padding: 9px 0; font-size: 17px; }
+  .fb-row + .fb-row { border-top: 1px solid var(--border); }
+  .fb-label { font-size: var(--text-xs); color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.05em; }
+  .fb-real { color: var(--text); }
+  .fb-fallback { color: var(--text-dim); font-family: 'Consolas', monospace; }
+
+  /* UI snippets */
+  .ui-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; align-items: start; }
+  @media (max-width: 680px) { .ui-grid, .panels { grid-template-columns: 1fr; } }
+
+  .ui-card { border: 1px solid var(--border); background: var(--bg-surface); padding: var(--space-4); }
+  .ui-card-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 6px; }
+  .ui-card-head h3 { font-size: var(--text-base); }
+  .ui-card-body { color: var(--text-dim); font-size: var(--text-sm); line-height: var(--leading); margin-bottom: 10px; text-wrap: pretty; }
+  .ui-card-foot { display: flex; align-items: center; gap: 8px; font-size: var(--text-xs); }
+
+  .ui-table { width: 100%; border-collapse: collapse; font-size: var(--text-sm); }
+  .ui-table th { text-align: left; font-size: var(--text-xs); font-weight: 500; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.04em; padding: 0 8px 6px 0; border-bottom: 1px solid var(--border); }
+  .ui-table td { padding: 5px 8px 5px 0; color: var(--text-dim); border-bottom: 1px solid var(--border); }
+  .ui-table td.num { text-align: right; font-variant-numeric: tabular-nums; color: var(--text); }
+  .ui-table td.proj { color: var(--text); }
+
+  .ctl { display: flex; flex-direction: column; gap: 10px; }
+  .ctl-row { display: flex; gap: 8px; align-items: center; }
+</style>
+</head>
+<body>
+
+<h1>type family</h1>
+<p class="lede">One monospace face — <b>JetBrains Mono</b> — carries the entire system. Prose, labels, headings, numbers and code are all set in it; hierarchy comes from weight, <code>--fg-*</code> color and size, never a second typeface. Rendered live from <code>base.css</code>.</p>
+<p class="live" id="live">family <b id="fam">—</b> · webfont <span id="status">checking…</span></p>
+
+<section>
+  <div class="recipe">The face</div>
+  <h2>JetBrains Mono</h2>
+  <p class="note">A humanist mono drawn for code — tall x-height, open apertures, unambiguous <code>0/O</code>, <code>1/l/I</code>. Picked because the fleet is code-adjacent: paths, hashes, tool output, IRC feeds.</p>
+  <div class="specimen">Aa Bb Gg 0123</div>
+  <p class="pangram">The quick brown fox jumps over the lazy dog — 0123456789</p>
+  <div class="glyphs">0 O · 1 l I i · { } [ ] ( ) &lt; &gt; · @ # $ &amp; % · =&gt; -&gt; != &gt;=</div>
+  <p class="glyph-note">Slashed zero, seriffed <code>1</code>, tailed <code>l</code>, dotted <code>i</code> — disambiguation is the whole point.</p>
+</section>
+
+<section>
+  <div class="recipe">Weights</div>
+  <h2>Two files, four weights</h2>
+  <p class="note">Only <b>Regular</b> and <b>Bold</b> ship. The <code>@font-face</code> ranges map the in-between weights to a real file: <code>400-500 → Regular</code>, <code>600-700 → Bold</code>. So the on-screen step is Regular → Bold; 500 and 600 are the same pixels as 400 and 700, chosen for authoring intent.</p>
+  <div class="w-row"><span class="w-sample" style="font-weight:400">Body, prose, meta, timestamps</span><span class="w-meta"><b>400</b> · <span class="w-file">Regular</span></span></div>
+  <div class="w-row"><span class="w-sample" style="font-weight:500">Labels, badges, buttons, section headers</span><span class="w-meta"><b>500</b> · <span class="w-file">Regular</span></span></div>
+  <div class="w-row"><span class="w-sample" style="font-weight:600">Nicks, subheads, active-channel</span><span class="w-meta"><b>600</b> · <span class="w-file">Bold</span></span></div>
+  <div class="w-row"><span class="w-sample" style="font-weight:700">Headings, .bold, hard emphasis</span><span class="w-meta"><b>700</b> · <span class="w-file">Bold</span></span></div>
+</section>
+
+<section>
+  <div class="recipe">Ligatures</div>
+  <h2>Contextual alternates (<code>calt</code>)</h2>
+  <p class="note"><code>base.css</code> sets no <code>font-feature-settings</code>, so <code>calt</code> renders at the browser default — <b>on</b>. Coding sequences fuse into single glyphs. A consumer that wants a raw terminal look opts out on its own root (the mase.fi homepage does exactly this) — the shared sheet is never touched.</p>
+  <div class="panels">
+    <div class="panel">
+      <div class="panel-head"><span class="on">base.css default</span> · calt on</div>
+      <div class="panel-body">-&gt; =&gt; &lt;- &lt;= &gt;= != == === := |&gt; ... // /* */ &amp;&amp; ||</div>
+    </div>
+    <div class="panel">
+      <div class="panel-head"><span class="off">mase.fi opt-out</span> · "ss01","ss02","calt" 0</div>
+      <div class="panel-body no-liga">-&gt; =&gt; &lt;- &lt;= &gt;= != == === := |&gt; ... // /* */ &amp;&amp; ||</div>
+    </div>
+  </div>
+</section>
+
+<section>
+  <div class="recipe">Numerics</div>
+  <h2>Tabular figures</h2>
+  <p class="note">In a true monospace face every digit already shares one advance width, so <code>font-variant-numeric: tabular-nums</code> is a near no-op for JetBrains Mono itself — apply it per <em>container</em>, not globally, and mainly as insurance: it keeps numeric columns aligned even against the proportional <em>fallback</em> during the swap flash. mase.fi sets it on feed timestamps.</p>
+  <div class="nums">
+    <table class="tnum"><caption>aligned</caption>
+      <tr><td>1,204,880</td></tr><tr><td>96,412</td></tr><tr><td>7,003</td></tr><tr><td>128</td></tr>
+    </table>
+    <table class="tnum"><caption>hashes · times</caption>
+      <tr><td>c7fb654 · 23:55</td></tr><tr><td>91d22a7 · 09:02</td></tr><tr><td>8bbc094 · 14:37</td></tr>
+    </table>
+  </div>
+</section>
+
+<section>
+  <div class="recipe">Fallback</div>
+  <h2>Before the webfont, or if it fails</h2>
+  <p class="note">Self-hosted with <code>font-display: swap</code>, so the fallback shows only during the load flash or on hard failure: <code>'Consolas', monospace</code>. Metrics differ — expect a reflow on swap-in. The lower row forces the fallback stack (no JetBrains Mono) so you can see what a cold visitor gets.</p>
+  <div class="fb-row"><span class="fb-label">JetBrains</span><span class="fb-real">$ git log --oneline · 0O1lI · =&gt; != &gt;=</span></div>
+  <div class="fb-row"><span class="fb-label">fallback</span><span class="fb-fallback">$ git log --oneline · 0O1lI · =&gt; != &gt;=</span></div>
+</section>
+
+<section>
+  <div class="recipe">One family, full hierarchy</div>
+  <h2>No second typeface needed</h2>
+  <p class="note">Real <code>base.css</code> component classes — card, table, badges, controls — all set in the one face. Weight, color and size do the work a display font would elsewhere.</p>
+  <div class="ui-grid">
+    <div class="ui-card">
+      <div class="ui-card-head">
+        <h3>session · kelo-42</h3>
+        <span class="status status-running">running</span>
+      </div>
+      <p class="ui-card-body">Autonomous dispatch queued three tasks; two merged clean, one awaiting review. Feed rows arrive with the modem-jitter effect.</p>
+      <div class="ui-card-foot">
+        <span class="tag tag-feature">feature</span>
+        <span class="muted">1,204,880 tokens · 3m ago</span>
+      </div>
+    </div>
+
+    <div class="ui-card">
+      <table class="ui-table">
+        <thead><tr><th>project</th><th style="text-align:right">commits</th><th style="text-align:right">tokens</th><th style="text-align:right">ago</th></tr></thead>
+        <tbody>
+          <tr><td class="proj">mase.fi</td><td class="num">128</td><td class="num">1,204,880</td><td class="num">2m</td></tr>
+          <tr><td class="proj">helm</td><td class="num">96</td><td class="num">842,110</td><td class="num">18m</td></tr>
+          <tr><td class="proj">explorer</td><td class="num">7</td><td class="num">63,004</td><td class="num">1h</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <div class="ctl" style="margin-top:12px;">
+    <div>
+      <label class="form-label" for="q">command</label>
+      <input class="input" id="q" value="/deploy mase.fi" spellcheck="false">
+    </div>
+    <div class="ctl-row">
+      <button class="btn btn-primary">approve</button>
+      <button class="btn">archive</button>
+      <button class="btn-ghost">cancel</button>
+      <span class="label label-accent">card</span>
+      <span class="label label-muted">draft</span>
+    </div>
+  </div>
+</section>
+
+<script>
+  // Live-read the token + probe whether the webfont actually loaded.
+  const cs = getComputedStyle(document.documentElement);
+  document.getElementById('fam').textContent = cs.getPropertyValue('--font').trim();
+  const status = document.getElementById('status');
+  const paint = () => {
+    const ok = document.fonts && document.fonts.check('16px "JetBrains Mono"');
+    status.innerHTML = ok
+      ? '<span class="ok">JetBrains Mono loaded</span>'
+      : '<span class="fb">fallback (Consolas → monospace)</span>';
+  };
+  // load() forces the fetch and settles (resolve on success, reject on failure);
+  // repaint either way so check() reflects the true state, not a race with swap.
+  if (document.fonts && document.fonts.load) { document.fonts.load('16px "JetBrains Mono"').then(paint, paint); }
+  paint();
+</script>
+
+</body>
+</html>

@@ -1,0 +1,74 @@
+/* Design tokens: font-face declarations, CSS custom properties, base resets */
+@font-face {
+  font-family: 'JetBrains Mono';
+  src: url('../fonts/JetBrainsMono-Regular.woff2') format('woff2');
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'JetBrains Mono';
+  src: url('../fonts/JetBrainsMono-Bold.woff2') format('woff2');
+  font-weight: 700;
+  font-style: normal;
+  font-display: swap;
+}
+
+/* ============================================================
+   mase.fi — palette & scaffolding
+   ============================================================ */
+:root {
+  /* fixed palette from brief */
+  --bg:        #09090b;
+  --bg-1:      #0e0e11;   /* slight lift */
+  --bg-2:      #141418;   /* cards, topic bar */
+  --bg-3:      #1b1b20;   /* hover */
+  --line:      #2a2a30;
+  --line-dim:  #1f1f24;
+
+  --text:      #fafafa;
+  --dim:       #a1a1aa;
+  --muted:     #52525b;
+  --faint:     #3a3a42;
+
+  --accent:    #e8a308;   /* golden orange */
+  --accent-hi: #ffbe2a;
+  --accent-lo: #8a6005;
+
+  --green:     #22c55e;
+  --red:       #ef4444;
+  --cyan:      #06b6d4;
+  --blue:      #7aa2f7;
+  --violet:    #a78bfa;
+
+  --mono: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+
+  --line-h: 20px;
+  --row-h:  22px;
+  --char-w: 0.6ch;
+
+  /* motion timings */
+  --jitter-ms: 320ms;
+  --stagger-ms: 38ms;
+  --switch-ms: 420ms;
+
+  /* per-channel accent (overridden by JS) */
+  --ch-accent: var(--accent);
+}
+
+* { box-sizing: border-box; }
+html, body { margin: 0; padding: 0; height: 100%; background: var(--bg); color: var(--text); }
+body {
+  font-family: var(--mono);
+  font-size: 13.5px;
+  line-height: var(--line-h);
+  font-feature-settings: "ss01", "ss02", "calt" 0;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+  overscroll-behavior: none;
+}
+::selection { background: color-mix(in oklab, var(--accent) 45%, transparent); color: #000; }
+
+button { font: inherit; color: inherit; background: none; border: 0; padding: 0; cursor: pointer; }
+a { color: var(--accent); text-decoration: none; }
+a:hover { text-decoration: underline; text-underline-offset: 3px; }

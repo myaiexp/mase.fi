@@ -1,42 +1,30 @@
-/** Orchestrator: fetch data, boot or direct load, init all modules. */
-import { shouldSkipBoot, runBoot, initReplayButton } from './boot.js';
-import { initSidebar, setActiveChannel } from './sidebar.js';
-import { initRouter, navigateTo, resolveInitialChannel } from './channels.js';
-import { initSearch } from './search.js';
-import './style.css';
+// Orchestrator: fetch updates, run boot (or skip), then wire all modules
+import { fetchData } from './data.js';
+import { shouldSkipBoot, runBoot, initReplayBoot } from './boot.js';
+import { initChannels, applyInitialChannel, navigate } from './channels.js';
+import { renderChanlist } from './sidebar.js';
+import { initCommand } from './command.js';
+import { initTickers } from './tickers.js';
+import './styles/index.css';
 
-const prefersReducedMotion = matchMedia('(prefers-reduced-motion: reduce)').matches;
-const dataPromise = fetch('/updates.json')
-  .then((r) => r.json())
-  .catch(() => ({ entries: [], projects: [] }));
+const reduced = matchMedia('(prefers-reduced-motion: reduce)').matches;
+const dataPromise = fetchData();
+initReplayBoot();
 
-/** Full init — used for skip-boot path and replay */
-function initApp(data) {
-  initSidebar(data);
-  initRouter(data, prefersReducedMotion);
-  initSearch(data);
-
-  const channelId = resolveInitialChannel();
-  navigateTo(channelId, data, prefersReducedMotion);
+async function init() {
+  const data = await dataPromise;
+  initChannels(data);
+  renderChanlist(data, navigate);
+  initCommand(data);
+  initTickers(data.meta.bootTime);
+  applyInitialChannel();
 }
 
-/** After boot: wire up functional modules without re-rendering content.
- *  Boot Phase 3 already built the sidebar DOM and #home content visually.
- *  We just need initSidebar for mobile dropdown + event wiring,
- *  then router + search. No navigateTo — content is already there. */
-function initAfterBoot(data) {
-  initSidebar(data);
-  initRouter(data, prefersReducedMotion);
-  initSearch(data);
-}
-
-if (shouldSkipBoot(prefersReducedMotion)) {
-  dataPromise.then(initApp);
+if (shouldSkipBoot(reduced)) {
+  document.getElementById('app').hidden = false;
+  document.getElementById('boot')?.remove();
+  init();
 } else {
-  runBoot(dataPromise, initAfterBoot);
+  window.addEventListener('mase:booted', init, { once: true });
+  runBoot();
 }
-
-initReplayButton(
-  () => fetch('/updates.json').then((r) => r.json()),
-  (data) => { initSidebar(data); setActiveChannel('home'); },
-);

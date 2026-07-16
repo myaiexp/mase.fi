@@ -1,36 +1,87 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>mase.fi</title>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>mase.fi</title>
 </head>
 <body>
+  <!-- Boot overlay (7-day TTL, skip on click/keypress) -->
+  <div id="boot" class="boot" aria-hidden="true"></div>
 
-  <div id="boot-overlay" class="boot-overlay"></div>
-  <div class="terminal">
-    <div class="terminal__titlebar">
-      <span class="terminal__title">mase.fi</span>
-      <button id="boot-replay" class="terminal__replay">&blacktriangleright; boot</button>
-    </div>
-    <div class="terminal__body">
-      <aside id="sidebar" class="sidebar"></aside>
-      <div class="content">
-        <div id="content-pinned" class="content__pinned"></div>
-        <div id="content-feed" class="content__feed"></div>
+  <!-- Main app shell -->
+  <div id="app" class="app" hidden>
+    <!-- Left sidebar (desktop) -->
+    <aside class="sidebar" aria-label="Channels">
+      <header class="sidebar-head">
+        <div class="server-chip">
+          <span class="dot" aria-hidden="true"></span>
+          <span class="server-name">irc.mase.fi</span>
+          <span class="server-port">:6667</span>
+        </div>
+        <div class="head-meta">
+          <span class="kv"><i>up</i><b id="uptime">—</b></span>
+          <span class="kv"><i>ping</i><b id="ping">—</b></span>
+        </div>
+      </header>
+      <nav class="chanlist" id="chanlist" aria-label="Channel list"></nav>
+    </aside>
+
+    <!-- Main pane -->
+    <main class="pane" id="pane">
+      <!-- Topic bar (IRC-style) -->
+      <div class="topic-bar" id="topic-bar">
+        <span class="topic-hash" id="topic-hash">#home</span>
+        <span class="topic-sep">│</span>
+        <span class="topic-text" id="topic-text">daily logbook · appended nightly · autoscroll on</span>
+        <span class="topic-spacer"></span>
+        <span class="topic-meta" id="topic-meta"></span>
       </div>
-    </div>
-    <div class="terminal__inputbar">
-      <span class="terminal__prompt">mase@fi:~$</span>
-      <input id="command-input" type="text" class="terminal__input" autocomplete="off">
-      <span class="terminal__cursor"></span>
-    </div>
-    <!-- Mobile top bar (hidden on desktop) -->
-    <div id="mobile-topbar" class="mobile-topbar">
-      <span id="mobile-channel-name" class="mobile-topbar__channel">#home</span>
-      <button id="mobile-dropdown-toggle" class="mobile-topbar__toggle">&blacktriangledown;</button>
-      <div id="mobile-dropdown" class="mobile-dropdown"></div>
-    </div>
+
+      <!-- Hero line: mobile-only sub-row with quick-access link (desktop: hidden) -->
+      <div class="hero-line" id="hero-line"></div>
+
+      <!-- Pinned area (swaps per channel) -->
+      <section class="pinned" id="pinned" aria-label="Channel header"></section>
+
+      <!-- Feed -->
+      <section class="feed-wrap">
+        <div class="feed" id="feed" role="log" aria-live="polite" aria-label="Channel feed"></div>
+        <div class="feed-overlay" id="feed-overlay" aria-hidden="true"></div>
+      </section>
+    </main>
+
+    <!-- Bottom status/input bar — spans full width so sidebar + pane share one strip -->
+    <footer class="statusbar">
+      <div class="statusbar-who">
+        <span class="foot-prompt" aria-hidden="true">$</span>
+        <div class="who-strip" id="who-strip">
+          <span class="who-nick">mase</span><span class="who-sep">@</span><span class="who-host">mase.fi</span>
+        </div>
+      </div>
+      <div class="cmd" id="cmd">
+        <span class="cmd-prompt" id="cmd-prompt">&gt;</span>
+        <input
+          id="cmd-input"
+          class="cmd-input"
+          type="text"
+          autocomplete="off"
+          spellcheck="false"
+          placeholder="press / to jump · type to search · ? for help"
+          aria-label="Command input"
+          role="combobox"
+          aria-autocomplete="list"
+          aria-haspopup="listbox"
+          aria-expanded="false"
+          aria-controls="cmd-complete"
+        />
+        <span class="cmd-hint" id="cmd-hint"></span>
+        <div class="cmd-complete" id="cmd-complete" hidden></div>
+      </div>
+    </footer>
+
+    <!-- Mobile bottom tab bar -->
+    <nav class="tabbar" id="tabbar" aria-label="Channels (mobile)"></nav>
   </div>
 
   <script type="module" src="/src/main.js"></script>
