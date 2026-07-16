@@ -1,5 +1,5 @@
 // Slash-command registry — easter-egg commands surfaced in the "/" autocomplete.
-import { formatUptime } from './chrome.js';
+import { formatUptime } from './tickers.js';
 
 // describeAgent: terse "Browser on OS" label from a userAgent (+ platform
 // fallback). Pure so it can be pinned directly; order matters (Edge/Opera

@@ -9,16 +9,16 @@ export function formatUptime(ms) {
 }
 
 /** Start the 1.2s interval that updates #uptime and #ping in the sidebar header. */
-export function initChrome(bootTime) {
+export function initTickers(bootTime) {
   const $uptime = document.getElementById('uptime');
   const $ping   = document.getElementById('ping');
 
-  function tickChrome() {
+  function tick() {
     $uptime.textContent = formatUptime(Date.now() - bootTime);
     const ping = 11 + Math.floor(Math.random() * 7);
     $ping.textContent = ping + 'ms';
   }
 
-  tickChrome();
-  setInterval(tickChrome, 1200);
+  tick();
+  setInterval(tick, 1200);
 }

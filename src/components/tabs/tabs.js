@@ -173,14 +173,10 @@ class BaseTabs extends HTMLElement {
 
 customElements.define('base-tabs', BaseTabs);
 
-// <base-tab> is a simple container; display logic controlled by parent <base-tabs>
+// <base-tab> is a simple container; the parent <base-tabs> owns all display
+// logic (show/hide via _applyActive), so no connection-time work is needed here.
 class BaseTab extends HTMLElement {
   static observedAttributes = ['label', 'active', 'disabled'];
-
-  connectedCallback() {
-    // Initial hide; parent will set visibility via _applyActive
-    // No action needed here — parent manages display
-  }
 
   attributeChangedCallback() {
     // Notify parent to re-evaluate if needed

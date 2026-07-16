@@ -41,7 +41,7 @@ export function playSwitchTransition(onMid) {
 
   // Swap content ~a third of the way down, under the descending band, so the
   // new feed reads as wiped in. The sweep is composited, so this synchronous
-  // relayout can no longer stall it. Tracked so a rapid re-switch can cancel it.
+  // relayout doesn't stall it. Tracked so a rapid re-switch can cancel it.
   midTimer = setTimeout(() => { midTimer = 0; onMid(); }, durMs * 0.33);
 
   const done = () => {

@@ -1,15 +1,15 @@
 // @vitest-environment jsdom
 // Unit tests for formatUptime(ms) — the pure 'Xd HHh MMm' formatter behind the
 // sidebar uptime ticker. formatUptime is module-private, so (per the normalizeDate
-// pattern) it is exercised through its only caller initChrome(): with Date.now()
+// pattern) it is exercised through its only caller initTickers(): with Date.now()
 // frozen, passing bootTime = NOW - ms makes the synchronous first tick write
 // formatUptime(ms) into #uptime. Edge cases pinned: 0ms, sub-minute, exactly 1
 // day, multi-day, padding, and very large values.
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import { initChrome } from './chrome.js';
+import { initTickers } from './tickers.js';
 
 // Frozen wall clock so Date.now() - bootTime equals exactly the ms under test,
-// independent of real time elapsed during the synchronous initChrome() call.
+// independent of real time elapsed during the synchronous initTickers() call.
 const NOW = new Date('2026-06-13T12:00:00Z').getTime();
 
 beforeEach(() => {
@@ -18,11 +18,11 @@ beforeEach(() => {
 });
 
 afterEach(() => {
-  vi.clearAllTimers(); // drop the 1.2s interval initChrome registers
+  vi.clearAllTimers(); // drop the 1.2s interval initTickers registers
   vi.useRealTimers();
 });
 
-// Render the uptime string formatUptime(ms) produces, via initChrome's first tick.
+// Render the uptime string formatUptime(ms) produces, via initTickers's first tick.
 function uptimeFor(ms) {
   document.body.replaceChildren();
   for (const id of ['uptime', 'ping']) {
@@ -30,11 +30,11 @@ function uptimeFor(ms) {
     el.id = id;
     document.body.appendChild(el);
   }
-  initChrome(NOW - ms);
+  initTickers(NOW - ms);
   return document.getElementById('uptime').textContent;
 }
 
-describe('formatUptime (via initChrome uptime ticker)', () => {
+describe('formatUptime (via initTickers uptime ticker)', () => {
   it('formats exactly 0ms as all-zero with padded h/m', () => {
     expect(uptimeFor(0)).toBe('0d 00h 00m');
   });

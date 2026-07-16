@@ -75,11 +75,10 @@ function truncateLastLine(lineText, maxWidth, ellipsis, font) {
 export function justifyLines(prepared, maxWidth, maxLines) {
   if (fullTextOf(prepared) === null) return [];
 
-  // One walk yields each line's text AND its paint width. The width measured
-  // here is byte-identical to measureNaturalWidth(doPrepare(line.text, font))
-  // — same paint-width engine, trailing whitespace excluded the same way — so
-  // reusing it drops the N redundant per-line prepareWithSegments calls the
-  // old code paid just to re-read a width it already had.
+  // One walk yields each line's text AND its paint width, avoiding a per-line
+  // prepareWithSegments re-measure. The width here is identical to
+  // measureNaturalWidth(doPrepare(line.text, font)) — same paint-width engine,
+  // trailing whitespace excluded the same way — so reusing it is safe.
   const allLines = [];
   walkLineRanges(prepared, maxWidth, (range) => {
     const line = materializeLineRange(prepared, range);

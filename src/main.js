@@ -4,7 +4,7 @@ import { shouldSkipBoot, runBoot, initReplayBoot } from './boot.js';
 import { initChannels, applyInitialChannel, navigate } from './channels.js';
 import { renderChanlist } from './sidebar.js';
 import { initCommand } from './command.js';
-import { initChrome } from './chrome.js';
+import { initTickers } from './tickers.js';
 import './styles/index.css';
 
 const reduced = matchMedia('(prefers-reduced-motion: reduce)').matches;
@@ -16,7 +16,7 @@ async function init() {
   initChannels(data);
   renderChanlist(data, navigate);
   initCommand(data);
-  initChrome(data.meta.bootTime);
+  initTickers(data.meta.bootTime);
   applyInitialChannel();
 }
 

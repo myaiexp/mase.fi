@@ -125,8 +125,8 @@ function aggregateActivity(rawEntries) {
  */
 function normalizeProjects(rawProjects, counts, lastActivity) {
   // Reduce instead of spreading into Math.max: a large map would exceed the
-  // engine's argument-count limit (~65k) and throw. Floor of 1 matches the
-  // prior Math.max(1, …), which also yielded 1 for an empty map.
+  // engine's argument-count limit (~65k) and throw. Floor of 1 avoids a
+  // divide-by-zero on an empty map (heat = count / maxCount below).
   let maxCount = 1;
   for (const c of counts.values()) if (c > maxCount) maxCount = c;
 
