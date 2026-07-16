@@ -37,6 +37,7 @@ function stubFetch(payload) {
 
 afterEach(() => {
   vi.unstubAllGlobals();
+  vi.restoreAllMocks();
 });
 
 function stubDemosResponse(ok, body) {
@@ -230,6 +231,7 @@ describe('fetchData routing', () => {
   });
 
   it('returns empty entries/projects when fetch rejects', async () => {
+    vi.spyOn(console, 'warn').mockImplementation(() => {});
     vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new Error('network down')));
     const data = await fetchData();
     expect(data.entries).toEqual([]);
@@ -239,6 +241,7 @@ describe('fetchData routing', () => {
   it('degrades to empty data on a non-ok HTTP response (does not parse the error body)', async () => {
     // A 4xx/5xx with a JSON error body must not be parsed as data. The r.ok guard
     // throws, routing it to the same empty fallback as a network failure.
+    vi.spyOn(console, 'warn').mockImplementation(() => {});
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
       ok: false,
       status: 503,
@@ -250,15 +253,18 @@ describe('fetchData routing', () => {
     expect(data.meta.nick).toBe('mase');
   });
 
-  it('degrades to empty data when normalization throws (null element in entries)', async () => {
-    // A null entry makes the heat-count loop's `e.project` access throw. The fix
-    // keeps normalization inside the error boundary, so this degrades gracefully
-    // instead of escaping as an unhandled rejection that stalls the app shell.
+  it('degrades to empty data when normalization throws, and logs the error', async () => {
+    // A null entry makes the heat-count loop's `e.project` access throw. The error
+    // boundary keeps normalization inside it, so this degrades gracefully instead
+    // of escaping as an unhandled rejection that stalls the app shell — and the
+    // catch warns, so a real bug isn't silently swallowed as "no data".
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
     stubFetch({ projects: [], entries: [null] });
     const data = await fetchData();
     expect(data.entries).toEqual([]);
     expect(data.projects).toEqual([]);
     expect(data.meta.nick).toBe('mase');
+    expect(warnSpy).toHaveBeenCalled();
   });
 });
 

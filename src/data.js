@@ -49,116 +49,150 @@ export async function fetchData() {
     const rawProjects = Array.isArray(raw.projects) ? raw.projects : [];
     const rawEntries = Array.isArray(raw.entries) ? raw.entries : [];
 
-    // slug → channel lookup (entries reference by slug, channels are by `channel`)
-    const slugToChannel = new Map();
-    for (const p of rawProjects) {
-      const slug = (p.slug || p.channel || '').toLowerCase();
-      if (slug) slugToChannel.set(slug, p.channel);
-    }
-
-    // last-30d counts for heat, and per-project most-recent activity timestamp
-    // for the sidebar's recency sort.
-    const now = Date.now();
-    const cutoff = now - 30 * 86400000;
-    const counts = new Map();
-    const lastActivity = new Map();
-    for (const e of rawEntries) {
-      if (!e.project) continue;
-      if (e.category !== 'log' && e.category !== 'feature') continue;
-      const t = Date.parse(e.date);
-      if (!Number.isFinite(t)) continue;
-      const slug = e.project.toLowerCase();
-      if (t >= cutoff) counts.set(slug, (counts.get(slug) || 0) + 1);
-      if (t > (lastActivity.get(slug) || 0)) lastActivity.set(slug, t);
-    }
-    // Reduce instead of spreading into Math.max: a large map would exceed the
-    // engine's argument-count limit (~65k) and throw. Floor of 1 matches the
-    // prior Math.max(1, …), which also yielded 1 for an empty map.
-    let maxCount = 1;
-    for (const c of counts.values()) if (c > maxCount) maxCount = c;
-
-    const projects = rawProjects.map((p) => {
-      const slug = (p.slug || p.channel || '').toLowerCase();
-      const heat = Math.min(1, (counts.get(slug) || 0) / maxCount);
-      const links = [];
-      if (p.url) {
-        try {
-          const u = new URL(p.url);
-          // Only surface http(s) links. Non-special schemes (javascript:, data:,
-          // vbscript:) parse successfully with an empty host and would otherwise
-          // pass straight through to escapeHtml(), which doesn't strip protocols —
-          // a protocol-based XSS vector. Drop anything that isn't http/https.
-          if (u.protocol === 'http:' || u.protocol === 'https:') {
-            const host = u.host.replace(/^www\./, '');
-            links.push({ label: host, href: p.url });
-          }
-        } catch {
-          // URL() throws only on schemeless/relative inputs (e.g. "/explorer"),
-          // which are inherently same-origin and safe to link as-is.
-          links.push({ label: 'open', href: p.url });
-        }
-      }
-      return {
-        name: p.name,
-        channel: p.channel,
-        slug,
-        description: p.desc || '',
-        tag: '', // not present in live data; renderers should drop the "stack" chip
-        url: p.url || '',
-        links,
-        heat,
-        lastActivity: lastActivity.get(slug) || 0,
-      };
-    });
-    // Sort by most-recently-active first. The sidebar projects group, the
-    // mobile tabbar's "first 4", and any other order-sensitive consumer all
-    // see the same recency order.
-    projects.sort((a, b) => b.lastActivity - a.lastActivity);
-
-    const entries = rawEntries
-      .map((e) => {
-        const slug = (e.project || '').toLowerCase();
-        const mappedChannel = slugToChannel.get(slug);
-        const ch = mappedChannel
-          || (e.category === 'daily' ? 'home' : e.category === 'log' ? 'activity' : null);
-        if (!ch) return null;
-        const date = normalizeDate(e.date);
-        const text = e.text || e.summary || '';
-        const nick = pickNick(e);
-        return {
-          ch,
-          cat: e.category,
-          date,
-          nick,
-          text,
-          project: slug || undefined,
-          mappedChannel,
-          sticky: !!e.sticky,
-        };
-      })
-      .filter(Boolean)
-      .sort((a, b) => a.date.localeCompare(b.date));
-
-    // #activity gets *all* log entries (cross-project firehose), regardless of channel routing above.
-    // To avoid duplicating, we mark entries with `ch` of the project, then the activity feed pulls
-    // separately. See entriesFor() below.
+    const slugToChannel = buildSlugToChannel(rawProjects);
+    const { counts, lastActivity } = aggregateActivity(rawEntries);
+    const projects = normalizeProjects(rawProjects, counts, lastActivity);
+    const entries = normalizeEntries(rawEntries, slugToChannel);
 
     return {
-      meta: {
-        nick: 'mase',
-        server: 'irc.mase.fi',
-        bootTime: Date.now(),
-      },
+      meta: { nick: 'mase', server: 'irc.mase.fi', bootTime: Date.now() },
       projects,
       entries,
     };
-  } catch {
+  } catch (err) {
+    // Deliberate degrade-to-empty so the app shell still renders, but this catch
+    // also traps any programming bug thrown in the normalization pipeline — warn
+    // so a real bug surfaces in the console instead of masquerading as the benign
+    // "server returned no data" case.
+    console.warn('fetchData: failed to load/normalize updates.json, degrading to empty state', err);
     return {
       meta: { nick: 'mase', server: 'irc.mase.fi', bootTime: Date.now() },
       projects: [],
       entries: [],
     };
   }
+}
+
+/**
+ * Build the entry-slug → channel lookup. Entries reference a project by slug
+ * (matched case-insensitively); channels are keyed by `channel`. A project's slug
+ * defaults to its channel when not given explicitly.
+ */
+function buildSlugToChannel(rawProjects) {
+  const slugToChannel = new Map();
+  for (const p of rawProjects) {
+    const slug = (p.slug || p.channel || '').toLowerCase();
+    if (slug) slugToChannel.set(slug, p.channel);
+  }
+  return slugToChannel;
+}
+
+/**
+ * Aggregate per-project activity from raw entries in a single pass:
+ *  - counts:       last-30d log|feature entry count per slug (drives heat)
+ *  - lastActivity: newest activity timestamp (ms) per slug (drives recency sort)
+ * Only finite-dated, project-bearing log/feature entries contribute.
+ */
+function aggregateActivity(rawEntries) {
+  const cutoff = Date.now() - 30 * 86400000;
+  const counts = new Map();
+  const lastActivity = new Map();
+  for (const e of rawEntries) {
+    if (!e.project) continue;
+    if (e.category !== 'log' && e.category !== 'feature') continue;
+    const t = Date.parse(e.date);
+    if (!Number.isFinite(t)) continue;
+    const slug = e.project.toLowerCase();
+    if (t >= cutoff) counts.set(slug, (counts.get(slug) || 0) + 1);
+    if (t > (lastActivity.get(slug) || 0)) lastActivity.set(slug, t);
+  }
+  return { counts, lastActivity };
+}
+
+/**
+ * Normalize raw projects into the UI shape: synthesize http(s)-only links,
+ * compute 0..1 heat from last-30d counts, and sort most-recently-active first.
+ * Pure over (rawProjects, counts, lastActivity).
+ */
+function normalizeProjects(rawProjects, counts, lastActivity) {
+  // Reduce instead of spreading into Math.max: a large map would exceed the
+  // engine's argument-count limit (~65k) and throw. Floor of 1 matches the
+  // prior Math.max(1, …), which also yielded 1 for an empty map.
+  let maxCount = 1;
+  for (const c of counts.values()) if (c > maxCount) maxCount = c;
+
+  const projects = rawProjects.map((p) => {
+    const slug = (p.slug || p.channel || '').toLowerCase();
+    const heat = Math.min(1, (counts.get(slug) || 0) / maxCount);
+    const links = [];
+    if (p.url) {
+      try {
+        const u = new URL(p.url);
+        // Only surface http(s) links. Non-special schemes (javascript:, data:,
+        // vbscript:) parse successfully with an empty host and would otherwise
+        // pass straight through to escapeHtml(), which doesn't strip protocols —
+        // a protocol-based XSS vector. Drop anything that isn't http/https.
+        if (u.protocol === 'http:' || u.protocol === 'https:') {
+          const host = u.host.replace(/^www\./, '');
+          links.push({ label: host, href: p.url });
+        }
+      } catch {
+        // URL() throws only on schemeless/relative inputs (e.g. "/explorer"),
+        // which are inherently same-origin and safe to link as-is.
+        links.push({ label: 'open', href: p.url });
+      }
+    }
+    return {
+      name: p.name,
+      channel: p.channel,
+      slug,
+      description: p.desc || '',
+      tag: '', // not present in live data; renderers should drop the "stack" chip
+      url: p.url || '',
+      links,
+      heat,
+      lastActivity: lastActivity.get(slug) || 0,
+    };
+  });
+  // Sort by most-recently-active first. The sidebar projects group, the
+  // mobile tabbar's "first 4", and any other order-sensitive consumer all
+  // see the same recency order.
+  projects.sort((a, b) => b.lastActivity - a.lastActivity);
+  return projects;
+}
+
+/**
+ * Normalize raw entries into the UI shape: map category + project-slug → channel
+ * (falling back to daily→home, log→activity), drop unroutable entries, normalize
+ * the date, pick a nick, and sort by date ascending. Entries keep the project's
+ * own `ch`; the #activity firehose re-selects all `log` entries separately in
+ * entriesFor(), so there's no duplication to strip here.
+ * Pure over (rawEntries, slugToChannel).
+ */
+function normalizeEntries(rawEntries, slugToChannel) {
+  return rawEntries
+    .map((e) => {
+      const slug = (e.project || '').toLowerCase();
+      const mappedChannel = slugToChannel.get(slug);
+      const ch = mappedChannel
+        || (e.category === 'daily' ? 'home' : e.category === 'log' ? 'activity' : null);
+      if (!ch) return null;
+      const date = normalizeDate(e.date);
+      const text = e.text || e.summary || '';
+      const nick = pickNick(e);
+      return {
+        ch,
+        cat: e.category,
+        date,
+        nick,
+        text,
+        project: slug || undefined,
+        mappedChannel,
+        sticky: !!e.sticky,
+      };
+    })
+    .filter(Boolean)
+    .sort((a, b) => a.date.localeCompare(b.date));
 }
 
 /**
