@@ -4,7 +4,12 @@ set -euo pipefail
 
 UPDATES_FILE="${UPDATES_FILE:-/var/www/html/updates.json}"
 TODAY=$(TZ="Europe/Helsinki" date +%Y-%m-%d)
-DELEGATE_URL="${DELEGATE_URL:-http://localhost:9754/api/delegate}"
+# Summaries come from the Claude Code CLI in headless print mode. Absolute path
+# because the systemd *user* service runs with a minimal PATH that excludes
+# ~/.local/bin (curl/jq/awk resolve only because they live in /usr/bin).
+CLAUDE_BIN="${CLAUDE_BIN:-/home/mase/.local/bin/claude}"
+CLAUDE_MODEL="${CLAUDE_MODEL:-sonnet}"
+CLAUDE_TIMEOUT="${CLAUDE_TIMEOUT:-120}"
 NTFY_URL="${NTFY_URL:-https://ntfy.mase.fi/kelo}"
 HELM_ENV="${HELM_ENV:-/home/mase/Projects/helm/.env}"
 
@@ -28,9 +33,9 @@ ntfy_send() (
 )
 
 # `set -euo pipefail` aborts before any in-script alert, so a hard failure (jq
-# error, delegate curl breaking a pipe, mid-run I/O) would degrade the homepage
-# silently. Fire one alert on any non-zero exit; the intentional skip paths below
-# all `exit 0`, so a normal no-op run stays quiet.
+# error, a broken pipe, mid-run I/O) would degrade the homepage silently. Fire
+# one alert on any non-zero exit; the intentional skip paths below all `exit 0`,
+# so a normal no-op run stays quiet.
 on_exit() {
   local rc=$?
   if [[ $rc -ne 0 ]]; then
@@ -60,38 +65,27 @@ if [[ "$LOG_COUNT" -eq 0 ]]; then
     exit 0
 fi
 
-# Salvage the real highlight list from a small model's raw reply.
-# Hermes routinely leaks preamble and wrapper junk around the actual answer —
-# XML/markdown tags (`<?xml…`, `<warning>`, `<md>`), colon lead-ins
-# ("Here are the highlights:"), refusals ("I don't have…"), and stray words on
-# their own line (a bare " downturn" before the list). `head -1` stored that junk
-# verbatim onto the homepage. Instead: drop the junk lines, then among survivors
-# pick the one that most looks like the requested comma-separated list (most
-# commas wins; first line otherwise). Emits one line, or nothing if all dropped.
-sanitize_output() {
+# Take the model's answer as a single clean line. Sonnet in `-p` mode with an
+# "output ONLY" instruction returns exactly the list, so this only needs the
+# first non-empty line, trimmed, with one wrapping pair of quotes/backticks
+# stripped. (The old aggressive tag/refusal/JSON scrubber existed for Hermes'
+# leaky output; Sonnet doesn't need it — and its `<`/`>` rule wrongly nuked any
+# valid summary containing an arrow like `a -> b`, forcing a fallback.)
+clean_output() {
     awk '
     {
         line = $0
         gsub(/\r/, "", line)
         sub(/^[[:space:]]+/, "", line); sub(/[[:space:]]+$/, "", line)
+        if (line == "") next
         # strip a single pair of wrapping quotes/backticks around the whole line
         if (line ~ /^".*"$/ || line ~ /^`.*`$/ || line ~ /^'\''.*'\''$/) {
             line = substr(line, 2, length(line) - 2)
             sub(/^[[:space:]]+/, "", line); sub(/[[:space:]]+$/, "", line)
         }
-        if (line == "")            next   # blank
-        if (line ~ /^```/)         next   # code fence
-        if (line ~ /^[][{}]/)      next   # JSON / tool-call structure ({ } [ ] — open or close)
-        if (line ~ /^"?[A-Za-z_][A-Za-z0-9_-]*"?[[:space:]]*:[[:space:]]*["{[]/) next  # JSON key line ("command": "echo…, "args": {)
-        if (line ~ /[<>]/)         next   # any XML/HTML tag (<?xml, <warning>, <md>, </…>)
-        if (line ~ /:[[:space:]]*$/) next # lead-in ending in a colon
-        low = tolower(line)
-        if (low ~ /^(i (do not|don.?t|can.?t|cannot|am unable|will)|i.?m (unable|sorry)|as an ai|here (are|is|.?s)|sure[,:]|note:|disclaimer|output:|summary:)/) next
-        commas = gsub(/,/, ",", line)     # gsub returns the match count
-        if (first == "") first = line
-        if (commas > bestn) { bestn = commas; best = line }
+        print line
+        exit
     }
-    END { if (best != "") print best; else if (first != "") print first }
     '
 }
 
@@ -104,23 +98,21 @@ truncate_summary() {
     if [[ "$head" == *,* ]]; then printf '%s' "${head%,*}"; else printf '%s…' "${head% *}"; fi
 }
 
-# Generate AI summary from a list of commit messages via helm delegate (#954).
-# Routes through localhost helm delegate (Nous Hermes) instead of a direct
-# Anthropic OAuth call — standardizes external automation on the dispatch
-# primitive and drops the ~/.claude OAuth-token dependency.
-# Falls back to "project: N commits" if helm/delegate is unavailable or the
-# reply survives sanitization as nothing usable.
+# Generate a one-line themed summary of a project's commits via the Claude Code
+# CLI (`claude -p`, Sonnet) in headless print mode. No tools are needed for pure
+# text generation; the `timeout` wrapper is the backstop if the model ever stalls
+# or attempts a tool in the unattended 23:55 run. Falls back to
+# "project: N commits" on any non-zero exit, timeout, or empty reply — the same
+# silent-degradation signal the main loop counts and alerts on.
 generate_summary() {
     local project="$1"
     local commits_text="$2"
     local count="$3"
     local fallback="${project}: ${count} commits"
 
-    # Group-into-themes prompt (chosen over per-commit enumeration and prose after
-    # a live dry run on Hermes-4 across real project-days): synthesizes related
-    # commits into a few themes instead of de-verbing every subject, and the
-    # few-shot keeps the model out of "tool call" mode that the old terse prompt
-    # tripped. Output stays terminal-dense (lowercase, comma-separated).
+    # Group-into-themes prompt: synthesize related commits into a few themes
+    # rather than enumerating one line per commit. The few-shot anchors the output
+    # to a terse, lowercase, comma-separated shape and a short length.
     local prompt
     prompt="You are writing a one-line daily changelog for a software project from its git commits. Group the related commits into 3-5 short THEMES (not one-per-commit). Synthesize; drop trivial noise like version bumps and lint unless that is all there is. Output ONLY a terse, lowercase, comma-separated list on a single line, max 90 characters. No project name, no preamble, no tags, no quotes.
 Example commits:
@@ -133,23 +125,20 @@ Example output: oauth login + token refresh, dep bumps, auth tests
 Commits:
 ${commits_text}"
 
-    local payload
-    payload=$(jq -n --arg prompt "$prompt" '{prompt: $prompt, providerId: "nous"}')
-
+    # `|| true` keeps a single failed/timed-out call from aborting the whole run
+    # under `set -e` — this project falls back, the rest still get summarized.
     local response
-    response=$(curl -s --max-time 60 \
-        -H "content-type: application/json" \
-        -d "$payload" \
-        "$DELEGATE_URL" 2>/dev/null)
+    response=$(timeout "$CLAUDE_TIMEOUT" "$CLAUDE_BIN" -p "$prompt" --model "$CLAUDE_MODEL" 2>/dev/null) || true
 
-    # `.output` carries the model text. sanitize_output strips the model's
-    # preamble/tag/refusal noise and returns the line that reads as the list.
     local summary
-    summary=$(echo "$response" | jq -r '.output // empty' 2>/dev/null | sanitize_output)
+    summary=$(printf '%s' "$response" | clean_output)
 
     if [[ -n "$summary" ]]; then
         truncate_summary "$summary"; echo
     else
+        # Log the failed/empty reply to the journal so a fallback is diagnosable
+        # (the delegate era discarded the reply, leaving every fallback a black box).
+        echo "generate_summary: empty/failed claude reply for '${project}' — falling back to count" >&2
         echo "$fallback"
     fi
 }
@@ -163,8 +152,8 @@ jq --arg date "$TODAY" '
 # Build daily entries with AI summaries
 echo '[]' > /tmp/daily_entries.json
 
-FALLBACK_COUNT=0   # projects where the delegate produced nothing usable
-DELEGATE_COUNT=0   # projects that actually went through the delegate (multi-commit)
+FALLBACK_COUNT=0     # projects where claude produced nothing usable
+SUMMARIZED_COUNT=0   # projects that actually went through claude (multi-commit)
 
 for i in $(jq -r 'range(length)' /tmp/daily_groups.json); do
     project=$(jq -r ".[$i].project" /tmp/daily_groups.json)
@@ -176,9 +165,9 @@ for i in $(jq -r 'range(length)' /tmp/daily_groups.json); do
     else
         commits_text=$(jq -r ".[$i].commits[]" /tmp/daily_groups.json)
         summary=$(generate_summary "$project" "$commits_text" "$count")
-        DELEGATE_COUNT=$((DELEGATE_COUNT + 1))
-        # generate_summary echoes exactly this string when the delegate is down or
-        # its reply sanitizes to nothing — the silent-degradation signal. The model
+        SUMMARIZED_COUNT=$((SUMMARIZED_COUNT + 1))
+        # generate_summary echoes exactly this string when claude fails/times out
+        # or its reply cleans to nothing — the silent-degradation signal. The model
         # prompt forbids the "project: N" shape, so a real summary can't collide.
         [[ "$summary" == "${project}: ${count} commits" ]] && FALLBACK_COUNT=$((FALLBACK_COUNT + 1))
     fi
@@ -202,11 +191,11 @@ jq --slurpfile daily /tmp/daily_entries.json '
 DAILY_COUNT=$(jq --arg date "$TODAY" '[.entries[] | select(.category == "daily" and .date == $date)] | length' "$UPDATES_FILE")
 echo "Created $DAILY_COUNT daily summary entries for $TODAY"
 
-# One consolidated alert if any delegate summary silently degraded to a commit
-# count — rather than per-project spam. The run still succeeded (fallback text is
-# valid), so this is informational, not a failure.
+# One consolidated alert if any summary silently degraded to a commit count —
+# rather than per-project spam. The run still succeeded (fallback text is valid),
+# so this is informational, not a failure.
 if [[ "$FALLBACK_COUNT" -gt 0 ]]; then
     ntfy_send "mase.fi daily-summary degraded" \
-        "${TODAY}: ${FALLBACK_COUNT}/${DELEGATE_COUNT} project summaries fell back to commit counts — helm delegate unavailable or returned nothing usable"
-    echo "Degraded run: ${FALLBACK_COUNT}/${DELEGATE_COUNT} projects fell back — ntfy sent"
+        "${TODAY}: ${FALLBACK_COUNT}/${SUMMARIZED_COUNT} project summaries fell back to commit counts — claude -p failed, timed out, or returned nothing usable"
+    echo "Degraded run: ${FALLBACK_COUNT}/${SUMMARIZED_COUNT} projects fell back — ntfy sent"
 fi
