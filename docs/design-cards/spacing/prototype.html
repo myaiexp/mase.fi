@@ -5,34 +5,31 @@
 <title>spacing · prototype</title>
 <link rel="stylesheet" href="src/base.css">
 <style>
+  /* Living specimen for the spacing card. Demos consume real base.css classes
+     (.gap-*, .btn, .input, .form-label, .helper, .status, .section-header);
+     prototype-local styles below are only annotations + demo scaffolding. */
+
   body {
-    padding: var(--space-6) 28px 48px;
-    max-width: 760px;
+    padding: var(--space-6) 28px 64px;
+    max-width: 820px;
+    margin: 0 auto;
     color: var(--text);
   }
 
-  h1 {
-    font-size: var(--text-md);
-    color: var(--text-dim);
-    font-weight: 500;
-    letter-spacing: 0.02em;
-    margin-bottom: var(--space-2);
+  .page-title {
+    font-size: var(--text-lg);
+    color: var(--text);
+    margin-bottom: var(--space-1);
   }
-
   .lede {
     color: var(--text-muted);
     font-size: var(--text-sm);
-    margin-bottom: 32px;
   }
-  .lede code {
-    background: transparent;
-    color: var(--text-dim);
-    padding: 0;
-  }
+  .lede code { background: transparent; color: var(--text-dim); padding: 0; }
 
-  section {
-    margin-bottom: 32px;
-  }
+  /* Sections of the doc are landmarks — 24px apart. Uses the real .flex-col.gap-6
+     utilities this card shipped (see markup), so the specimen eats its own dog food. */
+  .doc { margin-top: 32px; }
 
   .eyebrow {
     font-size: var(--text-xs);
@@ -41,497 +38,295 @@
     letter-spacing: 0.06em;
     margin-bottom: var(--space-3);
   }
+  h2 { margin-bottom: var(--space-2); }
+  .note { color: var(--text-muted); font-size: var(--text-sm); margin-bottom: var(--space-5); }
+  .note code { background: transparent; color: var(--accent-text); padding: 0; }
 
-  h2 {
-    font-size: var(--text-base);
-    font-weight: 500;
-    color: var(--text);
-    margin-bottom: var(--space-1);
-  }
-
-  .note {
-    color: var(--text-muted);
-    font-size: var(--text-sm);
-    margin-bottom: 14px;
-  }
-
-  /* ========== The scale ========== */
-
-  .scale {
-    display: grid;
-    grid-template-columns: 90px 40px auto 1fr;
-    align-items: center;
-    row-gap: var(--space-3);
-    column-gap: var(--space-4);
-    font-size: var(--text-sm);
-  }
-  .scale .token {
-    color: var(--accent);
-    font-size: var(--text-xs);
-  }
-  .scale .px {
-    color: var(--text);
-    font-variant-numeric: tabular-nums;
-  }
-  .scale .bar {
-    height: 14px;
-    background: color-mix(in srgb, var(--accent) 50%, transparent);
-    border-right: 1px solid var(--accent);
-  }
-  .scale .use {
-    color: var(--text-dim);
-    font-size: var(--text-xs);
-  }
-
-  /* ========== Each step in context ========== */
-
-  .uses {
-    display: flex;
-    flex-direction: column;
-    gap: var(--space-5);
-  }
-  .use-row {
-    display: grid;
-    grid-template-columns: 90px 1fr;
-    column-gap: var(--space-4);
-    align-items: start;
-  }
-  .use-meta {
-    font-size: var(--text-xs);
-    color: var(--text-muted);
-    line-height: 1.5;
-  }
-  .use-meta .step {
-    display: block;
-    color: var(--accent);
-    font-size: var(--text-md);
-    font-weight: 500;
-    line-height: 1.1;
-    margin-bottom: var(--space-1);
-  }
-  .use-meta .tok {
-    display: block;
-    color: var(--text-dim);
-    font-size: var(--text-xs);
-  }
-  .use-meta .why {
-    display: block;
-    margin-top: var(--space-2);
-    color: var(--text-muted);
-  }
-  .use-demo {
-    background: var(--bg-surface);
-    padding: var(--space-4);
-    position: relative;
-  }
-  .flag {
-    display: inline-block;
-    background: color-mix(in srgb, var(--accent) 14%, transparent);
-    color: var(--accent);
+  /* amber annotation tick — reused everywhere a gap is called out */
+  .tick {
+    display: inline-flex; align-items: center; gap: var(--space-1);
+    background: color-mix(in srgb, var(--accent) 12%, transparent);
+    color: var(--accent-text);
     padding: 0 var(--space-2);
     font-size: var(--text-xs);
-    margin-left: var(--space-2);
-    vertical-align: middle;
+    white-space: nowrap;
   }
 
-  /* 2px — intra-row */
-  .demo-card-title {
-    font-size: var(--text-base);
-    color: var(--text);
-  }
-  .demo-card-meta {
-    margin-top: var(--space-1);
-    font-size: var(--text-sm);
-    color: var(--text-dim);
-  }
+  /* ===== The relationship ladder ===== */
 
-  /* 4px — inline siblings */
-  .demo-inline {
-    display: inline-flex;
-    align-items: center;
-    gap: var(--space-2);
-    font-size: var(--text-sm);
-    color: var(--text-dim);
-  }
-  .demo-inline .sep { color: var(--text-muted); }
-  .demo-inline .dot {
-    width: 6px; height: 6px;
-    background: var(--green);
-    display: inline-block;
-  }
-  .demo-inline .running { color: var(--green); }
-
-  /* 8px — compact row padding */
-  .demo-list {
-    display: flex;
-    flex-direction: column;
-    gap: 1px;
-    background: var(--border);
-  }
-  .demo-list .item {
-    background: var(--bg-raised);
-    padding: var(--space-3);
-    font-size: var(--text-sm);
-    color: var(--text-dim);
-    display: flex;
-    justify-content: space-between;
-  }
-  .demo-list .item code {
-    background: transparent;
-    color: var(--text-muted);
-    padding: 0;
-  }
-
-  /* 12px — section padding */
-  .demo-panel {
-    background: var(--bg-raised);
-    padding: var(--space-4);
-  }
-  .demo-panel-title {
-    font-size: var(--text-xs);
-    text-transform: uppercase;
-    color: var(--text-muted);
-    letter-spacing: 0.04em;
-    margin-bottom: var(--space-2);
-  }
-  .demo-panel-body {
-    font-size: var(--text-sm);
-    color: var(--text-dim);
-  }
-
-  /* 16px — pane padding & between groups */
-  .demo-pane {
-    background: var(--bg-raised);
-    padding: var(--space-5);
-    display: flex;
-    flex-direction: column;
-    gap: var(--space-5);
-  }
-  .demo-pane .group {
-    font-size: var(--text-sm);
-    color: var(--text-dim);
-  }
-  .demo-pane .group .h {
-    color: var(--text-muted);
-    text-transform: uppercase;
-    font-size: var(--text-xs);
-    letter-spacing: 0.04em;
-    margin-bottom: var(--space-2);
-  }
-
-  /* 24px — landmarks */
-  .demo-landmarks {
-    display: flex;
-    flex-direction: column;
-    gap: var(--space-6);
-    background: var(--bg-surface);
-    padding: var(--space-4);
-  }
-  .demo-landmarks .land h4 {
-    font-size: var(--text-base);
-    color: var(--text);
-    font-weight: 500;
-    margin-bottom: var(--space-2);
-  }
-  .demo-landmarks .land p {
-    font-size: var(--text-sm);
-    color: var(--text-dim);
-  }
-
-  /* ========== Rules ========== */
-
-  .rule {
-    margin-bottom: var(--space-4);
-  }
-  .rule-pair {
+  .ladder {
     display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: var(--space-4);
-  }
-  .rule-pair > div {
-    background: var(--bg-surface);
-    padding: var(--space-4);
-  }
-  .rule-pair .head {
-    display: block;
-    font-size: var(--text-xs);
-    margin-bottom: var(--space-3);
-    color: var(--text-muted);
-    text-transform: uppercase;
-    letter-spacing: 0.06em;
-  }
-  .rule-pair .ok .head { color: var(--green); }
-  .rule-pair .bad .head { color: var(--red); }
-  .rule-pair .caption {
-    margin-top: var(--space-3);
-    font-size: var(--text-xs);
-    color: var(--text-muted);
-  }
-
-  .stack-gap {
-    display: flex;
-    flex-direction: column;
-    gap: var(--space-3);
-  }
-  .stack-margin > div {
-    margin-bottom: var(--space-3);
-  }
-  .stack-item {
-    background: var(--bg-raised);
-    padding: var(--space-2) var(--space-3);
+    grid-template-columns: 84px 34px 26px auto;
+    align-items: center;
+    row-gap: var(--space-4);
+    column-gap: var(--space-4);
     font-size: var(--text-sm);
-    color: var(--text-dim);
   }
+  .ladder .tok { color: var(--accent-text); font-size: var(--text-xs); }
+  .ladder .px  { color: var(--text); font-variant-numeric: tabular-nums; }
+  .ladder .bar {
+    height: 13px;
+    background: color-mix(in srgb, var(--accent) 45%, transparent);
+    border-right: 1px solid var(--accent);
+  }
+  .ladder .rel { color: var(--text-dim); }
+  .ladder .rel b { color: var(--text); font-weight: 700; }
+  .ladder .rel .anchor { color: var(--text-muted); font-size: var(--text-xs); }
 
-  .swatches {
-    display: flex;
-    align-items: flex-end;
-    gap: var(--space-3);
+  /* ===== Demo surfaces ===== */
+
+  .surface { background: var(--bg-surface); padding: var(--space-4); }
+  .raised  { background: var(--bg-raised); }
+
+  /* a realistic card: title -> meta at 2px (--space-1) */
+  .card { background: var(--bg-raised); padding: var(--space-3); }
+  .card-title { font-size: var(--text-base); color: var(--text); }
+  .card-meta  { margin-top: var(--space-1); font-size: var(--text-sm); color: var(--text-dim); }
+  .card-meta code { background: transparent; color: var(--text-muted); padding: 0; }
+
+  /* a dense list: rows are homogeneous siblings, 1px seam, 8px inner padding */
+  .list { display: flex; flex-direction: column; gap: 1px; background: var(--border); }
+  .list .row {
+    background: var(--bg-raised); padding: var(--space-3);
+    font-size: var(--text-sm); color: var(--text-dim);
+    display: flex; justify-content: space-between; align-items: center;
   }
-  .sw {
-    background: var(--bg-raised);
-    text-align: center;
-    font-size: var(--text-xs);
-    color: var(--text);
-    padding-top: var(--space-1);
-    font-variant-numeric: tabular-nums;
+  .list .row code { background: transparent; color: var(--text-muted); padding: 0; }
+
+  /* a field: label + input + helper. Internal seams come free from
+     .form-label (margin-bottom) and .helper (margin-top) — the inputs card.
+     .field itself is a plain block wrapper (apps own this frame; base.css doesn't). */
+  .field { display: block; }
+
+  /* the composed pane: two sections 16px apart (--space-5), 16px padding */
+  .pane-demo {
+    background: var(--bg-surface);
+    border: 1px solid var(--border);
+    padding: var(--space-5);
+    display: flex; flex-direction: column; gap: var(--space-5);
   }
-  .sw.invalid {
-    background: color-mix(in srgb, var(--red) 18%, var(--bg-raised));
-    color: var(--red);
+  .pane-demo .section-header { padding: 0; }
+
+  .specimen-wrap { display: flex; gap: var(--space-4); align-items: flex-start; }
+  .specimen-wrap .pane-demo { flex: 1; min-width: 0; }
+  .rhythm-read {
+    width: 190px; flex-shrink: 0;
+    display: flex; flex-direction: column; gap: var(--space-2);
+    font-size: var(--text-xs); color: var(--text-muted); line-height: 1.5;
   }
+  .rhythm-read .r { display: flex; gap: var(--space-2); align-items: baseline; }
+  .rhythm-read .r .s { color: var(--accent-text); flex-shrink: 0; width: 42px; }
+
+  /* ===== Counter-examples ===== */
+
+  .trio { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: var(--space-4); }
+  .trio > figure { display: flex; flex-direction: column; gap: var(--space-3); }
+  .trio figcaption { font-size: var(--text-xs); }
+  .trio .ok  figcaption { color: var(--green); }
+  .trio .bad figcaption { color: var(--red); }
+  .trio .cap-note { color: var(--text-muted); font-size: var(--text-xs); margin-top: var(--space-2); }
+
+  /* mini-form used in the trio, spacing overridden per column to show right/cramped/loose */
+  .mini { background: var(--bg-raised); padding: var(--space-4); }
+  .mini .field-line { color: var(--text-dim); font-size: var(--text-sm); }
+  .mini .lab { color: var(--text-muted); font-size: var(--text-xs); text-transform: uppercase; letter-spacing: 0.03em; display: block; }
+  .mini .box { background: var(--bg-surface); border: 1px solid var(--border); height: 20px; margin-top: var(--space-2); }
+  .fields-right   { display: flex; flex-direction: column; gap: var(--space-4); }
+  .fields-cramped { display: flex; flex-direction: column; gap: var(--space-1); }
+  .fields-loose   { display: flex; flex-direction: column; gap: var(--space-6); }
+
+  /* ===== gap vs margin ===== */
+  .pair { display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-4); }
+  .pair > div { background: var(--bg-surface); padding: var(--space-4); }
+  .pair .head { display: block; font-size: var(--text-xs); text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: var(--space-3); }
+  .pair .ok .head { color: var(--green); }
+  .pair .bad .head { color: var(--red); }
+  .pair .caption { margin-top: var(--space-3); font-size: var(--text-xs); color: var(--text-muted); }
+  .stack-item { background: var(--bg-raised); padding: var(--space-2) var(--space-3); font-size: var(--text-sm); color: var(--text-dim); }
+  .use-margin > .stack-item { margin-bottom: var(--space-3); }
 </style>
 </head>
 <body>
 
-<h1>spacing</h1>
-<p class="lede">Six steps. 2 → 4 → 8 → 12 → 16 → 24. Use tokens, not raw px. Use <code>gap</code>, not <code>margin</code>.</p>
+<div class="page-title">spacing</div>
+<p class="lede">Six steps, one per rung of the containment tree. Deeper nesting → tighter gap. Use tokens and <code>.gap-*</code>, never raw px or <code>margin</code> on stack children.</p>
 
-<section>
-  <div class="eyebrow">The scale</div>
-  <h2>Six steps</h2>
-  <p class="note">Doubling at the small end (2 / 4 / 8) for compact details. Tighter at the layout end (12 / 16 / 24) for density.</p>
+<div class="doc flex-col gap-6">
 
-  <div class="scale">
-    <span class="token">--space-1</span>
-    <span class="px">2px</span>
-    <span class="bar" style="width: 2px;"></span>
-    <span class="use">intra-row</span>
+  <!-- ========== 1. The ladder ========== -->
+  <section>
+    <div class="eyebrow">The relationship ladder</div>
+    <h2>One step per rung</h2>
+    <p class="note">The step isn't chosen by eye — it's chosen by <b>how deeply two things belong together</b>. The anchor column is where the fleet already ships that step (buttons, inputs, modal).</p>
 
-    <span class="token">--space-2</span>
-    <span class="px">4px</span>
-    <span class="bar" style="width: 4px;"></span>
-    <span class="use">siblings</span>
+    <div class="ladder">
+      <span class="tok">--space-1</span><span class="px">2px</span><span class="bar" style="width:2px"></span>
+      <span class="rel"><b>Intra-row seam</b> — two lines of one object: card title → its metadata <span class="anchor">· tightest legible gap</span></span>
 
-    <span class="token">--space-3</span>
-    <span class="px">8px</span>
-    <span class="bar" style="width: 8px;"></span>
-    <span class="use">compact padding</span>
+      <span class="tok">--space-2</span><span class="px">4px</span><span class="bar" style="width:4px"></span>
+      <span class="rel"><b>Intra-control / field seam</b> — icon→label, dot→text, label→input, input→helper <span class="anchor">· .btn gap · .form-label · .helper</span></span>
 
-    <span class="token">--space-4</span>
-    <span class="px">12px</span>
-    <span class="bar" style="width: 12px;"></span>
-    <span class="use">section padding</span>
+      <span class="tok">--space-3</span><span class="px">8px</span><span class="bar" style="width:8px"></span>
+      <span class="rel"><b>Control padding · dense rows</b> — inner padding of a control; gap between homogeneous list rows <span class="anchor">· .btn · .input padding</span></span>
 
-    <span class="token">--space-5</span>
-    <span class="px">16px</span>
-    <span class="bar" style="width: 16px;"></span>
-    <span class="use">pane padding</span>
+      <span class="tok">--space-4</span><span class="px">12px</span><span class="bar" style="width:12px"></span>
+      <span class="rel"><b>Between fields · section padding</b> — distinct labeled fields; padding inside a panel <span class="anchor">· form composition</span></span>
 
-    <span class="token">--space-6</span>
-    <span class="px">24px</span>
-    <span class="bar" style="width: 24px;"></span>
-    <span class="use">landmarks</span>
-  </div>
-</section>
+      <span class="tok">--space-5</span><span class="px">16px</span><span class="bar" style="width:16px"></span>
+      <span class="rel"><b>Pane padding · between sections</b> — a pane's own padding; grouped sections on one surface <span class="anchor">· .modal padding</span></span>
 
-<section>
-  <div class="eyebrow">Each step in context</div>
-  <h2>Where each step belongs</h2>
-  <p class="note">One vignette per step, demonstrating the use case it documents. The amber tag marks where the gap lives.</p>
-
-  <div class="uses">
-
-    <div class="use-row">
-      <div class="use-meta">
-        <span class="step">2px</span>
-        <span class="tok">--space-1</span>
-        <span class="why">title → meta inside a card</span>
-      </div>
-      <div class="use-demo">
-        <div class="demo-card-title">deploy helm / master <span class="flag">↓ 2px</span></div>
-        <div class="demo-card-meta">02c0935 · 17s</div>
-      </div>
+      <span class="tok">--space-6</span><span class="px">24px</span><span class="bar" style="width:24px"></span>
+      <span class="rel"><b>Between landmarks · page gutter</b> — top-level regions; the outermost gutter <span class="anchor">· page composition</span></span>
     </div>
+  </section>
 
-    <div class="use-row">
-      <div class="use-meta">
-        <span class="step">4px</span>
-        <span class="tok">--space-2</span>
-        <span class="why">inline siblings on a row</span>
-      </div>
-      <div class="use-demo">
-        <span class="demo-inline">
-          <span class="dot"></span>
-          <span class="running">running</span>
-          <span class="sep">·</span>
-          <span>helm</span>
-          <span class="sep">·</span>
-          <span>02c0935</span>
-          <span class="sep">·</span>
-          <span>17s</span>
-        </span>
-        <span class="flag">↔ 4px</span>
-      </div>
-    </div>
+  <!-- ========== 2. Composition ========== -->
+  <section>
+    <div class="eyebrow">Composition</div>
+    <h2>The rhythm, read top to bottom</h2>
+    <p class="note">A real launch form built from <code>.section-header</code>, <code>.form-label</code>, <code>.input</code>, <code>.helper</code>, and <code>.btn</code> — every gap a token. The read-out on the right names the rung each transition uses.</p>
 
-    <div class="use-row">
-      <div class="use-meta">
-        <span class="step">8px</span>
-        <span class="tok">--space-3</span>
-        <span class="why">compact row padding</span>
-      </div>
-      <div class="use-demo">
-        <div class="demo-list">
-          <div class="item"><span>nightly summary</span><code>42m</code></div>
-          <div class="item"><span>audit · base-components</span><code>1h</code></div>
-          <div class="item"><span>deploy helm / master</span><code>17s</code></div>
-        </div>
-        <div style="margin-top: var(--space-2); font-size: var(--text-xs); color: var(--text-muted);">8px on every side of each row <span class="flag">⛶ 8px</span></div>
-      </div>
-    </div>
-
-    <div class="use-row">
-      <div class="use-meta">
-        <span class="step">12px</span>
-        <span class="tok">--space-4</span>
-        <span class="why">section padding inside a panel</span>
-      </div>
-      <div class="use-demo">
-        <div class="demo-panel">
-          <div class="demo-panel-title">recent</div>
-          <div class="demo-panel-body">modal body, card grid section, panel block <span class="flag">⛶ 12px</span></div>
-        </div>
-      </div>
-    </div>
-
-    <div class="use-row">
-      <div class="use-meta">
-        <span class="step">16px</span>
-        <span class="tok">--space-5</span>
-        <span class="why">pane padding · between grouped lists</span>
-      </div>
-      <div class="use-demo">
-        <div class="demo-pane">
-          <div class="group">
-            <div class="h">activity</div>
-            <div>commit · commit · commit</div>
-          </div>
-          <div class="group">
-            <div class="h">deploys</div>
-            <div>mase.fi · helm</div>
+    <div class="specimen-wrap">
+      <div class="pane-demo">
+        <div>
+          <div class="section-header" style="margin-bottom:var(--space-4)">Launch session</div>
+          <div style="display:flex;flex-direction:column;gap:var(--space-4)">
+            <div class="field">
+              <label class="form-label" for="p-branch">Branch</label>
+              <input class="input" id="p-branch" value="helm/design-spacing">
+              <div class="helper">Working-tree branch name.</div>
+            </div>
+            <div class="field">
+              <label class="form-label" for="p-repo">Repo</label>
+              <input class="input" id="p-repo" value="mase.fi" aria-invalid="true">
+              <div class="helper helper-error">Repository not reachable (404).</div>
+            </div>
           </div>
         </div>
-        <div style="margin-top: var(--space-2); font-size: var(--text-xs); color: var(--text-muted);">⛶ 16px pane padding · ↕ 16px between groups</div>
+        <div style="display:flex;gap:var(--space-3);justify-content:flex-end">
+          <button class="btn">Cancel</button>
+          <button class="btn btn-primary">Launch</button>
+        </div>
+      </div>
+
+      <div class="rhythm-read">
+        <div class="r"><span class="s">16px</span><span>pane padding &amp; section→actions <code style="background:none;padding:0;color:var(--text-muted)">--space-5</code></span></div>
+        <div class="r"><span class="s">12px</span><span>header→field, between fields <code style="background:none;padding:0;color:var(--text-muted)">--space-4</code></span></div>
+        <div class="r"><span class="s">4px</span><span>label→input, input→helper <code style="background:none;padding:0;color:var(--text-muted)">--space-2</code></span></div>
+        <div class="r"><span class="s">8px</span><span>button↔button <code style="background:none;padding:0;color:var(--text-muted)">--space-3</code></span></div>
       </div>
     </div>
+  </section>
 
-    <div class="use-row">
-      <div class="use-meta">
-        <span class="step">24px</span>
-        <span class="tok">--space-6</span>
-        <span class="why">between top-level landmarks</span>
+  <!-- ========== 3. Rows vs fields ========== -->
+  <section>
+    <div class="eyebrow">The subtle one</div>
+    <h2>Rows sit at 8px, fields at 12px</h2>
+    <p class="note">Same-looking vertical stacks, different rung. Homogeneous rows only need a seam; heterogeneous labeled fields need clear grouping — the 4px internal seam demands a 3× jump between fields so nothing reads as orphaned.</p>
+
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:var(--space-4)">
+      <div>
+        <div style="display:flex;align-items:center;gap:var(--space-2);margin-bottom:var(--space-3)">
+          <span class="tick">gap 8px · --space-3</span><span class="muted" style="font-size:var(--text-xs)">homogeneous rows</span>
+        </div>
+        <div class="list">
+          <div class="row"><span>nightly summary</span><code>42m</code></div>
+          <div class="row"><span>audit · base-components</span><code>1h</code></div>
+          <div class="row"><span>deploy helm / master</span><code>17s</code></div>
+        </div>
       </div>
-      <div class="use-demo">
-        <div class="demo-landmarks">
-          <div class="land">
-            <h4>spacing</h4>
-            <p>Six-step scale. Doubling with a 2px seed.</p>
+      <div>
+        <div style="display:flex;align-items:center;gap:var(--space-2);margin-bottom:var(--space-3)">
+          <span class="tick">gap 12px · --space-4</span><span class="muted" style="font-size:var(--text-xs)">labeled fields</span>
+        </div>
+        <div class="surface" style="display:flex;flex-direction:column;gap:var(--space-4)">
+          <div class="field">
+            <label class="form-label">Name</label>
+            <input class="input" value="mase.fi">
           </div>
-          <div class="land">
-            <h4>scale</h4>
-            <p>2 → 4 → 8 → 12 → 16 → 24</p>
+          <div class="field">
+            <label class="form-label">Port</label>
+            <input class="input" value="9754">
           </div>
         </div>
-        <div style="margin-top: var(--space-2); font-size: var(--text-xs); color: var(--text-muted);">↕ 24px between header group and content group</div>
       </div>
     </div>
+  </section>
 
-  </div>
-</section>
+  <!-- ========== 4. Counter-examples ========== -->
+  <section>
+    <div class="eyebrow">Rules in action</div>
+    <h2>Right · cramped · loose</h2>
+    <p class="note">The same three-field form at the correct rung, then broken two ways — everything jammed to the 4px seam, then everything blown out to the 24px landmark step. Both destroy the grouping the ramp exists to create.</p>
 
-<section>
-  <div class="eyebrow">Rules in action</div>
-  <h2>Three contrasts</h2>
-  <p class="note">The scale is opinionated. These are the most common ways it gets broken.</p>
+    <div class="trio">
+      <figure class="ok">
+        <div class="mini">
+          <div class="fields-right">
+            <div class="field-line"><span class="lab">Branch</span><div class="box"></div></div>
+            <div class="field-line"><span class="lab">Repo</span><div class="box"></div></div>
+            <div class="field-line"><span class="lab">Model</span><div class="box"></div></div>
+          </div>
+        </div>
+        <figcaption>✓ 12px between fields</figcaption>
+        <div class="cap-note">4px inside a field, 12px between — grouping is unambiguous.</div>
+      </figure>
 
-  <div class="rule">
-    <div class="rule-pair">
+      <figure class="bad">
+        <div class="mini">
+          <div class="fields-cramped">
+            <div class="field-line"><span class="lab">Branch</span><div class="box"></div></div>
+            <div class="field-line"><span class="lab">Repo</span><div class="box"></div></div>
+            <div class="field-line"><span class="lab">Model</span><div class="box"></div></div>
+          </div>
+        </div>
+        <figcaption>✗ 4px — cramped</figcaption>
+        <div class="cap-note">Fields collide with their own labels; which label owns which box?</div>
+      </figure>
+
+      <figure class="bad">
+        <div class="mini">
+          <div class="fields-loose">
+            <div class="field-line"><span class="lab">Branch</span><div class="box"></div></div>
+            <div class="field-line"><span class="lab">Repo</span><div class="box"></div></div>
+            <div class="field-line"><span class="lab">Model</span><div class="box"></div></div>
+          </div>
+        </div>
+        <figcaption>✗ 24px — loose</figcaption>
+        <div class="cap-note">Landmark-sized gaps between fields; the form stops reading as one unit.</div>
+      </figure>
+    </div>
+  </section>
+
+  <!-- ========== 5. gap over margin ========== -->
+  <section>
+    <div class="eyebrow">The stacking rule</div>
+    <h2>gap on the parent, not margin on children</h2>
+    <p class="note">Rhythm belongs to the container. <code>.gap-*</code> now covers all six rungs, so there's no stack a parent can't own — margins are the intra-field seams only.</p>
+
+    <div class="pair">
       <div class="ok">
-        <span class="head">✓ gap</span>
-        <div class="stack-gap">
+        <span class="head">✓ .flex-col.gap-3</span>
+        <div class="flex-col gap-3">
           <div class="stack-item">item</div>
           <div class="stack-item">item</div>
           <div class="stack-item">item</div>
         </div>
-        <p class="caption">Composable. Predictable. One source of truth on the parent.</p>
+        <p class="caption">One source of truth on the parent. No trailing edge, no collapse.</p>
       </div>
       <div class="bad">
-        <span class="head">✗ margin</span>
-        <div class="stack-margin">
+        <span class="head">✗ margin-bottom on each</span>
+        <div class="use-margin">
           <div class="stack-item">item</div>
           <div class="stack-item">item</div>
           <div class="stack-item">item</div>
         </div>
-        <p class="caption">Last item leaves trailing space. Margins collapse unpredictably.</p>
+        <p class="caption">Last item leaks a trailing margin; siblings collapse unpredictably.</p>
       </div>
     </div>
-  </div>
+  </section>
 
-  <div class="rule">
-    <div class="rule-pair">
-      <div class="ok">
-        <span class="head">✓ pick a side</span>
-        <div class="swatches">
-          <div class="sw" style="width: 16px; height: 36px;">16</div>
-          <div class="sw" style="width: 24px; height: 36px;">24</div>
-        </div>
-        <p class="caption">No values between 16 and 24. The gap is the choice.</p>
-      </div>
-      <div class="bad">
-        <span class="head">✗ 20 in the middle</span>
-        <div class="swatches">
-          <div class="sw" style="width: 16px; height: 36px;">16</div>
-          <div class="sw invalid" style="width: 20px; height: 36px;">20</div>
-          <div class="sw" style="width: 24px; height: 36px;">24</div>
-        </div>
-        <p class="caption">If 20 looks right, you're over-padding one element. Restructure.</p>
-      </div>
-    </div>
-  </div>
-
-  <div class="rule">
-    <div class="rule-pair">
-      <div class="ok">
-        <span class="head">✓ adjacent steps</span>
-        <div class="swatches">
-          <div class="sw" style="width: 4px; height: 36px;">4</div>
-          <div class="sw" style="width: 8px; height: 36px;">8</div>
-        </div>
-        <p class="caption">One step per jump. The scale handles the rhythm.</p>
-      </div>
-      <div class="bad">
-        <span class="head">✗ inventing in-between</span>
-        <div class="swatches">
-          <div class="sw" style="width: 4px; height: 36px;">4</div>
-          <div class="sw invalid" style="width: 6px; height: 36px;">6</div>
-          <div class="sw" style="width: 8px; height: 36px;">8</div>
-        </div>
-        <p class="caption">"Too tight at 4, too loose at 8" → fix layout, not the gap.</p>
-      </div>
-    </div>
-  </div>
-</section>
+</div>
 
 </body>
 </html>
