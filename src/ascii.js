@@ -77,11 +77,3 @@ export function scramble(str, p = 0.6) {
   }
   return out;
 }
-
-// box-drawing header for cards: "┌── LABEL ──┤ right ├──...──┐"
-export function boxHeader(label, right, width) {
-  const l = `┌── ${label} `;
-  const r = right ? ` ${right} ──┐` : "──┐";
-  const dashes = Math.max(4, width - l.length - r.length);
-  return l + "─".repeat(dashes) + r;
-}

@@ -206,54 +206,16 @@ export function entriesFor(channelId, data) {
 }
 
 /**
- * Total commit count across the dataset (used in #home pinned stats).
- */
-export function totalLogCount(data) {
-  return data.entries.filter((e) => e.cat === 'log').length;
-}
-
-/**
- * Last-N-day commit buckets for the #home heatstrip.
- * Returns an array of N integers (oldest first), one per day, counting `log` entries.
- */
-export function dailyLogBuckets(data, days = 28) {
-  const out = new Array(days).fill(0);
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-  const start = today.getTime() - (days - 1) * 86400000;
-  for (const e of data.entries) {
-    if (e.cat !== 'log') continue;
-    const t = Date.parse(e.date);
-    if (!Number.isFinite(t)) continue;
-    const idx = Math.floor((t - start) / 86400000);
-    if (idx >= 0 && idx < days) out[idx]++;
-  }
-  return out;
-}
-
-/**
- * Last commit info — returns { date, project } of the newest log entry, or null.
- */
-export function lastLog(data) {
-  let best = null;
-  for (const e of data.entries) {
-    if (e.cat !== 'log') continue;
-    if (!best || e.date > best.date) best = e;
-  }
-  return best;
-}
-
-/**
- * Single-pass log aggregate for the #home pinned card. Walks data.entries once
- * and returns everything totalLogCount + dailyLogBuckets + lastLog produced
- * separately, byte-for-byte identical to calling all three:
+ * Single-pass log aggregate for the pinned cards. Walks data.entries once:
  *   - totalCommits: count of every `log` entry
- *   - buckets:      last-`days` per-day counts (finite, in-range dates only)
+ *   - buckets:      last-`days` per-day counts, oldest first (finite, in-range
+ *                   dates only) — the #home heatstrip and the #activity rate
  *   - last:         newest `log` entry by date string, or null
  * The finite-date guard is a nested branch (not `continue`) so a malformed date
- * still counts toward totalCommits and the lastLog comparison.
+ * still counts toward totalCommits and the newest-entry comparison — only the
+ * day bucket needs a parseable date.
  */
-export function homeLogStats(data, days = 28) {
+export function logStats(data, days = 28) {
   const buckets = new Array(days).fill(0);
   const today = new Date();
   today.setHours(0, 0, 0, 0);

@@ -1,13 +1,6 @@
 // Unit tests for the data adapter (fetch + normalize + channel routing/bucketing).
 import { describe, it, expect, vi, afterEach } from 'vitest';
-import {
-  fetchData,
-  fetchDemos,
-  entriesFor,
-  totalLogCount,
-  dailyLogBuckets,
-  lastLog,
-} from './data.js';
+import { fetchData, fetchDemos, entriesFor, logStats } from './data.js';
 
 // ---- helpers -------------------------------------------------------------
 
@@ -29,7 +22,7 @@ function dataWith(entries) {
 
 // Local-time date string "YYYY-MM-DDTHH:MM" for `offsetDays` from today's local
 // midnight, defaulting to noon so DST drift (~1h) can never push it across a day
-// boundary in dailyLogBuckets' floor() math.
+// boundary in logStats' bucket floor() math.
 function dayStr(offsetDays, hour = 12) {
   const d = new Date();
   d.setHours(0, 0, 0, 0);
@@ -353,11 +346,11 @@ describe('fetchData date normalization (normalizeDate)', () => {
   });
 });
 
-// ---- totalLogCount -------------------------------------------------------
+// ---- logStats.totalCommits -----------------------------------------------
 
-describe('totalLogCount', () => {
+describe('logStats totalCommits', () => {
   it('returns 0 for empty entries', () => {
-    expect(totalLogCount(dataWith([]))).toBe(0);
+    expect(logStats(dataWith([])).totalCommits).toBe(0);
   });
 
   it('counts only log entries in a mixed dataset', () => {
@@ -368,29 +361,37 @@ describe('totalLogCount', () => {
       entry('feature', 'explorer'),
       entry('project', 'explorer'),
     ]);
-    expect(totalLogCount(data)).toBe(2);
+    expect(logStats(data).totalCommits).toBe(2);
   });
 
   it('returns 0 when there are no log entries', () => {
     const data = dataWith([entry('daily', 'home'), entry('feature', 'explorer')]);
-    expect(totalLogCount(data)).toBe(0);
+    expect(logStats(data).totalCommits).toBe(0);
+  });
+
+  it('counts a log entry whose date is unparseable', () => {
+    const data = dataWith([
+      entry('log', 'activity', { date: 'not-a-date' }),
+      entry('log', 'activity', { date: dayStr(0) }),
+    ]);
+    expect(logStats(data).totalCommits).toBe(2);
   });
 });
 
-// ---- dailyLogBuckets -----------------------------------------------------
+// ---- logStats.buckets ----------------------------------------------------
 
-describe('dailyLogBuckets', () => {
+describe('logStats buckets', () => {
   it('returns an all-zero array of the requested length for empty input', () => {
-    expect(dailyLogBuckets(dataWith([]), 3)).toEqual([0, 0, 0]);
+    expect(logStats(dataWith([]), 3).buckets).toEqual([0, 0, 0]);
   });
 
   it('defaults to a 28-element window', () => {
-    expect(dailyLogBuckets(dataWith([]))).toHaveLength(28);
+    expect(logStats(dataWith([])).buckets).toHaveLength(28);
   });
 
   it('places a single log entry today in the last bucket', () => {
     const data = dataWith([entry('log', 'activity', { date: dayStr(0) })]);
-    expect(dailyLogBuckets(data, 3)).toEqual([0, 0, 1]);
+    expect(logStats(data, 3).buckets).toEqual([0, 0, 1]);
   });
 
   it('sums multiple entries falling on the same day', () => {
@@ -399,7 +400,7 @@ describe('dailyLogBuckets', () => {
       entry('log', 'activity', { date: dayStr(0, 14) }),
       entry('log', 'activity', { date: dayStr(0, 20) }),
     ]);
-    expect(dailyLogBuckets(data, 3)).toEqual([0, 0, 3]);
+    expect(logStats(data, 3).buckets).toEqual([0, 0, 3]);
   });
 
   it('distributes entries spanning days into the correct buckets', () => {
@@ -408,7 +409,7 @@ describe('dailyLogBuckets', () => {
       entry('log', 'activity', { date: dayStr(-1) }), // index 1
       entry('log', 'activity', { date: dayStr(0) }), //  today → index 2
     ]);
-    expect(dailyLogBuckets(data, 3)).toEqual([1, 1, 1]);
+    expect(logStats(data, 3).buckets).toEqual([1, 1, 1]);
   });
 
   it('ignores entries outside the window (older than start, in the future)', () => {
@@ -417,7 +418,7 @@ describe('dailyLogBuckets', () => {
       entry('log', 'activity', { date: dayStr(1) }), //  tomorrow, after window end
       entry('log', 'activity', { date: dayStr(-2) }), // index 0 — the only one counted
     ]);
-    expect(dailyLogBuckets(data, 3)).toEqual([1, 0, 0]);
+    expect(logStats(data, 3).buckets).toEqual([1, 0, 0]);
   });
 
   it('ignores non-log entries and unparseable dates', () => {
@@ -426,20 +427,20 @@ describe('dailyLogBuckets', () => {
       entry('log', 'activity', { date: 'not-a-date' }), //  unparseable
       entry('log', 'activity', { date: dayStr(0) }), //     the only counted entry
     ]);
-    expect(dailyLogBuckets(data, 3)).toEqual([0, 0, 1]);
+    expect(logStats(data, 3).buckets).toEqual([0, 0, 1]);
   });
 });
 
-// ---- lastLog -------------------------------------------------------------
+// ---- logStats.last -------------------------------------------------------
 
-describe('lastLog', () => {
+describe('logStats last', () => {
   it('returns null for empty entries', () => {
-    expect(lastLog(dataWith([]))).toBeNull();
+    expect(logStats(dataWith([])).last).toBeNull();
   });
 
   it('returns null when there are no log entries', () => {
     const data = dataWith([entry('daily', 'home'), entry('feature', 'explorer')]);
-    expect(lastLog(data)).toBeNull();
+    expect(logStats(data).last).toBeNull();
   });
 
   it('returns the newest log entry regardless of input order', () => {
@@ -449,8 +450,13 @@ describe('lastLog', () => {
       entry('log', 'activity', { date: '2026-02-01T08:00', project: 'b' }),
       entry('daily', 'home', { date: '2026-12-31T08:00', project: 'ignored' }), // non-log, ignored
     ]);
-    const got = lastLog(data);
+    const got = logStats(data).last;
     expect(got.date).toBe('2026-03-20T08:00');
     expect(got.project).toBe('newest');
+  });
+
+  it('still considers a log entry whose date is unparseable', () => {
+    const data = dataWith([entry('log', 'activity', { date: 'zzz-unparseable' })]);
+    expect(logStats(data).last.date).toBe('zzz-unparseable');
   });
 });

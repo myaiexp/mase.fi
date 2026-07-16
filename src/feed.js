@@ -4,8 +4,6 @@ import { playJitter, clearJitter } from './jitter.js';
 import { relayoutAll } from './feed-layout.js';
 import { navigate } from './channels.js';
 
-export { clearJitter };
-
 const MAX_JITTER = 14;
 
 // Per-feed-element wiring state, keyed by the $feed node rather than held in

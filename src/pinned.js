@@ -1,6 +1,6 @@
 // Pinned hero card renderers — one per channel kind
 import { LOGO, PROJECT_ART, sparkbar } from './ascii.js';
-import { homeLogStats, dailyLogBuckets } from './data.js';
+import { logStats } from './data.js';
 import { mountBeam } from './beam.js';
 import { escapeHtml } from './html.js';
 
@@ -15,7 +15,7 @@ function cardHead(meta, right) {
 }
 
 function pinnedHome(data) {
-  const { totalCommits, buckets, last } = homeLogStats(data, 28);
+  const { totalCommits, buckets, last } = logStats(data, 28);
   const maxV = Math.max(1, ...buckets);
   const spark = sparkbar(buckets, maxV);
   // Every dynamic value (date slices + project) is escapeHtml'd; the accent span
@@ -84,7 +84,7 @@ function pinnedActivity(data) {
   // days (idle days excluded so the figure reflects "when I push, ~N/day" rather
   // than a calendar average diluted to near-zero). Recomputed every render — no
   // stale hardcoded constant. '—' when there's been no recent activity.
-  const recent = dailyLogBuckets(data, 28);
+  const recent = logStats(data, 28).buckets;
   const activeDays = recent.filter(n => n > 0).length;
   const rate = activeDays
     ? '~' + Math.round(recent.reduce((a, b) => a + b, 0) / activeDays) + '/day'

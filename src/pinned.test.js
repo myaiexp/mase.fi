@@ -47,7 +47,7 @@ describe('renderPinned — home', () => {
     renderPinned('home', data);
     const html = pinnedEl().innerHTML;
     expect(html).toContain('2 active');   // projects.length
-    expect(html).toContain('2 in feed');  // totalLogCount
+    expect(html).toContain('2 in feed');  // logStats().totalCommits
     expect(html).toContain('2026-03-20'); // last-push date slice
     expect(html).toContain('porssi');     // last-push project (newest log entry)
   });
@@ -187,8 +187,8 @@ describe('renderPinned — activity', () => {
     expect(html).toContain('<dt>range</dt><dd>—</dd>');
   });
 
-  // A local-noon naive date string N days ago. dailyLogBuckets parses naive ISO
-  // as local time, so building the string in local terms keeps the bucket index
+  // A local-noon naive date string N days ago. logStats parses naive ISO as
+  // local time, so building the string in local terms keeps the bucket index
   // stable across timezones and clear of day/window boundaries.
   const localNoonDaysAgo = (n) => {
     const d = new Date();
