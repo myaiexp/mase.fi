@@ -3,13 +3,13 @@
   "private": true,
   "version": "0.0.0",
   "type": "module",
+  "packageManager": "pnpm@10.33.0",
   "scripts": {
     "dev": "vite",
-    "build": "vite build && cp src/base.css dist/base.css && npm run build:components",
+    "build": "build-lock vite build && cp src/base.css dist/base.css && pnpm run build:components",
     "preview": "vite preview",
     "test": "vitest run",
-    "build:components": "vite build --config vite.components.config.js",
-    "build:all": "vite build && npm run build:components",
+    "build:components": "build-lock vite build --config vite.components.config.js",
     "lint": "eslint src/"
   },
   "devDependencies": {
@@ -20,8 +20,6 @@
     "vitest": "^4.1.0"
   },
   "dependencies": {
-    "@chenglou/pretext": "^0.0.5",
-    "@leeoniya/ufuzzy": "^1.0.19",
-    "animejs": "^4.3.6"
+    "@chenglou/pretext": "^0.0.7"
   }
 }
