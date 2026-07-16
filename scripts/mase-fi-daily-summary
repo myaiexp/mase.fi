@@ -102,10 +102,13 @@ clean_lines() {
         # all-from-one-day, let-me-write-the-changelog) — the real changelog
         # lines that follow it survive.
         if (low ~ /^(one|two|three|four|five|six|seven|eight|nine|ten|[0-9]+) lines?\b/) next
-        if (low ~ /^(the )?commits (are|were|show|span|look|appear)/) next
+        if (low ~ /\b(all |the )?commits (are|were|show|span|look|appear)\b/) next
         if (low ~ /^today.?s (git )?(log|commits|work)/) next
         if (low ~ /^let me\b/) next
         if (low ~ /\bone per project\b/) next
+        if (low ~ /\bfrom a single day\b/) next
+        if (low ~ /\bappear to be\b/) next
+        if (low ~ /\bdistinct threads\b/) next
         print line
         if (++n >= max) exit
     }
