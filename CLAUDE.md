@@ -7,7 +7,7 @@
 - **Routing:** Hash-based (`#/home`, `#/activity`, `#/<project>`), browser back/forward; defaults to `#home` via `parseHash()` (no last-channel persistence — only the boot animation uses localStorage)
 - **Channels:** `#home` (daily summaries, nick'd per-project for a color-coded standup via `pickNick` in `data.js`), project channels (feature feed), `#activity` (commit log). Registry built in `channels.js` from `home` + `updates.json` projects + `activity` — no `#about` channel (removed in the rework).
 - **Boot:** 3-phase TTY animation on first visit (7-day localStorage TTL), skip on click/key; replay via the `window.__maseReplayBoot()` console helper (no visible replay button)
-- **Search & commands:** Plain text fuzzy-highlights feed lines; `/` prefix navigates to channels with autocomplete and runs easter-egg slash commands (`/help`, `/whoami`, `/uptime`, `/date`, `/clear` — registry in `commands.js`, surfaced in the `/` popup on name-prefix match, output as ephemeral IRC server-notice lines in the feed via `command.js`). Search highlighting lives in `command-search.js`; `?` shows the help panel.
+- **Search & commands:** Plain text fuzzy-highlights feed lines; `/` prefix navigates to channels with autocomplete and runs easter-egg slash commands (`/help`, `/whoami`, `/uptime`, `/date`, `/clear` — registry in `slash-commands.js`, surfaced in the `/` popup on name-prefix match, output as ephemeral IRC server-notice lines in the feed via `command.js`). Search highlighting lives in `command-search.js`; `?` shows the help panel.
 - **Mobile (<640px):** Sidebar hidden, top bar with dropdown channel picker
 - **Scroll model:** Chat-style (newest at bottom), IntersectionObserver lazy loads older entries on scroll-up
 

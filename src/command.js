@@ -2,7 +2,7 @@
 import { getChannels, chAccent, navigate } from './channels.js';
 import { entriesFor, parseEntryDate } from './data.js';
 import { escapeHtml } from './html.js';
-import { buildCommands } from './commands.js';
+import { buildCommands } from './slash-commands.js';
 import { applySearch } from './command-search.js';
 import { optionAttrs, markListbox, setActive, markHelp, collapseCombobox } from './command-aria.js';
 
@@ -231,7 +231,7 @@ export function initCommand(data) {
   $feed      = document.getElementById('feed');
 
   // Build the slash-command registry, wiring the side-effect hooks commands
-  // need (search reset + notice teardown) without commands.js touching the DOM.
+  // need (search reset + notice teardown) without slash-commands.js touching the DOM.
   _commands = buildCommands({
     data,
     clearSearch: () => { $cmdInput.value = ''; search(''); },

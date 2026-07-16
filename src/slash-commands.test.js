@@ -1,6 +1,6 @@
 // Unit tests for the slash-command registry: pure formatters + buildCommands.
 import { describe, it, expect, vi } from 'vitest';
-import { describeAgent, formatServerTime, buildCommands } from './commands.js';
+import { describeAgent, formatServerTime, buildCommands } from './slash-commands.js';
 
 describe('describeAgent', () => {
   it('detects Firefox on Linux', () => {

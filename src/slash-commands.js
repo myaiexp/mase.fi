@@ -33,7 +33,7 @@ export function formatServerTime(d) {
 
 /**
  * Build the slash-command list. `ctx` supplies the runtime hooks each command
- * needs without commands.js reaching into the DOM:
+ * needs without slash-commands.js reaching into the DOM:
  *   - data:         normalized dataset (for meta.bootTime / meta.server)
  *   - clearSearch:  reset active search highlights + input
  *   - clearNotices: remove existing server-notice lines from the feed
