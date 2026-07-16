@@ -75,7 +75,8 @@ describe('renderPinned — home', () => {
 // ---- renderPinned: project -----------------------------------------------
 
 describe('renderPinned — project', () => {
-  const projectData = (project, entries = []) => ({ projects: [project], entries });
+  // demos defaults to [] to mirror fetchData's canonical shape (always present).
+  const projectData = (project, entries = [], demos = []) => ({ projects: [project], entries, demos });
 
   it('renders a project card with commits, heat, status, description and links', () => {
     const project = {
@@ -130,7 +131,7 @@ describe('renderPinned — project', () => {
   });
 
   it('renders a "try demo →" chip when the channel has a published demo', () => {
-    const data = { ...projectData({ channel: 'explorer', heat: 0.5, description: 'd', links: [] }), demos: ['explorer'] };
+    const data = projectData({ channel: 'explorer', heat: 0.5, description: 'd', links: [] }, [], ['explorer']);
     renderPinned('explorer', data);
     const a = pinnedEl().querySelector('.demo-link');
     expect(a).not.toBeNull();
@@ -249,6 +250,7 @@ describe('renderHeroLine', () => {
   it('renders the first project link plus status for a matched project', () => {
     const data = {
       projects: [{ channel: 'explorer', heat: 0.8, links: [{ href: 'https://mase.fi/explorer', label: 'mase.fi' }] }],
+      demos: [],
     };
     renderHeroLine('explorer', data);
     const html = heroEl().innerHTML;
@@ -258,7 +260,7 @@ describe('renderHeroLine', () => {
   });
 
   it('renders only the status when a matched project has no links', () => {
-    renderHeroLine('explorer', { projects: [{ channel: 'explorer', heat: 0.4, links: [] }] });
+    renderHeroLine('explorer', { projects: [{ channel: 'explorer', heat: 0.4, links: [] }], demos: [] });
     const html = heroEl().innerHTML;
     expect(html).not.toContain('<a');
     expect(html).toContain('steady'); // heat > 0.3
@@ -275,6 +277,7 @@ describe('renderHeroLine', () => {
   it('escapes a malicious project link in the hero line', () => {
     const data = {
       projects: [{ channel: 'explorer', heat: 0.8, links: [{ href: '"><script>alert(1)</script>', label: '<b>x</b>' }] }],
+      demos: [],
     };
     renderHeroLine('explorer', data);
     const a = heroEl().querySelector('a');

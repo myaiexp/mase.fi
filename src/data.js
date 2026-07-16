@@ -22,7 +22,7 @@ export async function fetchDemos() {
 
 /**
  * Fetch + normalize the live updates.json into the canonical shape used by the UI:
- *   { meta:{nick,server,bootTime}, projects:[{name,channel,description,tag,links[],heat}], entries:[{ch,date,cat,nick,text,project?}] }
+ *   { meta:{nick,server,bootTime}, projects:[{name,channel,description,tag,links[],heat}], entries:[{ch,date,cat,nick,text,project?}], demos:[channelSlug] }
  *
  * The real /updates.json carries a different shape — see README — so we map here.
  *  - entry.category → cat
@@ -30,8 +30,15 @@ export async function fetchDemos() {
  *  - entry.text || entry.summary → text
  *  - project.heat is computed from last-30d entry count, normalized 0..1
  *  - project.tag, project.links don't exist live — we synthesize: tag = "" (dropped chip), links = [project.url]
+ *  - demos: channel slugs with a published demo (from /demos/manifest.json via fetchDemos),
+ *    fetched in parallel and folded in here so the shape is complete in one place — no
+ *    consumer has to staple it on or guard against its absence.
  */
 export async function fetchData() {
+  // Kick the demos-manifest fetch off up front so it overlaps the updates fetch.
+  // fetchDemos never rejects (it degrades to [] on any failure), so awaiting it in
+  // either branch below is safe and never masks an updates.json error.
+  const demosPromise = fetchDemos();
   // Single error boundary around fetch + the full normalization pipeline. A
   // network/parse failure OR a structural error while normalizing (e.g. a null
   // element in entries making e.project throw, a non-array field) both degrade to
@@ -58,6 +65,7 @@ export async function fetchData() {
       meta: { nick: 'mase', server: 'irc.mase.fi', bootTime: Date.now() },
       projects,
       entries,
+      demos: await demosPromise,
     };
   } catch (err) {
     // Deliberate degrade-to-empty so the app shell still renders, but this catch
@@ -69,6 +77,7 @@ export async function fetchData() {
       meta: { nick: 'mase', server: 'irc.mase.fi', bootTime: Date.now() },
       projects: [],
       entries: [],
+      demos: await demosPromise,
     };
   }
 }

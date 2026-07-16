@@ -14,10 +14,11 @@ function heatStatus(heat) {
 }
 
 // "try demo" anchor when this channel has a published demo (demos/<channel>/).
-// Single source for the /demos/ URL shape. Returns '' when there's no demo;
+// Single source for the /demos/ URL shape. `demos` is the canonical always-present
+// slug list from fetchData (never undefined). Returns '' when there's no demo;
 // `arrow` appends the → glyph (desktop card only).
 function demoLinkHtml(channel, demos, { arrow = false } = {}) {
-  if (!(demos || []).includes(channel)) return '';
+  if (!demos.includes(channel)) return '';
   return '<a class="demo-link" href="/demos/' + escapeHtml(channel) + '/">try demo' +
     (arrow ? ' →' : '') + '</a>';
 }
