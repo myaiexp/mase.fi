@@ -1,4 +1,5 @@
 // <base-tabs> + <base-tab> — accessible tab panel component with keyboard navigation
+import { wrapIndex } from '../shared/menu-nav.js';
 
 const tabsTemplate = document.createElement('template');
 tabsTemplate.innerHTML = [
@@ -140,31 +141,32 @@ class BaseTabs extends HTMLElement {
   }
 
   _onKeydown(e) {
-    const count = this._tabs.length;
-    if (count === 0) return;
+    if (this._tabs.length === 0) return;
 
     if (e.key === 'ArrowRight') {
       e.preventDefault();
-      let next = (this._activeIndex + 1) % count;
-      // Skip disabled tabs
-      let attempts = 0;
-      while (this._tabs[next] && this._tabs[next].hasAttribute('disabled') && attempts < count) {
-        next = (next + 1) % count;
-        attempts++;
-      }
-      this.selectTab(next);
+      this._moveActive(1);
     } else if (e.key === 'ArrowLeft') {
       e.preventDefault();
-      let prev = (this._activeIndex - 1 + count) % count;
-      let attempts = 0;
-      while (this._tabs[prev] && this._tabs[prev].hasAttribute('disabled') && attempts < count) {
-        prev = (prev - 1 + count) % count;
-        attempts++;
-      }
-      this.selectTab(prev);
+      this._moveActive(-1);
     } else if (e.key === 'Enter' || e.key === ' ') {
       e.preventDefault();
       this.selectTab(this._activeIndex);
+    }
+  }
+
+  // Step the active tab by `direction`, wrapping and skipping disabled tabs.
+  // Bounded to one lap so an all-disabled tablist terminates instead of spinning.
+  _moveActive(direction) {
+    const len = this._tabs.length;
+    let idx = this._activeIndex;
+
+    for (let step = 0; step < len; step++) {
+      idx = wrapIndex(idx, direction, len);
+      if (!this._tabs[idx].hasAttribute('disabled')) {
+        this.selectTab(idx);
+        return;
+      }
     }
   }
 }

@@ -127,6 +127,55 @@ describe('base-dropdown', () => {
     expect(document.activeElement).toBe(items[0]);
   });
 
+  it('ArrowDown wraps from the last item to the first', () => {
+    const el = createDropdown({
+      items: [
+        { value: 'a', label: 'A' },
+        { value: 'b', label: 'B' },
+      ],
+    });
+    getTrigger(el).click();
+
+    const items = [...el.querySelectorAll('base-dropdown-item')];
+    items[1].focus();
+    items[1].dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowDown', bubbles: true }));
+    expect(document.activeElement).toBe(items[0]);
+  });
+
+  it('ArrowUp wraps from the first item to the last', () => {
+    const el = createDropdown({
+      items: [
+        { value: 'a', label: 'A' },
+        { value: 'b', label: 'B' },
+      ],
+    });
+    getTrigger(el).click();
+
+    const items = [...el.querySelectorAll('base-dropdown-item')];
+    expect(document.activeElement).toBe(items[0]);
+    items[0].dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowUp', bubbles: true }));
+    expect(document.activeElement).toBe(items[1]);
+  });
+
+  it('arrow nav skips disabled items when wrapping', () => {
+    const el = createDropdown({
+      items: [
+        { value: 'a', label: 'A' },
+        { value: 'b', label: 'B', disabled: true },
+        { value: 'c', label: 'C' },
+      ],
+    });
+    getTrigger(el).click();
+
+    const items = [...el.querySelectorAll('base-dropdown-item')];
+    // Enabled set is [A, C] — ArrowDown from A skips the disabled B.
+    items[0].dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowDown', bubbles: true }));
+    expect(document.activeElement).toBe(items[2]);
+    // ...and wraps from C back to A rather than stopping at the end.
+    items[2].dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowDown', bubbles: true }));
+    expect(document.activeElement).toBe(items[0]);
+  });
+
   it('Enter on focused item fires select and closes menu', () => {
     const el = createDropdown({ items: [{ value: 'enter-val', label: 'Enter' }] });
     getTrigger(el).click();

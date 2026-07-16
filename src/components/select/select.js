@@ -37,7 +37,7 @@ class BaseSelect extends HTMLElement {
   }
 
   disconnectedCallback() {
-    this._removeDocListeners();
+    removeOverlayListeners(this);
     this._observer?.disconnect();
     if (this.#blurTimeout) clearTimeout(this.#blurTimeout);
   }
@@ -82,7 +82,7 @@ class BaseSelect extends HTMLElement {
     this.#open = false;
     this._menu.hidden = true;
     this.#highlightIdx = -1;
-    this._removeDocListeners();
+    removeOverlayListeners(this);
 
     // Searchable: cancelling reverts the trigger to the selected option's label
     // AND clears the filter, so the abandoned query leaves no trace — a fresh
@@ -267,10 +267,6 @@ class BaseSelect extends HTMLElement {
 
   _addDocListeners() {
     addOverlayListeners(this, (e) => !this.contains(e.target) && !this.shadowRoot.contains(e.target));
-  }
-
-  _removeDocListeners() {
-    removeOverlayListeners(this);
   }
 }
 

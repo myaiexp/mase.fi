@@ -1,6 +1,6 @@
 // Command input — slash-jump, ?-help, plain-text search; global / ? g-leader shortcuts.
 import { CHANNELS, chAccent, navigate } from './channels.js';
-import { entriesFor } from './data.js';
+import { entriesFor, parseEntryDate } from './data.js';
 import { escapeHtml } from './html.js';
 import { buildCommands } from './commands.js';
 import { applySearch } from './command-search.js';
@@ -209,11 +209,8 @@ export function highlightFuzzy(str, q) {
 function lastActivity(id) {
   const es = entriesFor(id, _data);
   if (!es.length) return '—';
-  const d = es[es.length - 1].date;
-  const now = new Date();
-  const iso = d.includes('T') ? d : d + 'T00:00';
-  const t = new Date(iso.endsWith('Z') ? iso : iso + 'Z');
-  const mins = Math.max(0, Math.round((now - t) / 60000));
+  const t = parseEntryDate(es[es.length - 1].date);
+  const mins = Math.max(0, Math.round((new Date() - t) / 60000));
   if (mins < 60) return mins + 'm';
   if (mins < 1440) return Math.round(mins / 60) + 'h';
   return Math.round(mins / 1440) + 'd';

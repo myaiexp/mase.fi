@@ -161,6 +161,17 @@ export async function fetchData() {
   }
 }
 
+/**
+ * Parse an entry date into a Date. Entry dates are wall-clock Finnish-server
+ * strings with no zone marker, so the 'Z' makes the parse explicitly UTC rather
+ * than viewer-local — otherwise the same entry would land on a different day
+ * depending on who's reading. The input is normalizeDate's output shape
+ * ("YYYY-MM-DDTHH:MM", no zone suffix); keep the two in step if that changes.
+ */
+export function parseEntryDate(d) {
+  return new Date(d + 'Z');
+}
+
 /** Normalize a date string to "YYYY-MM-DDTHH:MM" form used by the UI. */
 function normalizeDate(s) {
   if (!s || typeof s !== 'string') return '1970-01-01T00:00';

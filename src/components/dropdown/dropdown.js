@@ -2,6 +2,7 @@
 
 import { addOverlayListeners, removeOverlayListeners } from '../shared/overlay-utils.js';
 import { applyMenuFlip } from '../shared/menu-flip.js';
+import { wrapIndex } from '../shared/menu-nav.js';
 import { MENU_ITEM_CSS, MENU_SURFACE_CSS } from '../shared/menu-styles.js';
 
 // ─── base-dropdown-item ──────────────────────────────────────────────────────
@@ -148,7 +149,7 @@ class BaseDropdown extends HTMLElement {
   }
 
   disconnectedCallback() {
-    this._removeDocListeners();
+    removeOverlayListeners(this);
     this._observer?.disconnect();
   }
 
@@ -190,17 +191,18 @@ class BaseDropdown extends HTMLElement {
   }
 
   _onItemKeydown(e, item) {
+    // Pre-filtered to enabled items, so wrapIndex alone lands on a valid target
+    // (no skip loop). A disabled item is not in the list, so its idx of -1 wraps
+    // to the first/last enabled item — the same convention menu-nav documents.
     const items = this._items().filter(i => !i.disabled);
     const idx = items.indexOf(item);
 
     if (e.key === 'ArrowDown') {
       e.preventDefault();
-      const next = items[idx + 1];
-      if (next) next.focus();
+      if (items.length) items[wrapIndex(idx, 1, items.length)].focus();
     } else if (e.key === 'ArrowUp') {
       e.preventDefault();
-      const prev = items[idx - 1];
-      if (prev) prev.focus();
+      if (items.length) items[wrapIndex(idx, -1, items.length)].focus();
     } else if (e.key === 'Enter') {
       e.preventDefault();
       this._selectItem(item);
@@ -218,25 +220,17 @@ class BaseDropdown extends HTMLElement {
     const first = this._items().find(i => !i.disabled);
     first?.focus();
 
-    this._addDocListeners();
+    addOverlayListeners(this, (e) => !this.contains(e.target));
   }
 
   close() {
     this.#open = false;
     this._menu.hidden = true;
-    this._removeDocListeners();
+    removeOverlayListeners(this);
   }
 
   get isOpen() {
     return this.#open;
-  }
-
-  _addDocListeners() {
-    addOverlayListeners(this, (e) => !this.contains(e.target));
-  }
-
-  _removeDocListeners() {
-    removeOverlayListeners(this);
   }
 }
 

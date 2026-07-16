@@ -123,7 +123,7 @@ class BaseContextMenu extends HTMLElement {
     this.#items = [];
     this._menu.hidden = true;
     while (this._menu.firstChild) this._menu.firstChild.remove();
-    this._removeDocListeners();
+    removeOverlayListeners(this);
   }
 
   get isOpen() {
@@ -168,10 +168,6 @@ class BaseContextMenu extends HTMLElement {
         { target: window, type: 'blur', handler: () => this.close() },
       ],
     );
-  }
-
-  _removeDocListeners() {
-    removeOverlayListeners(this);
   }
 
   // Escape is handled by overlay-utils; this covers menu navigation only.

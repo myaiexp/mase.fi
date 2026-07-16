@@ -1,6 +1,6 @@
 // Unit tests for the data adapter (fetch + normalize + channel routing/bucketing).
 import { describe, it, expect, vi, afterEach } from 'vitest';
-import { fetchData, fetchDemos, entriesFor, logStats } from './data.js';
+import { fetchData, fetchDemos, entriesFor, logStats, parseEntryDate } from './data.js';
 
 // ---- helpers -------------------------------------------------------------
 
@@ -343,6 +343,29 @@ describe('fetchData date normalization (normalizeDate)', () => {
 
   it('bounds an oversized/garbage date string to the epoch fallback', async () => {
     expect(await dateOf('"><script>alert(1)</script>'.repeat(20))).toBe('1970-01-01T00:00');
+  });
+
+  it('round-trips through parseEntryDate: normalized output parses as UTC', async () => {
+    // The contract that couples the two helpers — normalizeDate's output shape is
+    // exactly what parseEntryDate accepts. Change one and this test fails.
+    expect(parseEntryDate(await dateOf('2026-01-01T08:30')).toISOString())
+      .toBe('2026-01-01T08:30:00.000Z');
+  });
+});
+
+// ---- parseEntryDate -------------------------------------------------------
+
+describe('parseEntryDate', () => {
+  it('parses a normalized entry date as UTC, not viewer-local', () => {
+    expect(parseEntryDate('2026-01-01T08:30').toISOString()).toBe('2026-01-01T08:30:00.000Z');
+  });
+
+  it('parses the epoch fallback to time zero', () => {
+    expect(parseEntryDate('1970-01-01T00:00').getTime()).toBe(0);
+  });
+
+  it('treats midnight as the same UTC day (no off-by-one day shift)', () => {
+    expect(parseEntryDate('2026-01-01T00:00').toISOString().slice(0, 10)).toBe('2026-01-01');
   });
 });
 

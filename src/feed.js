@@ -1,5 +1,5 @@
 // Feed rendering — day separators, IRC-style rows, with modem-jitter arrival
-import { entriesFor } from './data.js';
+import { entriesFor, parseEntryDate } from './data.js';
 import { playJitter, clearJitter } from './jitter.js';
 import { relayoutAll } from './feed-layout.js';
 import { navigate } from './channels.js';
@@ -25,7 +25,7 @@ export function nickColor(nick) {
 }
 
 export function dayLabel(date) {
-  const d = new Date(date + 'Z').toISOString().slice(0, 10);
+  const d = parseEntryDate(date).toISOString().slice(0, 10);
   const today = new Date().toISOString().slice(0, 10);
   const yest = new Date(Date.now() - 86400000).toISOString().slice(0, 10);
   if (d === today) return 'today \xb7 ' + d;
