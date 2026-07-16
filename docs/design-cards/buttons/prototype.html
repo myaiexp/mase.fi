@@ -5,6 +5,7 @@
 <title>buttons · prototype</title>
 <link rel="stylesheet" href="src/base.css">
 <style>
+  /* Prototype chrome only — every button below renders from base.css, no inline copies. */
   body {
     padding: 24px 28px 48px;
     max-width: 760px;
@@ -79,98 +80,42 @@
     font-size: var(--text-sm);
   }
 
-  /* ===== Button system (from spec, on real mase.fi tokens) ===== */
-
-  .btn {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    height: 22px;
-    padding: 0 10px;
-    border: 1px solid var(--border);
-    background: var(--bg-raised);
-    color: var(--text);
-    font-size: var(--text-sm);
-    font-weight: 500;
-    line-height: 1;
-    white-space: nowrap;
-    cursor: pointer;
-    transition: background var(--transition);
-  }
-  .btn:hover { background: var(--bg-hover); }
-
-  .btn-primary {
-    background: var(--accent-glow);
-    border-color: rgba(232, 163, 8, 0.4);
-    color: var(--accent);
-  }
-  .btn-primary:hover { background: rgba(232, 163, 8, 0.18); }
-
-  .btn-danger {
-    background: rgba(239, 68, 68, 0.08);
-    border-color: rgba(239, 68, 68, 0.4);
-    color: var(--red);
-  }
-  .btn-danger:hover { background: rgba(239, 68, 68, 0.16); }
-
-  .btn:disabled {
-    opacity: 0.5;
-    cursor: not-allowed;
-  }
-
-  /* ===== In-use pane mock ===== */
-
-  .pane {
+  /* Dialog-footer mock — NOT base.css's .pane layout primitive, hence the local name. */
+  .mock {
     background: var(--bg-surface);
     border: 1px solid var(--border);
     padding: 12px 14px;
     margin-bottom: 8px;
   }
 
-  .pane-title {
+  .mock-title {
     font-size: var(--text-base);
     color: var(--text);
     margin-bottom: 2px;
   }
 
-  .pane-body {
+  .mock-body {
     font-size: var(--text-sm);
     color: var(--text-dim);
     margin-bottom: 14px;
   }
 
-  .pane-footer {
+  .mock-footer {
     display: flex;
     justify-content: flex-end;
     gap: 8px;
-  }
-
-  /* ===== "What not to do" — wrong-on-purpose inline specimens ===== */
-
-  .wrong {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    height: 22px;
-    padding: 0 10px;
-    border: 1px solid var(--border);
-    background: var(--bg-raised);
-    color: var(--text);
-    font-size: var(--text-sm);
-    font-weight: 500;
-    line-height: 1;
   }
 </style>
 </head>
 <body>
 
 <h1>.btn</h1>
-<p class="lede">One size, three variants. Default is the baseline; primary earns its amber; danger is red. Hover any button — they're live.</p>
+<p class="lede">One size, three variants — all rendered from <code>base.css</code>. Default is the baseline; primary earns its amber; danger is red. Hover any button — they're live.</p>
 
 <section>
   <div class="recipe">Variants</div>
   <h2>Default · Primary · Danger</h2>
-  <p class="note">22px tall, 11px, square. Most buttons are default. Primary marks the one most-forward action in a pane; danger is destructive — same shape as primary, red instead of amber.</p>
+  <p class="note">22px tall, <code>--text-sm</code> / 500, square. Most buttons are default. Primary marks the one most-forward action in a pane; danger is destructive — same shape, red instead of amber (both tint via <code>color-mix</code>, so a re-themed <code>--accent</code> / <code>--red</code> re-tints them).</p>
 
   <div class="row">
     <span class="row-label">at rest</span>
@@ -198,19 +143,19 @@
   <h2>One primary per pane</h2>
   <p class="note">Primary is reserved for the single most-forward action. Pair it with a neutral cancel; never show two primaries at once.</p>
 
-  <div class="pane">
-    <div class="pane-title">Launch session</div>
-    <div class="pane-body">Spin up a new Claude Code worktree on <code>master</code>.</div>
-    <div class="pane-footer">
+  <div class="mock">
+    <div class="mock-title">Launch session</div>
+    <div class="mock-body">Spin up a new Claude Code worktree on <code>master</code>.</div>
+    <div class="mock-footer">
       <button class="btn">Cancel</button>
       <button class="btn btn-primary">Launch</button>
     </div>
   </div>
 
-  <div class="pane">
-    <div class="pane-title">Delete worktree</div>
-    <div class="pane-body">This removes the branch and its uncommitted changes. Can't be undone.</div>
-    <div class="pane-footer">
+  <div class="mock">
+    <div class="mock-title">Delete worktree</div>
+    <div class="mock-body">This removes the branch and its uncommitted changes. Can't be undone.</div>
+    <div class="mock-footer">
       <button class="btn">Cancel</button>
       <button class="btn btn-danger">Delete</button>
     </div>
@@ -218,39 +163,45 @@
 </section>
 
 <section>
+  <div class="recipe">Legacy</div>
+  <h2>Deprecated — <code>.btn-sm</code> · <code>.btn-ghost</code></h2>
+  <p class="note">Not part of the one-size/three-variant vocabulary. Retained in <code>base.css</code> only so existing consumers don't break (~250 <code>.btn-sm</code>, ~24 <code>.btn-ghost</code> across the fleet). Don't reach for them in new work — removing them is a separate migration.</p>
+
+  <div class="row">
+    <span class="row-label">.btn-sm</span>
+    <button class="btn btn-sm">Run</button>
+    <span class="row-note">— 18px. For a genuinely tighter control, use a 16px icon-only affordance instead.</span>
+  </div>
+
+  <div class="row">
+    <span class="row-label">.btn-ghost</span>
+    <button class="btn btn-ghost">Edit</button>
+    <span class="row-note">— borderless reads as a link. Prefer a real <code>.btn</code> or an actual <code>&lt;a&gt;</code>.</span>
+  </div>
+</section>
+
+<section>
   <div class="recipe">Rules</div>
   <h2>What not to do</h2>
-  <p class="note">Each renders so the contrast reads — wrong for a specific reason.</p>
-
-  <div class="row">
-    <span class="row-label">❌ ghost</span>
-    <span class="wrong" style="border-color: transparent; background: transparent; color: var(--text-dim);">Edit</span>
-    <span class="row-note">— borderless reads as a link. Use a real <code>.btn</code> or an actual <code>&lt;a&gt;</code>.</span>
-  </div>
-
-  <div class="row">
-    <span class="row-label">❌ small</span>
-    <span class="wrong" style="height: 16px; padding: 1px 6px; font-size: var(--text-xs);">Run</span>
-    <span class="row-note">— one size only. For a tighter control, use a 16px icon-only affordance.</span>
-  </div>
+  <p class="note">Real <code>.btn</code>s with one property forced wrong, so the contrast reads.</p>
 
   <div class="row">
     <span class="row-label">❌ two amber</span>
     <button class="btn btn-primary">Save</button>
     <button class="btn btn-primary">Publish</button>
-    <span class="row-note">— the eye can't pick the action.</span>
+    <span class="row-note">— the eye can't pick the action. One primary per pane.</span>
   </div>
 
   <div class="row">
-    <span class="row-label">❌ verbose</span>
-    <span class="wrong">Save and continue to next step</span>
+    <span class="row-label">❌ wrapping</span>
+    <button class="btn" style="white-space: normal; width: 92px; height: auto;">Save and continue to next step</button>
     <span class="row-note">→ shorten to <button class="btn">Continue</button>. Buttons never wrap.</span>
   </div>
 
   <div class="row">
     <span class="row-label">❌ radius</span>
-    <span class="wrong" style="border-radius: 999px;">Launch</span>
-    <span class="row-note">— the system is square.</span>
+    <button class="btn" style="border-radius: 999px;">Launch</button>
+    <span class="row-note">— the system is square (<code>--radius: 0</code>).</span>
   </div>
 </section>
 
