@@ -11,10 +11,14 @@
 
 /* ===== Fonts ===== */
 
+/* Two woff2 files, four weights invoked (400/500/600/700). The declared RANGES
+   map the in-between weights to a real file instead of leaning on the browser's
+   weight-fallback algorithm: 400-500 -> Regular, 600-700 -> Bold. No synthesis,
+   no third file. See the type-family card for the weight/feature policy. */
 @font-face {
   font-family: 'JetBrains Mono';
   src: url('https://mase.fi/fonts/JetBrainsMono-Regular.woff2') format('woff2');
-  font-weight: 400;
+  font-weight: 400 500;
   font-style: normal;
   font-display: swap;
 }
@@ -22,7 +26,7 @@
 @font-face {
   font-family: 'JetBrains Mono';
   src: url('https://mase.fi/fonts/JetBrainsMono-Bold.woff2') format('woff2');
-  font-weight: 700;
+  font-weight: 600 700;
   font-style: normal;
   font-display: swap;
 }
@@ -278,7 +282,7 @@ pre code {
 /* ===== Status / Tag badges (dot+tint recipe) ===== */
 /* Additive — coexists with .label*. .status = live state (leading dot),
    .tag = static classification (no dot). Tints via color-mix so they track the color var.
-   font-weight:500 renders as the Regular file (the 400 @font-face covers 400-500). */
+   font-weight:500 renders from the Regular file — its @font-face declares the 400-500 range. */
 
 .status,
 .tag {
