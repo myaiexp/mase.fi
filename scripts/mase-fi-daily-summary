@@ -62,6 +62,12 @@ if [[ ! -f "$UPDATES_FILE" ]]; then
     exit 0
 fi
 
+# Refresh the homepage projects list from helm showcase flags first — it is
+# derived, not hand-maintained (see scripts/mase-fi-projects). Best-effort and
+# independent of the summary logic below; leaves .projects untouched if helm is
+# unreachable, so a bad run can never blank the sidebar.
+"$(dirname "$(readlink -f "$0")")/mase-fi-projects" || echo "projects refresh failed (non-fatal)" >&2
+
 # Skip if daily entries already exist for today (idempotency)
 DAILY_EXISTS=$(jq --arg date "$TODAY" '[.entries[] | select(.category == "daily" and .date == $date)] | length' "$UPDATES_FILE")
 if [[ "$DAILY_EXISTS" -gt 0 ]]; then
