@@ -48,7 +48,7 @@ raw `width`/`height`.
 |---|---|---|
 | **14px** | `.icon` (default) | Inline-in-text, sidebar rows, table cells, button leading-icons. mase.fi's baseline. |
 | **16px** | `.icon .icon-16` | Toolbar triggers and icon-only buttons — the sanctioned compact affordance (the buttons card's replacement for `.btn-sm`). |
-| **20px** | `--icon-size: 20px` at the call site | helm's sidebar-tab size. Not a mase.fi size — set it inline where an app's scale needs it, don't mint a class. |
+| **20px** | `--icon-size: 20px` at the call site | App-scale override for a surface that genuinely needs a larger glyph. Not a mase.fi size — set it inline, don't mint a class. (helm's sidebar formerly ran 20px; its design card moved it to the 14px default on 2026-07-16.) |
 
 Pick a **small fixed set per surface** and hold it. mase.fi is 14/16 — that density has no 20px
 and no in-between sizes. The rule is not "exactly 14 and 16 everywhere"; it's "few fixed steps,
