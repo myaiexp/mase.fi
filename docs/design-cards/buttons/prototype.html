@@ -1,0 +1,209 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>buttons · prototype</title>
+<link rel="stylesheet" href="src/base.css">
+<style>
+  /* Prototype chrome only — every button below renders from base.css, no inline copies. */
+  body {
+    padding: 24px 28px 48px;
+    max-width: 760px;
+    color: var(--text);
+  }
+
+  h1 {
+    font-size: var(--text-md);
+    color: var(--text-dim);
+    font-weight: 500;
+    letter-spacing: 0.02em;
+    margin-bottom: 4px;
+  }
+
+  .lede {
+    color: var(--text-muted);
+    font-size: var(--text-sm);
+    margin-bottom: 32px;
+  }
+
+  section {
+    margin-bottom: 32px;
+  }
+
+  .recipe {
+    font-size: var(--text-xs);
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    margin-bottom: 8px;
+  }
+
+  h2 {
+    font-size: var(--text-base);
+    font-weight: 500;
+    color: var(--text);
+    margin-bottom: 2px;
+  }
+
+  .note {
+    color: var(--text-muted);
+    font-size: var(--text-sm);
+    margin-bottom: 14px;
+  }
+
+  .note code {
+    background: var(--bg-surface);
+    padding: 0 0.2em;
+  }
+
+  .row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    align-items: center;
+    padding: 10px 0;
+  }
+
+  .row + .row {
+    border-top: 1px solid var(--border);
+  }
+
+  .row-label {
+    color: var(--text-muted);
+    font-size: var(--text-xs);
+    width: 72px;
+    flex-shrink: 0;
+  }
+
+  .row-note {
+    color: var(--text-muted);
+    font-size: var(--text-sm);
+  }
+
+  /* Dialog-footer mock — NOT base.css's .pane layout primitive, hence the local name. */
+  .mock {
+    background: var(--bg-surface);
+    border: 1px solid var(--border);
+    padding: 12px 14px;
+    margin-bottom: 8px;
+  }
+
+  .mock-title {
+    font-size: var(--text-base);
+    color: var(--text);
+    margin-bottom: 2px;
+  }
+
+  .mock-body {
+    font-size: var(--text-sm);
+    color: var(--text-dim);
+    margin-bottom: 14px;
+  }
+
+  .mock-footer {
+    display: flex;
+    justify-content: flex-end;
+    gap: 8px;
+  }
+</style>
+</head>
+<body>
+
+<h1>.btn</h1>
+<p class="lede">One size, three variants — all rendered from <code>base.css</code>. Default is the baseline; primary earns its amber; danger is red. Hover any button — they're live.</p>
+
+<section>
+  <div class="recipe">Variants</div>
+  <h2>Default · Primary · Danger</h2>
+  <p class="note">22px tall, <code>--text-sm</code> / 500, square. Most buttons are default. Primary marks the one most-forward action in a pane; danger is destructive — same shape, red instead of amber (both tint via <code>color-mix</code>, so a re-themed <code>--accent</code> / <code>--red</code> re-tints them).</p>
+
+  <div class="row">
+    <span class="row-label">at rest</span>
+    <button class="btn">Cancel</button>
+    <button class="btn btn-primary">Launch</button>
+    <button class="btn btn-danger">Delete</button>
+  </div>
+
+  <div class="row">
+    <span class="row-label">disabled</span>
+    <button class="btn" disabled>Waiting…</button>
+    <button class="btn btn-primary" disabled>Launch</button>
+    <button class="btn btn-danger" disabled>Delete</button>
+  </div>
+
+  <div class="row">
+    <span class="row-label">focus</span>
+    <button class="btn">Tab to me</button>
+    <span class="row-note">— ring is the global <code>:focus-visible</code> reset, not from <code>.btn</code></span>
+  </div>
+</section>
+
+<section>
+  <div class="recipe">In use</div>
+  <h2>One primary per pane</h2>
+  <p class="note">Primary is reserved for the single most-forward action. Pair it with a neutral cancel; never show two primaries at once.</p>
+
+  <div class="mock">
+    <div class="mock-title">Launch session</div>
+    <div class="mock-body">Spin up a new Claude Code worktree on <code>master</code>.</div>
+    <div class="mock-footer">
+      <button class="btn">Cancel</button>
+      <button class="btn btn-primary">Launch</button>
+    </div>
+  </div>
+
+  <div class="mock">
+    <div class="mock-title">Delete worktree</div>
+    <div class="mock-body">This removes the branch and its uncommitted changes. Can't be undone.</div>
+    <div class="mock-footer">
+      <button class="btn">Cancel</button>
+      <button class="btn btn-danger">Delete</button>
+    </div>
+  </div>
+</section>
+
+<section>
+  <div class="recipe">Legacy</div>
+  <h2>Deprecated — <code>.btn-sm</code> · <code>.btn-ghost</code></h2>
+  <p class="note">Not part of the one-size/three-variant vocabulary. Retained in <code>base.css</code> only so existing consumers don't break (~250 <code>.btn-sm</code>, ~24 <code>.btn-ghost</code> across the fleet). Don't reach for them in new work — removing them is a separate migration.</p>
+
+  <div class="row">
+    <span class="row-label">.btn-sm</span>
+    <button class="btn btn-sm">Run</button>
+    <span class="row-note">— 18px. For a genuinely tighter control, use a 16px icon-only affordance instead.</span>
+  </div>
+
+  <div class="row">
+    <span class="row-label">.btn-ghost</span>
+    <button class="btn btn-ghost">Edit</button>
+    <span class="row-note">— borderless reads as a link. Prefer a real <code>.btn</code> or an actual <code>&lt;a&gt;</code>.</span>
+  </div>
+</section>
+
+<section>
+  <div class="recipe">Rules</div>
+  <h2>What not to do</h2>
+  <p class="note">Real <code>.btn</code>s with one property forced wrong, so the contrast reads.</p>
+
+  <div class="row">
+    <span class="row-label">❌ two amber</span>
+    <button class="btn btn-primary">Save</button>
+    <button class="btn btn-primary">Publish</button>
+    <span class="row-note">— the eye can't pick the action. One primary per pane.</span>
+  </div>
+
+  <div class="row">
+    <span class="row-label">❌ wrapping</span>
+    <button class="btn" style="white-space: normal; width: 92px; height: auto;">Save and continue to next step</button>
+    <span class="row-note">→ shorten to <button class="btn">Continue</button>. Buttons never wrap.</span>
+  </div>
+
+  <div class="row">
+    <span class="row-label">❌ radius</span>
+    <button class="btn" style="border-radius: 999px;">Launch</button>
+    <span class="row-note">— the system is square (<code>--radius: 0</code>).</span>
+  </div>
+</section>
+
+</body>
+</html>

@@ -1,0 +1,195 @@
+/* Main pane: background gradient, topic bar, pinned card, ASCII art, project meta */
+/* ============================================================
+   Main pane
+   ============================================================ */
+.pane {
+  display: grid;
+  grid-template-rows: auto auto auto 1fr;
+  min-height: 0;
+  min-width: 0;
+  position: relative;
+  background:
+    radial-gradient(ellipse 90% 60% at 50% 0%, #0d0d10 0%, var(--bg) 55%);
+}
+
+/* topic bar */
+.topic-bar {
+  display: flex; align-items: center; gap: 12px;
+  padding: 10px 20px;
+  box-shadow: inset 0 -1px 0 var(--line);
+  background: linear-gradient(180deg, var(--bg-2), #0e0e11);
+  font-size: 12.5px;
+  color: var(--dim);
+  min-height: 42px;
+}
+.topic-hash { color: var(--ch-accent); font-weight: 600; }
+.topic-sep  { color: var(--faint); }
+.topic-text { color: var(--dim); }
+.topic-spacer { flex: 1; }
+.topic-meta { color: var(--muted); font-size: 11px; }
+.topic-meta .mode {
+  border: 1px solid var(--line);
+  padding: 1px 7px;
+  border-radius: 3px;
+  margin-left: 8px;
+  color: var(--dim);
+}
+
+/* hero-line: mobile-only quick-access row — hidden by default, shown via mobile.css */
+.hero-line { display: none; }
+
+/* pinned */
+.pinned { padding: 18px 20px 10px; }
+
+.card {
+  box-shadow: inset 0 0 0 1px var(--line);
+  background: linear-gradient(180deg, #0d0d10, #0a0a0d);
+  position: relative;
+}
+.card-head {
+  display: flex; align-items: center; gap: 14px;
+  padding: 7px 12px;
+  box-shadow: inset 0 -1px 0 var(--line);
+  background:
+    linear-gradient(90deg,
+      color-mix(in oklab, var(--ch-accent) 10%, var(--bg-2)) 0%,
+      var(--bg-2) 60%);
+  font-size: 11.5px;
+  color: var(--dim);
+}
+.card-head .spacer { flex: 1; }
+.card-head .right { color: var(--muted); font-size: 10.5px; }
+.card-head .ch-meta {
+  display: inline-flex; align-items: baseline; gap: 6px;
+  font-size: 10.5px;
+  letter-spacing: 0.02em;
+}
+.card-head .ch-meta i {
+  font-style: normal;
+  color: var(--faint);
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  font-size: 9.5px;
+}
+.card-head .ch-meta b {
+  font-weight: 500;
+  color: var(--dim);
+}
+.card-head .ch-meta:first-child b {
+  color: var(--ch-accent);
+  font-weight: 600;
+}
+
+.card-body { padding: 14px 14px 16px; position: relative; }
+
+/* ASCII art area inside pinned */
+.ascii {
+  color: var(--ch-accent);
+  white-space: pre;
+  font-size: 11px;
+  line-height: 1.15;
+  letter-spacing: 0;
+  filter: drop-shadow(0 0 12px color-mix(in oklab, var(--ch-accent) 15%, transparent));
+}
+.ascii.dim { color: var(--muted); filter: none; }
+
+/* Beam destruction effect: when beam.js mounts onto the home LOGO it adds
+   .beam-host, switches .ascii to absolute-positioned chars, and overlays a
+   sweeping golden bar. Pretext provides the exact pixel width/height of the
+   text block so the bar tracks the glyph geometry with no DOM reflow. */
+.ascii.beam-host {
+  position: relative;
+  cursor: pointer;
+  /* Stop the drop-shadow glow from blurring the per-char spans. */
+  filter: none;
+  user-select: none;
+}
+/* Clip the sweeping bar and its wide glow to the hero card frame: it still
+   washes ambient light across the card interior, but can't bleed into the
+   feed below or neighbouring content. Scoped to the beam card only. */
+.card:has(.beam-host) { overflow: hidden; }
+.ascii .bch {
+  position: absolute;
+  white-space: pre;
+  transition: color 90ms linear, opacity 90ms linear, text-shadow 90ms linear;
+  will-change: contents;
+}
+.ascii .bch.ch {
+  color: var(--accent-hi);
+  text-shadow: 0 0 6px color-mix(in oklab, var(--accent-hi) 70%, transparent);
+}
+.ascii .bch.pk {
+  color: #fff;
+  text-shadow:
+    0 0 4px var(--accent-hi),
+    0 0 10px color-mix(in oklab, var(--accent-hi) 80%, transparent),
+    0 0 18px color-mix(in oklab, var(--accent) 50%, transparent);
+}
+.ascii .bch.dc  { color: var(--accent-lo); }
+.ascii .bch.dc0 { color: var(--accent); }
+.ascii .bch.dc1 { color: color-mix(in oklab, var(--accent) 70%, var(--muted) 30%); }
+.ascii .bch.dc2 { color: var(--muted); }
+.ascii .bch.dc3, .ascii .bch.dc4 { color: var(--faint); }
+.ascii .bch.ash { opacity: 0; }
+
+.ascii .ascii-beam {
+  position: absolute;
+  top: 0; left: 0;
+  width: 10px;
+  margin-left: -5px;             /* center on translateX(x) */
+  pointer-events: none;
+  background: linear-gradient(180deg,
+    transparent 0%,
+    color-mix(in oklab, var(--accent-hi) 90%, transparent) 50%,
+    transparent 100%);
+  box-shadow:
+    0 0 18px color-mix(in oklab, var(--accent-hi) 70%, transparent),
+    0 0 48px color-mix(in oklab, var(--accent-hi) 35%, transparent),
+    0 0 96px color-mix(in oklab, var(--accent) 20%, transparent);
+  mix-blend-mode: screen;
+  opacity: 0;
+  transform: translateX(-100px);
+  will-change: transform, opacity;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ascii.beam-host { cursor: default; }
+  .ascii .ascii-beam { display: none; }
+}
+
+/* project card grid */
+.pin-grid {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 18px;
+  align-items: start;
+}
+.pin-meta {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 4px 14px;
+  font-size: 12px;
+}
+.pin-meta dt { color: var(--muted); text-transform: uppercase; letter-spacing: 0.08em; font-size: 10.5px; }
+.pin-meta dd { margin: 0; color: var(--text); }
+.pin-meta dd.accent { color: var(--ch-accent); }
+.pin-meta dd a { color: var(--dim); border-bottom: 1px dashed var(--faint); }
+.pin-meta dd a:hover { color: var(--ch-accent); border-bottom-color: var(--ch-accent); text-decoration: none; }
+.pin-meta dd.links { display: flex; flex-wrap: wrap; gap: 10px; }
+/* "try demo →" — a filled accent chip so it reads as the primary action,
+   distinct from the dashed-underline text links beside it. */
+.pin-meta dd .demo-link {
+  color: var(--bg);
+  background: var(--ch-accent);
+  border-radius: 3px;
+  padding: 1px 9px;
+  font-weight: 600;
+  border-bottom: 0;
+}
+.pin-meta dd .demo-link:hover { background: var(--accent); color: var(--bg); border-bottom: 0; }
+
+.pin-tagline {
+  margin: 0 0 10px; color: var(--dim); font-size: 13px;
+  text-wrap: pretty; max-width: 58ch;
+}
+.pin-tagline b { color: var(--text); font-weight: 500; }

@@ -1,191 +1,76 @@
-/** Sidebar: channel list rendering, active state, mobile dropdown. */
+// Sidebar channel list + mobile tabbar rendering, plus active-channel highlight.
+import { chAccent, chHeat, getChannels, channelById } from './channels.js';
+import { escapeHtml } from './html.js';
 
-import { getChannels } from './data.js';
-import { relativeDate } from './terminal.js';
-
-/** Remove all children from an element. */
-function clearEl(el) {
-  while (el.firstChild) el.removeChild(el.firstChild);
+function chanRow(c) {
+  const heat = chHeat(c.id);
+  const cells = 5;
+  const on = Math.max(1, Math.round(heat * cells));
+  const bars = Array.from({ length: cells }, (_, i) =>
+    `<b class="${i < on ? 'on' : ''}"></b>`).join('');
+  // role=link + tabindex makes these div rows keyboard-operable navigation
+  // targets (they change the hash route); aria-label gives a clean name since
+  // the visible content is "# <label>" plus decorative heat bars.
+  return `
+    <div class="chan" data-ch="${escapeHtml(c.id)}" role="link" tabindex="0" aria-label="${escapeHtml(c.label)} channel" style="--ch-accent:${chAccent(c.id)}">
+      <span class="hash" aria-hidden="true">#</span>
+      <span class="name">${escapeHtml(c.label)}</span>
+      <span class="heat" title="activity" aria-hidden="true">${bars}</span>
+    </div>`;
 }
 
-/**
- * Render the sidebar: channel groups with links and activity indicators.
- * Also renders mobile dropdown content.
- * @param {{ entries: Array, projects: Array }} data
- */
-export function initSidebar(data) {
-  const sidebar = document.getElementById('sidebar');
-  if (!sidebar) return;
+/** Render the desktop sidebar (#chanlist) and the mobile tabbar (#tabbar). Wires click → navigate. */
+export function renderChanlist(data, navigate) {
+  const $chanlist = document.getElementById('chanlist');
+  const $tabbar = document.getElementById('tabbar');
 
-  const channels = getChannels(data.entries, data.projects);
-  clearEl(sidebar);
+  const groups = [['system', 'server'], ['projects', 'projects']];
+  const html = groups.map(([key, title]) => {
+    const chans = getChannels().filter(c => c.group === key);
+    return `<div class="chan-group">${title}</div>` +
+      chans.map(c => chanRow(c)).join('');
+  }).join('');
+  $chanlist.innerHTML = html;
 
-  for (const group of channels) {
-    const groupEl = document.createElement('div');
-    groupEl.className = 'sidebar__group';
+  // Mobile tabs: home + activity + first 4 projects
+  const primary = [
+    channelById('home'), channelById('activity'),
+    ...data.projects.slice(0, 4).map(p => channelById(p.channel)),
+  ].filter(Boolean);
+  $tabbar.innerHTML = primary.map(c => `
+    <button class="tab" data-ch="${escapeHtml(c.id)}" aria-label="${escapeHtml(c.label)} channel" style="--ch-accent:${chAccent(c.id)}">
+      <span class="tab-hash" aria-hidden="true">#</span>
+      <span class="tab-name">${escapeHtml(c.label)}</span>
+      <span class="tab-dot" aria-hidden="true"></span>
+    </button>
+  `).join('');
 
-    const header = document.createElement('div');
-    header.className = 'sidebar__group-header';
-    header.textContent = `\u2500\u2500 ${group.group} \u2500\u2500`;
-    groupEl.appendChild(header);
-
-    for (const ch of group.channels) {
-      const link = document.createElement('a');
-      link.className = 'sidebar__channel';
-      link.href = `#/${ch.id}`;
-      if (ch.isNew) link.classList.add('sidebar__channel--new');
-      link.dataset.channelId = ch.id;
-
-      const name = document.createElement('span');
-      name.className = 'sidebar__name';
-      const prefix = ch.isNew ? '\u2605' : '';
-      name.textContent = `${prefix}${ch.label}`;
-      link.appendChild(name);
-
-      if (ch.lastActivity) {
-        const indicator = document.createElement('span');
-        indicator.className = 'sidebar__indicator';
-        indicator.textContent = relativeDate(ch.lastActivity);
-        link.appendChild(indicator);
+  $chanlist.querySelectorAll('.chan').forEach(el => {
+    el.addEventListener('click', () => navigate(el.dataset.ch));
+    // role=link rows aren't natively keyboard-operable; activate on Enter/Space
+    // (Space is preventDefaulted so it navigates instead of scrolling the list).
+    el.addEventListener('keydown', e => {
+      if (e.key === 'Enter' || e.key === ' ') {
+        e.preventDefault();
+        navigate(el.dataset.ch);
       }
-
-      groupEl.appendChild(link);
-    }
-
-    sidebar.appendChild(groupEl);
-  }
-
-  _initMobileDropdown(data);
-  _initDropdownToggle();
-}
-
-/**
- * Highlight the active channel in the sidebar (and update mobile top bar).
- * @param {string} channelId
- */
-export function setActiveChannel(channelId) {
-  // Update sidebar active state
-  const allChannels = document.querySelectorAll('.sidebar__channel');
-  for (const el of allChannels) {
-    el.classList.remove('sidebar__channel--active');
-  }
-
-  const active = document.querySelector(`.sidebar__channel[data-channel-id="${channelId}"]`);
-  if (active) {
-    active.classList.add('sidebar__channel--active');
-  }
-
-  // Update mobile top bar
-  const mobileChannelName = document.getElementById('mobile-channel-name');
-  if (mobileChannelName) {
-    mobileChannelName.textContent = `#${channelId}`;
-  }
-
-  // Update mobile dropdown active state
-  const allDropdownItems = document.querySelectorAll('.mobile-dropdown__channel');
-  for (const el of allDropdownItems) {
-    el.classList.remove('mobile-dropdown__channel--active');
-  }
-  const activeDropdown = document.querySelector(
-    `.mobile-dropdown__channel[data-channel-id="${channelId}"]`,
-  );
-  if (activeDropdown) {
-    activeDropdown.classList.add('mobile-dropdown__channel--active');
-  }
-
-  // Close dropdown after channel selection on mobile
-  _closeMobileDropdown();
-}
-
-/** Render channel list into the mobile dropdown. */
-function _initMobileDropdown(data) {
-  const dropdown = document.getElementById('mobile-dropdown');
-  if (!dropdown) return;
-
-  const channels = getChannels(data.entries, data.projects);
-  clearEl(dropdown);
-
-  for (const group of channels) {
-    const groupEl = document.createElement('div');
-    groupEl.className = 'mobile-dropdown__group';
-
-    const header = document.createElement('div');
-    header.className = 'mobile-dropdown__group-header';
-    header.textContent = `\u2500\u2500 ${group.group} \u2500\u2500`;
-    groupEl.appendChild(header);
-
-    for (const ch of group.channels) {
-      const link = document.createElement('a');
-      link.className = 'mobile-dropdown__channel';
-      link.href = `#/${ch.id}`;
-      link.dataset.channelId = ch.id;
-      if (ch.isNew) link.classList.add('mobile-dropdown__channel--new');
-
-      const name = document.createElement('span');
-      name.className = 'mobile-dropdown__name';
-      const prefix = ch.isNew ? '\u2605' : '';
-      name.textContent = `${prefix}${ch.label}`;
-      link.appendChild(name);
-
-      if (ch.lastActivity) {
-        const indicator = document.createElement('span');
-        indicator.className = 'mobile-dropdown__indicator';
-        indicator.textContent = relativeDate(ch.lastActivity);
-        link.appendChild(indicator);
-      }
-
-      groupEl.appendChild(link);
-    }
-
-    dropdown.appendChild(groupEl);
-  }
-}
-
-/** Wire up dropdown toggle button and outside-tap dismiss. */
-function _initDropdownToggle() {
-  const toggle = document.getElementById('mobile-dropdown-toggle');
-  const dropdown = document.getElementById('mobile-dropdown');
-  if (!toggle || !dropdown) return;
-
-  // Remove any previous listener by replacing the element clone
-  const freshToggle = toggle.cloneNode(true);
-  toggle.parentNode.replaceChild(freshToggle, toggle);
-
-  freshToggle.addEventListener('click', (e) => {
-    e.stopPropagation();
-    const isOpen = dropdown.classList.contains('mobile-dropdown--open');
-    if (isOpen) {
-      _closeMobileDropdown();
-    } else {
-      _openMobileDropdown();
-    }
+    });
   });
+  // .tab is a native <button> — Enter/Space activation comes for free.
+  $tabbar.querySelectorAll('.tab').forEach(el => {
+    el.addEventListener('click', () => navigate(el.dataset.ch));
+  });
+}
 
-  // Dismiss on outside tap — use a one-time listener approach via a named handler
-  // stored on the document so re-init can remove and re-add it cleanly.
-  if (document._sidebarOutsideHandler) {
-    document.removeEventListener('click', document._sidebarOutsideHandler);
+/**
+ * Highlight the active channel on both sidebar rows and mobile tabs: the .active
+ * class drives the visual state, aria-current="page" exposes it to assistive tech.
+ */
+export function setActiveChannel(id) {
+  for (const el of document.querySelectorAll('.chan, .tab')) {
+    const active = el.dataset.ch === id;
+    el.classList.toggle('active', active);
+    if (active) el.setAttribute('aria-current', 'page');
+    else el.removeAttribute('aria-current');
   }
-  document._sidebarOutsideHandler = (e) => {
-    if (dropdown.classList.contains('mobile-dropdown--open')) {
-      if (!dropdown.contains(e.target) && e.target !== freshToggle) {
-        _closeMobileDropdown();
-      }
-    }
-  };
-  document.addEventListener('click', document._sidebarOutsideHandler);
-}
-
-function _openMobileDropdown() {
-  const dropdown = document.getElementById('mobile-dropdown');
-  const toggle = document.getElementById('mobile-dropdown-toggle');
-  if (dropdown) dropdown.classList.add('mobile-dropdown--open');
-  if (toggle) toggle.classList.add('mobile-topbar__toggle--open');
-}
-
-function _closeMobileDropdown() {
-  const dropdown = document.getElementById('mobile-dropdown');
-  const toggle = document.getElementById('mobile-dropdown-toggle');
-  if (dropdown) dropdown.classList.remove('mobile-dropdown--open');
-  if (toggle) toggle.classList.remove('mobile-topbar__toggle--open');
 }
