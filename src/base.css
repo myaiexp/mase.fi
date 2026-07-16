@@ -76,7 +76,7 @@
 
   /* Font */
   --font: 'JetBrains Mono', 'Consolas', monospace;
-  --font-mono: 'JetBrains Mono', 'Consolas', monospace;
+  --font-mono: var(--font);   /* alias — same stack; keeps the two from drifting */
 
   /* Base sizing */
   --text-xs:   10px;
