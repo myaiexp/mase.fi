@@ -47,7 +47,7 @@ describe('renderPinned — home', () => {
     renderPinned('home', data);
     const html = pinnedEl().innerHTML;
     expect(html).toContain('2 active');   // projects.length
-    expect(html).toContain('2 in feed');  // totalLogCount
+    expect(html).toContain('2 in feed');  // logStats().totalCommits
     expect(html).toContain('2026-03-20'); // last-push date slice
     expect(html).toContain('porssi');     // last-push project (newest log entry)
   });
@@ -75,7 +75,8 @@ describe('renderPinned — home', () => {
 // ---- renderPinned: project -----------------------------------------------
 
 describe('renderPinned — project', () => {
-  const projectData = (project, entries = []) => ({ projects: [project], entries });
+  // demos defaults to [] to mirror fetchData's canonical shape (always present).
+  const projectData = (project, entries = [], demos = []) => ({ projects: [project], entries, demos });
 
   it('renders a project card with commits, heat, status, description and links', () => {
     const project = {
@@ -129,6 +130,20 @@ describe('renderPinned — project', () => {
     expect(html).not.toContain('<script>');
   });
 
+  it('renders a "try demo →" chip when the channel has a published demo', () => {
+    const data = projectData({ channel: 'explorer', heat: 0.5, description: 'd', links: [] }, [], ['explorer']);
+    renderPinned('explorer', data);
+    const a = pinnedEl().querySelector('.demo-link');
+    expect(a).not.toBeNull();
+    expect(a.getAttribute('href')).toBe('/demos/explorer/');
+    expect(a.textContent).toContain('try demo');
+  });
+
+  it('omits the demo chip when the channel has no demo', () => {
+    renderPinned('explorer', projectData({ channel: 'explorer', heat: 0.5, description: 'd', links: [] }));
+    expect(pinnedEl().querySelector('.demo-link')).toBeNull();
+  });
+
   it('escapes malicious link href and label (no attribute breakout)', () => {
     const project = {
       channel: 'explorer',
@@ -172,6 +187,45 @@ describe('renderPinned — activity', () => {
     expect(html).toContain('0 entries');
     expect(html).toContain('<dt>range</dt><dd>—</dd>');
   });
+
+  // A local-noon naive date string N days ago. logStats parses naive ISO as
+  // local time, so building the string in local terms keeps the bucket index
+  // stable across timezones and clear of day/window boundaries.
+  const localNoonDaysAgo = (n) => {
+    const d = new Date();
+    d.setHours(12, 0, 0, 0);
+    d.setDate(d.getDate() - n);
+    const p = (x) => String(x).padStart(2, '0');
+    return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}T12:00`;
+  };
+
+  it('shows a recent rate computed as average commits per active day (~N/day)', () => {
+    const data = {
+      projects: [],
+      entries: [
+        // 4 commits one recent day + 2 another recent day → 6 / 2 active days = ~3.
+        logEntry({ cat: 'log', date: localNoonDaysAgo(3) }),
+        logEntry({ cat: 'log', date: localNoonDaysAgo(3) }),
+        logEntry({ cat: 'log', date: localNoonDaysAgo(3) }),
+        logEntry({ cat: 'log', date: localNoonDaysAgo(3) }),
+        logEntry({ cat: 'log', date: localNoonDaysAgo(7) }),
+        logEntry({ cat: 'log', date: localNoonDaysAgo(7) }),
+      ],
+    };
+    renderPinned('activity', data);
+    expect(pinnedEl().innerHTML).toContain('~3/day');
+  });
+
+  it('shows an em-dash rate when there is no recent (last-28d) activity', () => {
+    const data = {
+      projects: [],
+      // Older than the 28-day window → no active days → '—', never a stale number.
+      entries: [logEntry({ cat: 'log', date: localNoonDaysAgo(60) })],
+    };
+    renderPinned('activity', data);
+    const html = pinnedEl().innerHTML;
+    expect(html).toContain('<i>rate</i><b>—</b>');
+  });
 });
 
 // ---- renderPinned: unmatched ---------------------------------------------
@@ -196,6 +250,7 @@ describe('renderHeroLine', () => {
   it('renders the first project link plus status for a matched project', () => {
     const data = {
       projects: [{ channel: 'explorer', heat: 0.8, links: [{ href: 'https://mase.fi/explorer', label: 'mase.fi' }] }],
+      demos: [],
     };
     renderHeroLine('explorer', data);
     const html = heroEl().innerHTML;
@@ -205,15 +260,24 @@ describe('renderHeroLine', () => {
   });
 
   it('renders only the status when a matched project has no links', () => {
-    renderHeroLine('explorer', { projects: [{ channel: 'explorer', heat: 0.4, links: [] }] });
+    renderHeroLine('explorer', { projects: [{ channel: 'explorer', heat: 0.4, links: [] }], demos: [] });
     const html = heroEl().innerHTML;
     expect(html).not.toContain('<a');
     expect(html).toContain('steady'); // heat > 0.3
   });
 
+  it('includes a demo link when the channel has a published demo', () => {
+    const data = { projects: [{ channel: 'explorer', heat: 0.4, links: [] }], demos: ['explorer'] };
+    renderHeroLine('explorer', data);
+    const a = heroEl().querySelector('.demo-link');
+    expect(a).not.toBeNull();
+    expect(a.getAttribute('href')).toBe('/demos/explorer/');
+  });
+
   it('escapes a malicious project link in the hero line', () => {
     const data = {
       projects: [{ channel: 'explorer', heat: 0.8, links: [{ href: '"><script>alert(1)</script>', label: '<b>x</b>' }] }],
+      demos: [],
     };
     renderHeroLine('explorer', data);
     const a = heroEl().querySelector('a');

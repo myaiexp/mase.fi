@@ -12,12 +12,13 @@
 // of the production bundle.
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 
-// command.js needs CHANNELS/chAccent/navigate from the routing layer and
+// command.js needs getChannels/chAccent/navigate from the routing layer and
 // entriesFor from the data adapter. Stub both so these tests exercise only what
 // command.js OWNS: ranking, autocomplete rendering, and search highlighting.
-// CHANNELS is mutated per test via setChannels(); navigate is a spy.
+// The channel list is set per test via setChannels() (stubbing the accessor);
+// navigate is a spy.
 vi.mock('./channels.js', () => ({
-  CHANNELS: [],
+  getChannels: vi.fn(() => []),
   chAccent: vi.fn(() => 'oklch(0.620 0.140 78.0)'),
   navigate: vi.fn(),
 }));
@@ -25,8 +26,9 @@ vi.mock('./data.js', () => ({
   entriesFor: vi.fn(() => []),
 }));
 
-// Re-imported fresh per test so module state (ccIndex, the lazy DOM refs) starts
-// clean and command.js binds to the same mocked-channel instance the test sees.
+// Re-imported fresh per test so module state (the `complete` popup object, the
+// lazy DOM refs) starts clean and command.js binds to the same mocked-channel
+// instance the test sees.
 let command, channels;
 
 // The DOM nodes initCommand resolves by id. cmd-input is the only <input>.
@@ -40,11 +42,9 @@ function setupDom() {
   }
 }
 
-// Replace the mocked CHANNELS contents in place (command.js holds the same array
-// reference via its live import binding).
+// Point the mocked getChannels() accessor at a fresh channel list for this test.
 function setChannels(list) {
-  channels.CHANNELS.length = 0;
-  channels.CHANNELS.push(...list);
+  channels.getChannels.mockReturnValue(list);
 }
 
 function ch(id, label = id, topic = `${id} topic`) {
@@ -200,6 +200,62 @@ describe('renderComplete', () => {
   });
 });
 
+// ---- combobox ARIA (autocomplete announced to screen readers) ------------
+
+describe('combobox ARIA', () => {
+  const input = () => document.getElementById('cmd-input');
+  const options = () => [...cc().querySelectorAll('[role="option"]')];
+
+  beforeEach(() => {
+    setChannels([ch('home'), ch('explorer'), ch('activity')]);
+    command.initCommand({ meta: { server: 'irc.test', bootTime: Date.now() } });
+  });
+
+  it('slash mode marks the popup a listbox of options with an active descendant', () => {
+    type('/o'); // matches home + explorer
+    expect(cc().getAttribute('role')).toBe('listbox');
+    const opts = options();
+    expect(opts).toHaveLength(2);
+    expect(opts.map((el) => el.id)).toEqual(['cc-opt-0', 'cc-opt-1']);
+    expect(input().getAttribute('aria-expanded')).toBe('true');
+    expect(input().getAttribute('aria-activedescendant')).toBe('cc-opt-0');
+    expect(opts[0].getAttribute('aria-selected')).toBe('true');
+    expect(opts[1].getAttribute('aria-selected')).toBe('false');
+  });
+
+  it('ArrowDown moves aria-activedescendant and aria-selected to the next option', () => {
+    const el = type('/o');
+    el.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowDown', bubbles: true }));
+    expect(input().getAttribute('aria-activedescendant')).toBe('cc-opt-1');
+    const opts = options();
+    expect(opts[0].getAttribute('aria-selected')).toBe('false');
+    expect(opts[1].getAttribute('aria-selected')).toBe('true');
+  });
+
+  it('hovering an option syncs aria-selected and the active descendant', () => {
+    type('/o');
+    options()[1].dispatchEvent(new MouseEvent('mouseenter', { bubbles: true }));
+    expect(input().getAttribute('aria-activedescendant')).toBe('cc-opt-1');
+    expect(options()[1].getAttribute('aria-selected')).toBe('true');
+  });
+
+  it('help mode announces a note, not a listbox, with no active descendant', () => {
+    type('?');
+    expect(cc().getAttribute('role')).toBe('note');
+    expect(options()).toHaveLength(0);
+    expect(input().getAttribute('aria-expanded')).toBe('true');
+    expect(input().hasAttribute('aria-activedescendant')).toBe(false);
+  });
+
+  it('collapses the combobox when the popup hides (no match / search)', () => {
+    type('/o');
+    type('/zzz'); // no match -> hidden
+    expect(input().getAttribute('aria-expanded')).toBe('false');
+    expect(input().hasAttribute('aria-activedescendant')).toBe(false);
+    expect(cc().hasAttribute('role')).toBe(false);
+  });
+});
+
 // ---- chooseFromComplete (channel navigation) -----------------------------
 
 describe('chooseFromComplete', () => {
@@ -219,7 +275,7 @@ describe('chooseFromComplete', () => {
     type('/o'); // matches home + explorer (both contain "o"), in registry order
     const list = items();
     expect(list.map((el) => el.dataset.ch)).toEqual(['home', 'explorer']);
-    list[1].dispatchEvent(new MouseEvent('mouseenter', { bubbles: true })); // ccIndex → 1
+    list[1].dispatchEvent(new MouseEvent('mouseenter', { bubbles: true })); // complete.idx → 1
     list[1].dispatchEvent(new MouseEvent('click', { bubbles: true }));
     expect(channels.navigate).toHaveBeenCalledWith('explorer');
   });
@@ -261,5 +317,49 @@ describe('applySearch', () => {
     type('');
     expect(document.querySelector('mark')).toBeNull();
     expect(document.querySelector('.search-dim')).toBeNull();
+  });
+});
+
+// ---- slash commands (easter-egg /help, /whoami, … in the "/" popup) -------
+
+describe('slash commands', () => {
+  const notices = () => [...document.getElementById('feed').querySelectorAll('.sys-notice')];
+
+  beforeEach(() => {
+    setChannels([ch('home'), ch('explorer'), ch('activity')]);
+    command.initCommand({ meta: { server: 'irc.test', bootTime: Date.now() } });
+  });
+
+  it('surfaces a matching command in the "/" popup, tagged is-cmd', () => {
+    type('/whoami'); // no channel matches "whoami"
+    const list = items();
+    expect(list).toHaveLength(1);
+    expect(list[0].classList.contains('is-cmd')).toBe(true);
+    expect(list[0].querySelector('.cc-ch').textContent).toContain('whoami');
+  });
+
+  it('keeps commands hidden on a bare "/" (channels only)', () => {
+    type('/');
+    expect(items().some((el) => el.classList.contains('is-cmd'))).toBe(false);
+    expect(items().map((el) => el.dataset.ch)).toEqual(['home', 'explorer', 'activity']);
+  });
+
+  it('Enter on a command prints server-notice line(s) and does not navigate', () => {
+    const input = type('/help');
+    input.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
+    const out = notices();
+    expect(out.length).toBeGreaterThan(1);
+    expect(out[0].textContent).toMatch(/slash commands/);
+    expect(input.value).toBe('');
+    expect(channels.navigate).not.toHaveBeenCalled();
+  });
+
+  it('/clear removes existing notices', () => {
+    let input = type('/help');
+    input.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
+    expect(notices().length).toBeGreaterThan(0);
+    input = type('/clear');
+    input.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
+    expect(notices()).toHaveLength(0);
   });
 });

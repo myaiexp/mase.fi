@@ -1,0 +1,311 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>tokens · prototype</title>
+<!-- Consumes the worktree's own base.css so any token refinement renders live -->
+<link rel="stylesheet" href="src/base.css">
+<style>
+  body {
+    padding: 24px 28px 64px;
+    max-width: 860px;
+    color: var(--text);
+  }
+
+  h1 {
+    font-size: var(--text-md);
+    color: var(--text-dim);
+    font-weight: 500;
+    letter-spacing: 0.02em;
+    margin-bottom: 4px;
+  }
+
+  .lede {
+    color: var(--text-muted);
+    font-size: var(--text-sm);
+    margin-bottom: 32px;
+    max-width: 60ch;
+    text-wrap: pretty;
+  }
+
+  section { margin-bottom: 34px; }
+
+  .recipe {
+    font-size: var(--text-xs);
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    margin-bottom: 8px;
+  }
+
+  h2 {
+    font-size: var(--text-base);
+    font-weight: 500;
+    color: var(--text);
+    margin-bottom: 2px;
+  }
+
+  .note {
+    color: var(--text-muted);
+    font-size: var(--text-sm);
+    margin-bottom: 14px;
+    max-width: 64ch;
+    text-wrap: pretty;
+  }
+
+  /* Swatch grid — one card per token */
+  .grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+    gap: 8px;
+  }
+
+  .swatch {
+    border: 1px solid var(--border);
+    display: flex;
+    flex-direction: column;
+  }
+
+  .swatch .chip {
+    height: 44px;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .swatch .meta {
+    padding: 6px 8px;
+    background: var(--bg-surface);
+  }
+
+  .swatch .name {
+    font-size: var(--text-sm);
+    color: var(--text);
+  }
+
+  .swatch .alias {
+    font-size: var(--text-xs);
+    color: var(--text-muted);
+  }
+
+  .swatch .val {
+    font-size: var(--text-xs);
+    color: var(--text-muted);
+    margin-top: 2px;
+  }
+
+  /* Foreground rows — colored text sample */
+  .fg-row {
+    display: flex;
+    align-items: baseline;
+    gap: 12px;
+    padding: 8px 0;
+  }
+  .fg-row + .fg-row { border-top: 1px solid var(--border); }
+  .fg-sample { font-size: var(--text-md); flex: 1; }
+  .fg-tokens { text-align: right; font-size: var(--text-xs); color: var(--text-muted); white-space: nowrap; }
+  .fg-tokens b { color: var(--text-dim); font-weight: 400; }
+
+  /* Type scale */
+  .type-row {
+    display: flex;
+    align-items: baseline;
+    gap: 16px;
+    padding: 7px 0;
+  }
+  .type-row + .type-row { border-top: 1px solid var(--border); }
+  .type-sample { flex: 1; color: var(--text); }
+  .type-tokens { font-size: var(--text-xs); color: var(--text-muted); white-space: nowrap; }
+  .type-tokens b { color: var(--text-dim); font-weight: 400; }
+  .type-role { color: var(--text-muted); }
+
+  /* Spacing scale */
+  .space-row {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    padding: 6px 0;
+  }
+  .space-row + .space-row { border-top: 1px solid var(--border); }
+  .space-bar { background: var(--accent); height: 12px; flex-shrink: 0; }
+  .space-tokens { font-size: var(--text-xs); color: var(--text-muted); }
+  .space-tokens b { color: var(--text-dim); font-weight: 400; }
+
+  .kv { font-size: var(--text-sm); color: var(--text-dim); }
+  .kv b { color: var(--text); font-weight: 400; }
+  .kv .square {
+    display: inline-block; width: 12px; height: 12px;
+    border: 1px solid var(--border-hover); vertical-align: -1px; margin-right: 6px;
+  }
+</style>
+</head>
+<body>
+
+<h1>design tokens</h1>
+<p class="lede">The full custom-property inventory from <code>base.css</code>, rendered live — every swatch reads its own computed value at load, so this specimen can't drift from the source. AMOLED-true-black, zinc greys, one amber accent, monospace, square.</p>
+
+<section>
+  <div class="recipe">Surfaces</div>
+  <h2>Elevation ramp</h2>
+  <p class="note">Three app surfaces over true-black, plus a shared hover tint and two overlay surfaces. The steps are close on purpose — elevation is structural (borders), not shadow. See the elevation card for the overlay contract.</p>
+  <div class="grid" data-group="surfaces"></div>
+</section>
+
+<section>
+  <div class="recipe">Borders</div>
+  <h2>1px dividers</h2>
+  <p class="note">No drop shadows anywhere. Overlays escalate to the stronger rim so they don't bleed into the black.</p>
+  <div class="grid" data-group="borders"></div>
+</section>
+
+<section>
+  <div class="recipe">Foreground</div>
+  <h2>Text hierarchy</h2>
+  <p class="note"><code>--fg-*</code> is canonical; <code>--text*</code> are live back-compat aliases pointing at the same value. Prefer <code>--fg-*</code> in new code.</p>
+  <div data-group="fg"></div>
+</section>
+
+<section>
+  <div class="recipe">Accent</div>
+  <h2>Amber — one accent</h2>
+  <p class="note"><code>--accent-glow</code> is the amber tint surface (primary buttons, selection) — the accent's analog of a <code>--*-bg</code>.</p>
+  <div class="grid" data-group="accent"></div>
+</section>
+
+<section>
+  <div class="recipe">Semantic palette</div>
+  <h2>Roles, not decoration</h2>
+  <p class="note">Fixed meaning across every project. Hover a swatch's role below. Don't reach for <code>--green</code> because you want a green.</p>
+  <div class="grid" data-group="semantic"></div>
+</section>
+
+<section>
+  <div class="recipe">Semantic surfaces</div>
+  <h2>15% tints</h2>
+  <p class="note">Pre-mixed fills for banners and badges, over true-black. Note the asymmetry — there is no <code>--cyan-bg</code> (cyan is a mark/text color, not a filled surface).</p>
+  <div class="grid" data-group="semanticBg"></div>
+</section>
+
+<section>
+  <div class="recipe">Type</div>
+  <h2>Five sizes, one family</h2>
+  <p class="note">Monospace-only. Only 400 + 700 ship; <code>font-weight: 500</code> renders from the 400 file — safe subtle emphasis without a third weight.</p>
+  <div data-group="type"></div>
+  <p class="kv" style="margin-top:12px;">family <b id="fam"></b> · line-height <b id="lh"></b> / <b id="lht"></b> tight</p>
+</section>
+
+<section>
+  <div class="recipe">Spacing</div>
+  <h2>2 / 4 / 8 / 12 / 16 / 24</h2>
+  <p class="note">Six steps, roughly doubling, tuned for a dense monospace UI. Bars drawn at each token's real width.</p>
+  <div data-group="space"></div>
+</section>
+
+<section>
+  <div class="recipe">Motion &amp; radii</div>
+  <h2>Square, one timing</h2>
+  <p class="note">Corner radius is intentionally zero — the system is square. One transition timing for hover/focus/color shifts.</p>
+  <p class="kv"><span class="square" id="radius-demo"></span><code>--radius</code> = <b id="radius-val"></b> — square</p>
+  <p class="kv" style="margin-top:6px;"><code>--transition</code> = <b id="transition-val"></b></p>
+</section>
+
+<script>
+  const cs = getComputedStyle(document.documentElement);
+  const val = (name) => cs.getPropertyValue(name).trim();
+
+  // --- color/surface swatches ---
+  const swatch = (name, alias) => {
+    const el = document.createElement('div');
+    el.className = 'swatch';
+    el.innerHTML =
+      `<div class="chip" style="background: var(${name})"></div>` +
+      `<div class="meta">` +
+        `<div class="name">${name}</div>` +
+        (alias ? `<div class="alias">→ ${alias}</div>` : '') +
+        `<div class="val">${val(name) || '—'}</div>` +
+      `</div>`;
+    return el;
+  };
+
+  const GROUPS = {
+    surfaces:   ['--bg', '--bg-surface', '--bg-raised', '--bg-hover', '--bg-overlay', '--bg-overlay-rim'],
+    borders:    ['--border', '--border-hover', '--border-overlay'],
+    accent:     ['--accent', '--accent-text', '--accent-glow'],
+    semantic:   ['--green', '--red', '--blue', '--cyan', '--orange', '--purple'],
+    semanticBg: ['--green-bg', '--red-bg', '--orange-bg', '--blue-bg', '--purple-bg'],
+  };
+  for (const [group, names] of Object.entries(GROUPS)) {
+    const host = document.querySelector(`[data-group="${group}"]`);
+    names.forEach((n) => host.appendChild(swatch(n)));
+  }
+
+  // Semantic role tooltips
+  const ROLES = {
+    '--green': 'success / working', '--red': 'error / danger', '--blue': 'tools / info / links',
+    '--cyan': 'results / tokens', '--orange': 'warnings / pending', '--purple': 'agents / thinking / Kelo',
+  };
+  document.querySelectorAll('[data-group="semantic"] .swatch').forEach((el, i) => {
+    const n = GROUPS.semantic[i];
+    el.title = ROLES[n] || '';
+    const meta = el.querySelector('.meta');
+    const role = document.createElement('div');
+    role.className = 'alias';
+    role.textContent = ROLES[n] || '';
+    meta.insertBefore(role, meta.querySelector('.val'));
+  });
+
+  // --- foreground text rows ---
+  const FG = [
+    ['--fg-1', '--text',       'Primary — headings, key content'],
+    ['--fg-2', '--text-dim',   'Secondary — body, dim labels'],
+    ['--fg-3', '--text-muted', 'Muted — timestamps, meta, placeholders'],
+  ];
+  const fgHost = document.querySelector('[data-group="fg"]');
+  FG.forEach(([name, alias, role]) => {
+    const row = document.createElement('div');
+    row.className = 'fg-row';
+    row.innerHTML =
+      `<div class="fg-sample" style="color: var(${name})">${role}</div>` +
+      `<div class="fg-tokens"><b>${name}</b> · ${alias}<br>${val(name)}</div>`;
+    fgHost.appendChild(row);
+  });
+
+  // --- type scale ---
+  const TYPE = [
+    ['--text-lg',   'heading — h1'],
+    ['--text-md',   'subhead — h2'],
+    ['--text-base', 'body — default'],
+    ['--text-sm',   'meta · badges · buttons'],
+    ['--text-xs',   'micro-caps · form labels'],
+  ];
+  const typeHost = document.querySelector('[data-group="type"]');
+  TYPE.forEach(([name, role]) => {
+    const row = document.createElement('div');
+    row.className = 'type-row';
+    row.innerHTML =
+      `<div class="type-sample" style="font-size: var(${name})">The quick brown fox — 0123</div>` +
+      `<div class="type-tokens"><b>${name}</b> ${val(name)} <span class="type-role">· ${role}</span></div>`;
+    typeHost.appendChild(row);
+  });
+  document.getElementById('fam').textContent = val('--font');
+  document.getElementById('lh').textContent = val('--leading');
+  document.getElementById('lht').textContent = val('--leading-tight');
+
+  // --- spacing scale ---
+  const SPACE = ['--space-1', '--space-2', '--space-3', '--space-4', '--space-5', '--space-6'];
+  const spaceHost = document.querySelector('[data-group="space"]');
+  SPACE.forEach((name) => {
+    const row = document.createElement('div');
+    row.className = 'space-row';
+    row.innerHTML =
+      `<div class="space-bar" style="width: var(${name})"></div>` +
+      `<div class="space-tokens"><b>${name}</b> · ${val(name)}</div>`;
+    spaceHost.appendChild(row);
+  });
+
+  // --- motion & radii ---
+  document.getElementById('radius-val').textContent = val('--radius');
+  document.getElementById('radius-demo').style.borderRadius = 'var(--radius)';
+  document.getElementById('transition-val').textContent = val('--transition');
+</script>
+
+</body>
+</html>

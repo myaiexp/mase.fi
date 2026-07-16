@@ -28,7 +28,8 @@ function sampleScramble() {
 
 // Returns a destruction progress in [0,1] for a char at `charX` given beam center `beamX`.
 // 0 = pristine, 1 = ash. The slope models charge → peak → decay → ash.
-function destructionAt(charX, beamX) {
+// Exported for unit testing — pure, deterministic, no DOM/animation dependency.
+export function destructionAt(charX, beamX) {
   const d = beamX - charX;
   if (d < -CHARGE_R)            return 0;
   if (d < 0)                    return (d + CHARGE_R) / CHARGE_R * 0.40;       // 0..0.40 charge

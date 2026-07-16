@@ -2,14 +2,71 @@
 # Generate daily summary entries from today's log entries in updates.json
 set -euo pipefail
 
-UPDATES_FILE="/var/www/html/updates.json"
+UPDATES_FILE="${UPDATES_FILE:-/var/www/html/updates.json}"
 TODAY=$(TZ="Europe/Helsinki" date +%Y-%m-%d)
-CREDS_FILE="${HOME}/.claude/.credentials.json"
+# Summaries come from the Claude Code CLI in headless print mode. Absolute path
+# because the systemd *user* service runs with a minimal PATH that excludes
+# ~/.local/bin (curl/jq/awk resolve only because they live in /usr/bin).
+CLAUDE_BIN="${CLAUDE_BIN:-/home/mase/.local/bin/claude}"
+CLAUDE_MODEL="${CLAUDE_MODEL:-sonnet}"
+CLAUDE_TIMEOUT="${CLAUDE_TIMEOUT:-120}"
+# Ceiling on daily lines a single busy project can post. The model judges how
+# many distinct notable threads a day held (default one); this only stops a huge
+# day from flooding #home. Not derived from commit count — a 60-commit refactor
+# sweep is still one line, a feature-packed day earns several.
+MAX_LINES="${MAX_LINES:-3}"
+NTFY_URL="${NTFY_URL:-https://ntfy.mase.fi/kelo}"
+HELM_ENV="${HELM_ENV:-/home/mase/Projects/helm/.env}"
+# Run claude from a throwaway empty dir. Invoked inside a project checkout it
+# would auto-load that repo's CLAUDE.md + recent-commit context into its prompt,
+# which leaks into the summary (e.g. describing today's commits instead of the
+# ones passed in). An empty dir has neither, so output depends only on the prompt
+# regardless of where the script runs. Removed in the exit trap.
+CLAUDE_CWD="$(mktemp -d)"
+
+# Best-effort ntfy push, isolated in a subshell so `set +e` and any failing
+# command here can't propagate into the script's `set -e`. Token from $NTFY_TOKEN
+# or helm's .env — no systemd EnvironmentFile needed, so this observability lives
+# entirely in the versioned script (mirrors helm's refuse-dirty-tree helper).
+ntfy_send() (
+  set +e
+  title="$1"; body="$2"
+  token="${NTFY_TOKEN:-}"
+  if [ -z "$token" ] && [ -f "$HELM_ENV" ]; then
+    token=$(grep -E '^NTFY_TOKEN=' "$HELM_ENV" 2>/dev/null | head -1 | cut -d= -f2-)
+  fi
+  [ -n "$token" ] || exit 0
+  curl -fsS -m 10 \
+    -H "Authorization: Bearer $token" \
+    -H "Title: $title" \
+    -d "$body" \
+    "$NTFY_URL" >/dev/null 2>&1 || true
+)
+
+# `set -euo pipefail` aborts before any in-script alert, so a hard failure (jq
+# error, a broken pipe, mid-run I/O) would degrade the homepage silently. Fire
+# one alert on any non-zero exit; the intentional skip paths below all `exit 0`,
+# so a normal no-op run stays quiet.
+on_exit() {
+  local rc=$?
+  [[ -n "${CLAUDE_CWD:-}" && -d "${CLAUDE_CWD:-}" ]] && rm -rf "$CLAUDE_CWD"
+  if [[ $rc -ne 0 ]]; then
+    ntfy_send "mase.fi daily-summary FAILED (exit $rc)" \
+      "${TODAY}: daily-summary aborted (exit $rc) — check: journalctl --user -u mase-fi-daily-summary"
+  fi
+}
+trap on_exit EXIT
 
 if [[ ! -f "$UPDATES_FILE" ]]; then
     echo "No updates.json found"
     exit 0
 fi
+
+# Refresh the homepage projects list from helm showcase flags first — it is
+# derived, not hand-maintained (see scripts/mase-fi-projects). Best-effort and
+# independent of the summary logic below; leaves .projects untouched if helm is
+# unreachable, so a bad run can never blank the sidebar.
+"$(dirname "$(readlink -f "$0")")/mase-fi-projects" || echo "projects refresh failed (non-fatal)" >&2
 
 # Skip if daily entries already exist for today (idempotency)
 DAILY_EXISTS=$(jq --arg date "$TODAY" '[.entries[] | select(.category == "daily" and .date == $date)] | length' "$UPDATES_FILE")
@@ -26,49 +83,139 @@ if [[ "$LOG_COUNT" -eq 0 ]]; then
     exit 0
 fi
 
-# Generate AI summary from a list of commit messages via Haiku
-# Falls back to "project: N commits" on failure
+# Keep the model's real summary lines and drop the noise. The prompt asks for one
+# line per notable thread with nothing else, so per line: strip CR + a leading
+# bullet/number marker + a wrapping pair of quotes/backticks, then drop blanks,
+# obvious preamble/meta ("here are…", "N characters", trailing-colon lead-ins).
+# Emit up to MAX_LINES survivors, in order. (Sonnet needs little scrubbing; this
+# is a light net, not the heavy Hermes-era filter — no `<`/`>` rule, which used
+# to wrongly nuke summaries containing an arrow like `a -> b`.)
+clean_lines() {
+    awk -v max="$MAX_LINES" '
+    function trim(s) { sub(/^[[:space:]]+/, "", s); sub(/[[:space:]]+$/, "", s); return s }
+    {
+        line = $0
+        gsub(/\r/, "", line); line = trim(line)
+        sub(/^([0-9]+[.)]|[-*•—])[[:space:]]+/, "", line); line = trim(line)  # list marker
+        if (line ~ /^".*"$/ || line ~ /^`.*`$/ || line ~ /^'\''.*'\''$/) line = trim(substr(line, 2, length(line) - 2))
+        if (line == "") next
+        low = tolower(line)
+        if (low ~ /^(here (are|is)|these |output:|summary:|changes:|note:)/) next  # preamble
+        if (line ~ /^[0-9]+ characters/) next          # self-check meta
+        if (line ~ /:[[:space:]]*$/) next              # trailing-colon lead-in
+        # drop narration about the commits, the day, or the model itself, which
+        # Sonnet occasionally prepends (two-lines-one-per-project, commits-are-
+        # all-from-one-day, let-me-write-the-changelog) — the real changelog
+        # lines that follow it survive.
+        if (low ~ /^(one|two|three|four|five|six|seven|eight|nine|ten|[0-9]+) lines?\b/) next
+        if (low ~ /\b(all |the )?commits (are|were|show|span|look|appear)\b/) next
+        if (low ~ /^today.?s (git )?(log|commits|work)/) next
+        if (low ~ /^let me\b/) next
+        if (low ~ /\bone per project\b/) next
+        if (low ~ /\bfrom a single day\b/) next
+        if (low ~ /\bappear to be\b/) next
+        if (low ~ /\bdistinct threads\b/) next
+        # drop conversational refusals / no-input replies: Claude Code sometimes
+        # tries to read a repo instead of the provided commits and then bails.
+        # The prompt makes these rare; this is the safety net.
+        if (low ~ /\bno (commit|work|git|changes|actual)/) next
+        if (low ~ /\b(in|from) your message\b/) next
+        if (low ~ /^i (don.?t|do not|only|need|can.?t|cannot|see|notice|am )/) next
+        if (low ~ /(could|can) you (paste|provide|share|clarify)/) next
+        if (low ~ /^(please|paste|provide)\b/) next
+        if (low ~ /^wait\b/) next
+        if (low ~ /working director/) next
+        if (low ~ /the user (only )?(supplied|provided|gave)/) next
+        print line
+        if (++n >= max) exit
+    }
+    '
+}
+
+# A highlight list is short by design; clamp a rambling reply to the last whole
+# item under ~110 chars rather than dumping an over-long line on the homepage.
+# If the clamp lands mid-parenthetical, drop the dangling "(fragment" too so the
+# line doesn't end on an unclosed paren.
+truncate_summary() {
+    local s="$1" max=110
+    if (( ${#s} > max )); then
+        local head="${s:0:$max}"
+        if [[ "$head" == *,* ]]; then s="${head%,*}"; else s="${head% *}…"; fi
+    fi
+    if [[ "$s" == *"("* && "$s" != *")"* ]]; then s="${s% (*}"; fi
+    printf '%s' "$s"
+}
+
+# Summarize a project's day into 1..MAX_LINES legible lines via the Claude Code
+# CLI (`claude -p`, Sonnet) in headless print mode. The model judges how many
+# distinct notable threads the day held — most days are one line; a day that
+# ships several separate things earns a line each. No tools are needed for pure
+# text generation; the `timeout` wrapper is the backstop if the model ever stalls
+# or attempts a tool in the unattended 23:55 run. Prints one cleaned+truncated
+# summary per line; falls back to a single "project: N commits" line on any
+# non-zero exit, timeout, or empty reply — the silent-degradation signal the main
+# loop counts and alerts on.
 generate_summary() {
     local project="$1"
     local commits_text="$2"
     local count="$3"
     local fallback="${project}: ${count} commits"
 
-    local token
-    token=$(jq -r '.claudeAiOauth.accessToken // empty' "$CREDS_FILE" 2>/dev/null)
-    if [[ -z "$token" ]]; then
-        echo "$fallback"
-        return
-    fi
-
+    # "What did the developer do today" for a semi-technical reader — terse and
+    # technical is fine, just legible. Output is one line per genuinely distinct
+    # notable thread (default ONE line); internal churn rides as a trailing
+    # mention or drops, since the raw commits live in the activity feed. The two
+    # examples anchor the split: a maintenance day → one line; a two-feature day
+    # → two lines. Char target is soft (Sonnet doesn't need Hermes-era clamping).
     local prompt
-    prompt="Summarize these git commits into a terse comma-separated list of highlights. Max 80 characters. No project name prefix. Lowercase. Example output: kanban board, multiline prompts, UI fixes
+    prompt="You are writing a short daily changelog for ONE software project from its git commits — a legible \"what did the developer do today\". Terse and technical is fine; do not dumb it down, do not pad it. The commits are listed at the end under \"Commits:\" and are the complete and only input — do not look for a git repository, do not run git, and do not ask for more commits or context; summarize exactly what is listed.
+
+Output 1 to ${MAX_LINES} lines, one line per genuinely distinct, notable thread of work, most significant first. MOST DAYS ARE ONE LINE. Use more only when the day clearly holds separate significant efforts (e.g. two unrelated features, or a feature plus a notable fix). A line reads as what happened, and may include the why when the commits make it clear. Internal churn — refactors, audits, tests, dependency bumps, lint — is NOT worth its own line: fold it into a trailing mention on another line, or drop it. The full commit list is available elsewhere.
+
+Each line: lowercase, terse, under ~110 characters. Output ONLY the lines — no numbering, no bullets, no preamble, no quotes, no project name, no commentary. Never narrate the commits, the day, or your own process — no lines like \"one line\", \"two lines\", \"commits are all from one day\", \"distinct threads\", \"one per project\", or \"let me…\". Emit only the changelog line(s) themselves.
+
+Example — a maintenance-heavy day, one line:
+Commits:
+refactor(auth): extract token helper
+test(auth): cover refresh flow
+chore(deps): bump axios
+fix(auth): handle expired token
+Output:
+auth token handling hardened + refresh test coverage
+
+Example — a day with two distinct features, two lines:
+Commits:
+feat(map): directory picker for saves
+feat(map): bounded BFS path resolver
+refactor(save): split orchestration module
+feat(ui): dark mode toggle
+Output:
+directory-picker saves with a bounded path resolver
+added a dark mode toggle
 
 Commits:
 ${commits_text}"
 
-    local payload
-    payload=$(jq -n --arg prompt "$prompt" '{
-        model: "claude-haiku-4-5-20251001",
-        max_tokens: 60,
-        messages: [{role: "user", content: $prompt}]
-    }')
-
+    # Run from the neutral CLAUDE_CWD so no ambient repo context leaks in.
+    # `</dev/null` skips claude's 3s "no stdin" wait; `|| true` keeps a single
+    # failed/timed-out call from aborting the whole run under `set -e` — this
+    # project falls back, the rest still get summarized.
     local response
-    response=$(curl -s --max-time 10 \
-        -H "Authorization: Bearer ${token}" \
-        -H "anthropic-version: 2023-06-01" \
-        -H "anthropic-beta: oauth-2025-04-20" \
-        -H "content-type: application/json" \
-        -d "$payload" \
-        "https://api.anthropic.com/v1/messages" 2>/dev/null)
+    response=$(cd "$CLAUDE_CWD" && timeout "$CLAUDE_TIMEOUT" "$CLAUDE_BIN" -p "$prompt" --model "$CLAUDE_MODEL" </dev/null 2>/dev/null) || true
 
-    local summary
-    summary=$(echo "$response" | jq -r '.content[0].text // empty' 2>/dev/null)
+    local lines
+    lines=$(printf '%s' "$response" | clean_lines)
 
-    if [[ -n "$summary" ]]; then
-        echo "$summary"
+    if [[ -n "$lines" ]]; then
+        local l
+        while IFS= read -r l; do
+            l="${l#"$project": }"   # drop a redundant leading "project:" the model sometimes adds
+            truncate_summary "$l"; echo
+        done <<< "$lines"
     else
+        # Log the failed/empty reply to the journal so a fallback is diagnosable
+        # (the delegate era discarded the reply, leaving every fallback a black box).
+        echo "generate_summary: empty/failed claude reply for '${project}' — falling back to count" >&2
         echo "$fallback"
     fi
 }
@@ -82,23 +229,35 @@ jq --arg date "$TODAY" '
 # Build daily entries with AI summaries
 echo '[]' > /tmp/daily_entries.json
 
+FALLBACK_COUNT=0     # projects where claude produced nothing usable
+SUMMARIZED_COUNT=0   # projects that actually went through claude (multi-commit)
+
 for i in $(jq -r 'range(length)' /tmp/daily_groups.json); do
     project=$(jq -r ".[$i].project" /tmp/daily_groups.json)
     count=$(jq -r ".[$i].commits | length" /tmp/daily_groups.json)
     commits_json=$(jq -c ".[$i].commits" /tmp/daily_groups.json)
 
     if [[ "$count" -eq 1 ]]; then
-        summary=$(jq -r ".[$i].commits[0]" /tmp/daily_groups.json)
+        summaries=$(jq -r ".[$i].commits[0]" /tmp/daily_groups.json)   # single commit → verbatim, one line
     else
         commits_text=$(jq -r ".[$i].commits[]" /tmp/daily_groups.json)
-        summary=$(generate_summary "$project" "$commits_text" "$count")
+        summaries=$(generate_summary "$project" "$commits_text" "$count")   # 1..MAX_LINES lines
+        SUMMARIZED_COUNT=$((SUMMARIZED_COUNT + 1))
+        # generate_summary echoes exactly this one line when claude fails/times out
+        # or its reply cleans to nothing — the silent-degradation signal. The model
+        # prompt forbids the "project: N" shape, so a real summary can't collide.
+        [[ "$summaries" == "${project}: ${count} commits" ]] && FALLBACK_COUNT=$((FALLBACK_COUNT + 1))
     fi
 
-    jq --arg date "$TODAY" --arg project "$project" --arg summary "$summary" \
-       --argjson commits "$commits_json" \
-       '. + [{date: $date, category: "daily", project: $project, summary: $summary, commits: $commits}]' \
-       /tmp/daily_entries.json > /tmp/daily_entries.json.tmp \
-    && mv /tmp/daily_entries.json.tmp /tmp/daily_entries.json
+    # One daily entry per summary line (a busy project can post several).
+    while IFS= read -r summary; do
+        [[ -z "$summary" ]] && continue
+        jq --arg date "$TODAY" --arg project "$project" --arg summary "$summary" \
+           --argjson commits "$commits_json" \
+           '. + [{date: $date, category: "daily", project: $project, summary: $summary, commits: $commits}]' \
+           /tmp/daily_entries.json > /tmp/daily_entries.json.tmp \
+        && mv /tmp/daily_entries.json.tmp /tmp/daily_entries.json
+    done <<< "$summaries"
 done
 
 rm -f /tmp/daily_groups.json
@@ -112,3 +271,12 @@ jq --slurpfile daily /tmp/daily_entries.json '
 
 DAILY_COUNT=$(jq --arg date "$TODAY" '[.entries[] | select(.category == "daily" and .date == $date)] | length' "$UPDATES_FILE")
 echo "Created $DAILY_COUNT daily summary entries for $TODAY"
+
+# One consolidated alert if any summary silently degraded to a commit count —
+# rather than per-project spam. The run still succeeded (fallback text is valid),
+# so this is informational, not a failure.
+if [[ "$FALLBACK_COUNT" -gt 0 ]]; then
+    ntfy_send "mase.fi daily-summary degraded" \
+        "${TODAY}: ${FALLBACK_COUNT}/${SUMMARIZED_COUNT} project summaries fell back to commit counts — claude -p failed, timed out, or returned nothing usable"
+    echo "Degraded run: ${FALLBACK_COUNT}/${SUMMARIZED_COUNT} projects fell back — ntfy sent"
+fi

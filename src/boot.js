@@ -96,7 +96,8 @@ export function runBoot() {
       setTimeout(finish, 400);
       return;
     }
-    const [text, kind, delay] = script[i++];
+    const [text, kind, delay] = script[i];
+    i++;
     const line = document.createElement('div');
     line.className = 'boot-line';
     if (kind === 'logo-block') {

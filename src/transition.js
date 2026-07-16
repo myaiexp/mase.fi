@@ -1,7 +1,12 @@
 // Channel-switch CRT scanline transition over the feed area
 
-// Tracks the in-flight run's safety timer so a rapid re-switch can cancel it
-// before it wipes the freshly-built overlay.
+// Track the in-flight run's timers so a rapid re-switch can cancel both:
+//  - midTimer:   the midpoint content swap. If left to fire after we've already
+//                navigated on, it renders the now-stale channel (and kicks off
+//                its jitter) over the freshly-navigated one. Cancel it on re-entry.
+//  - safetyTimer: the cleanup fallback. Cancel it so it can't tear down the
+//                overlay we're about to rebuild.
+let midTimer = 0;
 let safetyTimer = 0;
 
 /** Play the scanline transition; calls onMid at the midpoint where content should swap. */
@@ -13,7 +18,9 @@ export function playSwitchTransition(onMid) {
   const $overlay = document.getElementById('feed-overlay');
 
   // A rapid re-switch can land mid-sweep; cancel the previous run's pending
-  // cleanup so it can't tear down the overlay we're about to rebuild.
+  // midpoint swap (so it can't render the now-stale channel) and its cleanup
+  // timer (so it can't tear down the overlay we're about to rebuild).
+  if (midTimer) { clearTimeout(midTimer); midTimer = 0; }
   if (safetyTimer) { clearTimeout(safetyTimer); safetyTimer = 0; }
 
   $overlay.replaceChildren(); // safe: clearing our own controlled element
@@ -34,8 +41,8 @@ export function playSwitchTransition(onMid) {
 
   // Swap content ~a third of the way down, under the descending band, so the
   // new feed reads as wiped in. The sweep is composited, so this synchronous
-  // relayout can no longer stall it.
-  setTimeout(onMid, durMs * 0.33);
+  // relayout doesn't stall it. Tracked so a rapid re-switch can cancel it.
+  midTimer = setTimeout(() => { midTimer = 0; onMid(); }, durMs * 0.33);
 
   const done = () => {
     if (safetyTimer) { clearTimeout(safetyTimer); safetyTimer = 0; }

@@ -1,0 +1,62 @@
+#!/usr/bin/env bash
+# Regenerate updates.json's .projects array from helm showcase flags.
+#
+# The projects list is DERIVED, not hand-maintained: a project appears on the
+# mase.fi homepage exactly when it is flagged in helm
+#   helm project set-showcase <name> --url <url> --tagline "<blurb>" [--name "<Display>"]
+# and drops off when un-flagged (helm project unset-showcase <name>) or archived.
+# Heat/recency are computed client-side from entries, so this only supplies the
+# per-project metadata: name, channel (mase.fi route + sidebar label), slug
+# (matches entry.project), url, desc.
+#
+# A project's mase.fi channel (route + sidebar label) is its helm project name —
+# the url is NOT a reliable channel source (helm → cc.mase.fi, central-hub →
+# db.mase.fi). So channel = slug here.
+#
+# SHOWCASE_EXTRA (optional) points at a JSON array of full {name,channel,slug,
+# url,desc} entries for public projects that are NOT in the helm registry, or
+# whose mase.fi channel must differ from their helm name (e.g. porssi ↔ spot-price).
+#
+# Safety: if the showcase API is unreachable or returns nothing, the existing
+# .projects is left untouched (never wiped).
+set -euo pipefail
+
+UPDATES="${UPDATES_FILE:-/var/www/html/updates.json}"
+API="${SHOWCASE_API:-http://localhost:9754/api/projects/showcase}"
+EXTRA="${SHOWCASE_EXTRA:-/home/mase/Projects/mase.fi/scripts/showcase-extra.json}"
+
+showcased="$(curl -s --max-time 15 "$API" 2>/dev/null || true)"
+if ! printf '%s' "$showcased" | jq -e 'type=="array"' >/dev/null 2>&1; then
+    echo "showcase API unavailable or non-array — leaving .projects unchanged" >&2
+    exit 0
+fi
+
+extra='[]'
+[[ -f "$EXTRA" ]] && extra="$(cat "$EXTRA" 2>/dev/null || echo '[]')"
+
+projects="$(jq -n --argjson sc "$showcased" --argjson extra "$extra" '
+  ($sc | map(
+     (.slug // (.name | ascii_downcase)) as $slug
+     | {
+         name: .name,
+         slug: $slug,
+         channel: $slug,
+         url: .url,
+         desc: (.tagline // "")
+       }))
+  + $extra
+  | unique_by(.channel)
+  | sort_by(.channel)
+')"
+
+n="$(printf '%s' "$projects" | jq 'length')"
+if [[ "$n" -lt 1 ]]; then
+    echo "0 showcased projects — leaving .projects unchanged" >&2
+    exit 0
+fi
+
+tmp="$(mktemp)"
+jq --argjson p "$projects" '.projects = $p' "$UPDATES" > "$tmp"
+jq empty "$tmp" || { echo "generated invalid JSON — aborting, .projects unchanged" >&2; exit 1; }
+cp "$tmp" "$UPDATES"
+echo "wrote $n showcased projects to $UPDATES"

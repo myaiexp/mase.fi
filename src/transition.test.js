@@ -115,6 +115,29 @@ describe('playSwitchTransition — safety timeout fallback', () => {
   });
 });
 
+describe('playSwitchTransition — rapid re-switch cancels the stale midpoint swap', () => {
+  it('a second switch cancels the first run\'s pending onMid so only the latest channel renders', () => {
+    stubReducedMotion(false);
+    mountOverlay();
+    const onMidA = vi.fn();
+    const onMidB = vi.fn();
+
+    // First switch: schedules onMidA at the midpoint (~138ms).
+    playSwitchTransition(onMidA);
+    vi.advanceTimersByTime(50); // partway through — onMidA has not fired yet
+    expect(onMidA).not.toHaveBeenCalled();
+
+    // Rapid re-switch before the midpoint: must cancel onMidA's pending swap so
+    // it can't render the now-stale channel A over the freshly-navigated B.
+    playSwitchTransition(onMidB);
+    vi.advanceTimersByTime(MIDPOINT_MS);
+
+    // The stale first swap never runs; only the latest channel's onMid fires.
+    expect(onMidA).not.toHaveBeenCalled();
+    expect(onMidB).toHaveBeenCalledTimes(1);
+  });
+});
+
 describe('playSwitchTransition — animationend + safety timer do not double-fire', () => {
   it('calls onMid exactly once even when the safety window also elapses', () => {
     stubReducedMotion(false);

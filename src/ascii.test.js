@@ -1,6 +1,6 @@
-// Unit tests for ascii.js pure helpers (sparkbar, scramble, boxHeader).
+// Unit tests for ascii.js pure helpers (sparkbar, scramble).
 import { describe, it, expect, vi, afterEach } from 'vitest';
-import { sparkbar, scramble, boxHeader, GLYPHS } from './ascii.js';
+import { sparkbar, scramble, GLYPHS } from './ascii.js';
 
 const BARS = '▁▂▃▄▅▆▇█'; // 8 cells, indices 0..7
 const DIGITS = '0123456789ABCDEF'; // module-private in ascii.js; mirrored here for assertions
@@ -92,39 +92,5 @@ describe('scramble', () => {
   it('does not replace when stubbed Math.random equals p (0 < 0 is false)', () => {
     vi.spyOn(Math, 'random').mockReturnValue(0);
     expect(scramble('abc', 0)).toBe('abc');
-  });
-});
-
-describe('boxHeader', () => {
-  it('builds a header with a right label, total length equal to width', () => {
-    const out = boxHeader('LOGS', '12ms', 40);
-    expect(out.startsWith('┌── LOGS ')).toBe(true);
-    expect(out.endsWith(' 12ms ──┐')).toBe(true);
-    expect(out.length).toBe(40);
-    // l='┌── LOGS ' (9) + r=' 12ms ──┐' (9) => 22 dashes
-    expect(out).toContain('─'.repeat(22));
-  });
-
-  it('omits the right segment when right is falsy', () => {
-    const out = boxHeader('X', '', 20);
-    expect(out.startsWith('┌── X ')).toBe(true);
-    expect(out.endsWith('──┐')).toBe(true);
-    expect(out).not.toMatch(/ {2}──┐$/); // no " <right> ──┐" form
-    expect(out.length).toBe(20);
-  });
-
-  it('treats null/undefined right the same as empty (no right segment)', () => {
-    expect(boxHeader('X', null, 20)).toBe(boxHeader('X', '', 20));
-    expect(boxHeader('X', undefined, 20)).toBe(boxHeader('X', '', 20));
-  });
-
-  it('clamps the dash run to a minimum of 4 when width is too small', () => {
-    const out = boxHeader('VERYLONGLABEL', 'alsolong', 5);
-    const l = '┌── VERYLONGLABEL ';
-    const r = ' alsolong ──┐';
-    expect(out.startsWith(l)).toBe(true);
-    expect(out.endsWith(r)).toBe(true);
-    expect(out.length).toBe(l.length + 4 + r.length); // exactly 4 dashes
-    expect(out.slice(l.length, out.length - r.length)).toBe('────');
   });
 });

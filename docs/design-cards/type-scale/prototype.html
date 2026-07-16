@@ -1,0 +1,272 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>type scale · prototype</title>
+<!-- Consumes the worktree's own base.css: every step + line-height reads live from the tokens -->
+<link rel="stylesheet" href="src/base.css">
+<style>
+  body { padding: 24px 28px 64px; max-width: 880px; color: var(--text); }
+
+  h1 { font-size: var(--text-md); color: var(--text-dim); font-weight: 500; letter-spacing: 0.02em; margin-bottom: 4px; }
+  .lede { color: var(--text-muted); font-size: var(--text-sm); margin-bottom: 8px; max-width: 68ch; text-wrap: pretty; }
+  .lede code, .note code, .live code { color: var(--text-dim); background: var(--bg-surface); padding: 0 3px; }
+  .live { font-size: var(--text-xs); color: var(--text-muted); margin-bottom: 32px; }
+  .live b { color: var(--text-dim); font-weight: 500; }
+
+  section { margin-bottom: 36px; }
+  .recipe { font-size: var(--text-xs); color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 8px; }
+  h2 { font-size: var(--text-base); font-weight: 500; color: var(--text); margin-bottom: 2px; }
+  .note { color: var(--text-muted); font-size: var(--text-sm); margin-bottom: 16px; max-width: 70ch; text-wrap: pretty; }
+
+  /* Scale ramp — one row per step, live-measured px on the right */
+  .ramp-row { display: flex; align-items: baseline; gap: 20px; padding: 9px 0; }
+  .ramp-row + .ramp-row { border-top: 1px solid var(--border); }
+  .ramp-sample { flex: 1; color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .ramp-meta { text-align: right; white-space: nowrap; font-size: var(--text-xs); color: var(--text-muted); }
+  .ramp-meta b { color: var(--text-dim); font-weight: 500; }
+  .ramp-px { color: var(--accent-text); }
+  .ramp-role { color: var(--text-muted); }
+
+  /* Line-height — two blocks, same copy, the two leadings */
+  .lh-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+  @media (max-width: 680px) { .lh-grid, .role-grid, .thesis-grid { grid-template-columns: 1fr; } }
+  .lh-card { border: 1px solid var(--border); }
+  .lh-head { display: flex; justify-content: space-between; align-items: baseline; padding: 5px 10px; background: var(--bg-surface); border-bottom: 1px solid var(--border); font-size: var(--text-xs); color: var(--text-dim); text-transform: uppercase; letter-spacing: 0.05em; }
+  .lh-head .v { color: var(--accent-text); letter-spacing: 0; }
+  .lh-body { padding: 10px; font-size: var(--text-base); color: var(--text-dim); }
+  .lh-tight { line-height: var(--leading-tight); }
+  .lh-prose { line-height: var(--leading); }
+
+  /* Roles — each rendered with the real base.css class + its recipe */
+  .role-grid { display: grid; grid-template-columns: 1fr; gap: 0; border: 1px solid var(--border); }
+  .role-row { display: grid; grid-template-columns: 1fr 220px; gap: 16px; align-items: center; padding: 11px 12px; }
+  .role-row + .role-row { border-top: 1px solid var(--border); }
+  .role-render { min-width: 0; }
+  .role-spec { text-align: right; font-size: var(--text-xs); color: var(--text-muted); white-space: nowrap; }
+  .role-spec b { color: var(--text-dim); font-weight: 500; }
+  .role-name { color: var(--text-dim); }
+  /* local meta/timestamp role — no base.css class ships for it */
+  .meta-line { font-size: var(--text-sm); color: var(--text-muted); }
+  .meta-line .tnum { font-variant-numeric: tabular-nums; color: var(--text-dim); }
+
+  /* Thesis — same-size/different-weight, and smaller-but-superior */
+  .thesis-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+  .thesis-card { border: 1px solid var(--border); padding: 14px 14px 16px; }
+  .thesis-card .stack > * + * { margin-top: 6px; }
+  .thesis-tag { font-size: var(--text-xs); color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 10px; }
+  .thesis-note { font-size: var(--text-xs); color: var(--text-muted); margin-top: 12px; text-wrap: pretty; }
+  .thesis-note b { color: var(--text-dim); font-weight: 500; }
+  .body12 { font-size: var(--text-base); font-weight: 400; color: var(--fg-1); }
+
+  /* Composite — the whole hierarchy in one realistic surface */
+  .composite { border: 1px solid var(--border); background: var(--bg-surface); }
+  .composite-head { padding: 12px 14px 14px; border-bottom: 1px solid var(--border); }
+  .composite-head h1 { font-size: var(--text-lg); font-weight: 700; color: var(--fg-1); letter-spacing: 0; margin: 0 0 3px; }
+  .composite-head .sub { font-size: var(--text-sm); color: var(--text-muted); }
+  .composite-body { padding: 6px 0 10px; }
+  .composite-body .section-header { color: var(--text-muted); }
+  .composite h3 { font-size: var(--text-base); font-weight: 700; color: var(--fg-1); margin: 0; }
+  .row { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; padding: 7px 14px; }
+  .row + .row { border-top: 1px solid var(--border); }
+  .row-main { min-width: 0; }
+  .row-name { font-size: var(--text-base); color: var(--fg-1); }
+  .row-desc { font-size: var(--text-sm); color: var(--text-muted); }
+  .row-right { display: flex; align-items: center; gap: 8px; white-space: nowrap; }
+  .row-right .ts { font-size: var(--text-sm); color: var(--text-muted); font-variant-numeric: tabular-nums; }
+  .composite-foot { display: flex; align-items: center; gap: 8px; padding: 10px 14px; border-top: 1px solid var(--border); }
+</style>
+</head>
+<body>
+
+<h1>type scale</h1>
+<p class="lede">Five size steps, two line-heights — the system every consumer builds hierarchy from. Rendered live from <code>base.css</code>: the px readouts below are <b>measured off the rendered tokens</b>, not typed in, so this specimen can't drift from the source.</p>
+<p class="live" id="live">family <b id="fam">—</b> · anchor <code>body</code> = <b id="anchor">—</b> · leadings <b id="lead">—</b> / <b id="leadt">—</b></p>
+
+<section>
+  <div class="recipe">The scale</div>
+  <h2>Five steps · 10 → 15px</h2>
+  <p class="note">A hand-tuned dense ramp (<code>+1 / +1 / +1 / +2</code>), not a modular scale — the whole range is 5px. Each row is set at its own token; the px on the right is read back from the rendered element, so it stays honest.</p>
+  <div id="ramp"></div>
+</section>
+
+<section>
+  <div class="recipe">Line-height</div>
+  <h2>Two leadings · 1.4 &amp; 1.2</h2>
+  <p class="note">Same copy, both at 12px. <code>--leading</code> (1.4) for any multi-line run; <code>--leading-tight</code> (1.2) for headings and dense single-line rows. Only two documented exceptions ship — <code>pre</code> at 1.3 and single-line badges at 1.</p>
+  <div class="lh-grid">
+    <div class="lh-card">
+      <div class="lh-head"><span>--leading · prose</span><span class="v" id="lh-prose-v">—</span></div>
+      <div class="lh-body lh-prose">Autonomous dispatch queued three tasks against the helm worktree; two merged clean and one is awaiting review. Feed rows arrive with the modem-jitter effect as the daily summary lands.</div>
+    </div>
+    <div class="lh-card">
+      <div class="lh-head"><span>--leading-tight · dense</span><span class="v" id="lh-tight-v">—</span></div>
+      <div class="lh-body lh-tight">Autonomous dispatch queued three tasks against the helm worktree; two merged clean and one is awaiting review. Feed rows arrive with the modem-jitter effect as the daily summary lands.</div>
+    </div>
+  </div>
+</section>
+
+<section>
+  <div class="recipe">Roles</div>
+  <h2>Size × weight × color recipes</h2>
+  <p class="note">A role is a recipe, not a size. Each sample below is rendered with the actual <code>base.css</code> class; its recipe is on the right. Note two roles live at 10px and one at 12px shares body's size — weight and color, not px, tell them apart.</p>
+  <div class="role-grid">
+    <div class="role-row">
+      <div class="role-render"><h1 style="margin:0">New session</h1></div>
+      <div class="role-spec"><span class="role-name">heading</span> · <b>h1</b><br>15px · 700 · <code>--fg-1</code></div>
+    </div>
+    <div class="role-row">
+      <div class="role-render"><h2 style="margin:0;color:var(--fg-1)">Active sessions</h2></div>
+      <div class="role-spec"><span class="role-name">subhead</span> · <b>h2</b><br>13px · 700 · <code>--fg-1</code></div>
+    </div>
+    <div class="role-row">
+      <div class="role-render"><h3 style="margin:0">session · kelo-42</h3></div>
+      <div class="role-spec"><span class="role-name">strong body</span> · <b>h3</b><br>12px · 700 · <code>--fg-1</code></div>
+    </div>
+    <div class="role-row">
+      <div class="role-render">Deploy merged to master and restarted the service.</div>
+      <div class="role-spec"><span class="role-name">body</span> · <b>default</b><br>12px · 400 · <code>--fg-1</code></div>
+    </div>
+    <div class="role-row">
+      <div class="role-render meta-line">approved <span class="tnum">17:08</span> · <span class="tnum">2m 17s</span> ago · helm/02c0935</div>
+      <div class="role-spec"><span class="role-name">meta</span><br>11px · 400 · <code>--fg-3</code></div>
+    </div>
+    <div class="role-row">
+      <div class="role-render" style="display:flex;gap:8px;align-items:center">
+        <button class="btn btn-primary">approve</button>
+        <span class="status status-running">running</span>
+        <span class="tag tag-feature">feature</span>
+      </div>
+      <div class="role-spec"><span class="role-name">control / badge</span><br>11px · 500 · <code>contextual</code></div>
+    </div>
+    <div class="role-row">
+      <div class="role-render"><div class="section-header" style="padding:0">Working · 2</div></div>
+      <div class="role-spec"><span class="role-name">section header</span><br>10px · 700 · <code>--fg-3</code> · .04em</div>
+    </div>
+    <div class="role-row">
+      <div class="role-render"><label class="form-label" style="margin:0">Command</label></div>
+      <div class="role-spec"><span class="role-name">form label</span><br>10px · 500 · <code>--fg-2</code> · .03em</div>
+    </div>
+    <div class="role-row">
+      <div class="role-render" style="display:flex;gap:8px;align-items:center">
+        <span class="label label-accent">card</span>
+        <span class="label label-muted">draft</span>
+        <button class="btn btn-sm">retry</button>
+      </div>
+      <div class="role-spec"><span class="role-name">label / tag</span><br>10px · 500 · <code>--fg-2</code></div>
+    </div>
+  </div>
+</section>
+
+<section>
+  <div class="recipe">The thesis</div>
+  <h2>Color and weight carry hierarchy — not size</h2>
+  <p class="note">The scale is so tight that size is the weakest lever. These two panels prove it.</p>
+  <div class="thesis-grid">
+    <div class="thesis-card">
+      <div class="thesis-tag">same size · 12px</div>
+      <div class="stack">
+        <h3 style="margin:0">session · kelo-42</h3>
+        <div class="body12">session · kelo-42</div>
+      </div>
+      <p class="thesis-note"><b>h3</b> and <b>body</b> are both 12px. The only difference is weight — 700 vs 400. The emphasis you reach for is a weight, not a bigger step.</p>
+    </div>
+    <div class="thesis-card">
+      <div class="thesis-tag">smaller · still superior</div>
+      <div class="stack">
+        <div class="section-header" style="padding:0;color:var(--text-muted)">Working · 2</div>
+        <div class="body12">mase.fi — codify the type scale</div>
+        <div class="body12">helm — kanban filter chips</div>
+      </div>
+      <p class="thesis-note">The header is <b>10px</b>, smaller than the 12px rows beneath it, yet clearly outranks them. Uppercase + tracking + weight + muted color mark it as structure — size never enters into it.</p>
+    </div>
+  </div>
+</section>
+
+<section>
+  <div class="recipe">In place</div>
+  <h2>The whole hierarchy on one surface</h2>
+  <p class="note">Every role above, composed into a realistic card — heading, subhead-as-section-header, body rows, meta timestamps, badges and controls, each pulling from its own step.</p>
+  <div class="composite">
+    <div class="composite-head">
+      <h1>Design cards</h1>
+      <div class="sub">3 in review · 1 approved today</div>
+    </div>
+    <div class="composite-body">
+      <div class="section-header">In review · 3</div>
+      <div class="row">
+        <div class="row-main">
+          <div class="row-name">Type — Scale</div>
+          <div class="row-desc">Codify the 10–15px size ramp and role recipes</div>
+        </div>
+        <div class="row-right">
+          <span class="status status-running">running</span>
+          <span class="ts">2m</span>
+        </div>
+      </div>
+      <div class="row">
+        <div class="row-main">
+          <div class="row-name">Badges — status &amp; tag</div>
+          <div class="row-desc">Dot + tint pill recipe, sizes and weights</div>
+        </div>
+        <div class="row-right">
+          <span class="tag tag-feature">feature</span>
+          <span class="ts">18m</span>
+        </div>
+      </div>
+      <div class="section-header">Approved · 1</div>
+      <div class="row">
+        <div class="row-main">
+          <div class="row-name">Type — JetBrains Mono</div>
+          <div class="row-desc">One family, four weights, feature policy</div>
+        </div>
+        <div class="row-right">
+          <span class="ts">14:37</span>
+        </div>
+      </div>
+    </div>
+    <div class="composite-foot">
+      <button class="btn btn-primary">approve</button>
+      <button class="btn">archive</button>
+      <span class="label label-muted" style="margin-left:auto">4f3c73a9</span>
+    </div>
+  </div>
+</section>
+
+<script>
+  // Read tokens live and measure each step's ACTUAL rendered px so the readouts
+  // can't drift from base.css — even if a token later changed units.
+  const cs = getComputedStyle(document.documentElement);
+  const val = (n) => cs.getPropertyValue(n).trim();
+
+  document.getElementById('fam').textContent = val('--font');
+  document.getElementById('anchor').textContent = val('--text-base');
+  document.getElementById('lead').textContent = val('--leading');
+  document.getElementById('leadt').textContent = val('--leading-tight');
+  document.getElementById('lh-prose-v').textContent = val('--leading');
+  document.getElementById('lh-tight-v').textContent = val('--leading-tight');
+
+  // --- scale ramp ---
+  const STEPS = [
+    ['--text-lg',   'heading — h1'],
+    ['--text-md',   'subhead — h2'],
+    ['--text-base', 'body — default'],
+    ['--text-sm',   'meta · controls · badges'],
+    ['--text-xs',   'micro-caps · labels'],
+  ];
+  const ramp = document.getElementById('ramp');
+  STEPS.forEach(([name, role]) => {
+    const row = document.createElement('div');
+    row.className = 'ramp-row';
+    row.innerHTML =
+      `<div class="ramp-sample" style="font-size: var(${name})">The quick brown fox — 0123</div>` +
+      `<div class="ramp-meta"><b>${name}</b> · <span class="ramp-px" data-px></span> <span class="ramp-role">· ${role}</span></div>`;
+    ramp.appendChild(row);
+    // measured px, not the token string — read off the rendered sample
+    const px = getComputedStyle(row.querySelector('.ramp-sample')).fontSize;
+    row.querySelector('[data-px]').textContent = px;
+  });
+</script>
+
+</body>
+</html>

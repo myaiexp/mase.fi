@@ -1,8 +1,27 @@
 // Pinned hero card renderers — one per channel kind
 import { LOGO, PROJECT_ART, sparkbar } from './ascii.js';
-import { homeLogStats } from './data.js';
+import { logStats } from './data.js';
 import { mountBeam } from './beam.js';
 import { escapeHtml } from './html.js';
+
+// heat → status business rule. Single source for the >0.6 / >0.3 breakpoints so
+// the desktop hero card and the mobile hero line can't silently diverge.
+//   label: cardHead status dot   text: desktop status line   short: mobile status
+function heatStatus(heat) {
+  if (heat > 0.6) return { label: '● shipping', text: 'actively shipping', short: 'shipping' };
+  if (heat > 0.3) return { label: '● steady', text: 'steady', short: 'steady' };
+  return { label: '○ idle', text: 'maintenance only', short: 'idle' };
+}
+
+// "try demo" anchor when this channel has a published demo (demos/<channel>/).
+// Single source for the /demos/ URL shape. `demos` is the canonical always-present
+// slug list from fetchData (never undefined). Returns '' when there's no demo;
+// `arrow` appends the → glyph (desktop card only).
+function demoLinkHtml(channel, demos, { arrow = false } = {}) {
+  if (!demos.includes(channel)) return '';
+  return '<a class="demo-link" href="/demos/' + escapeHtml(channel) + '/">try demo' +
+    (arrow ? ' →' : '') + '</a>';
+}
 
 function cardHead(meta, right) {
   const chips = meta
@@ -15,12 +34,13 @@ function cardHead(meta, right) {
 }
 
 function pinnedHome(data) {
-  const { totalCommits, buckets, last } = homeLogStats(data, 28);
+  const { totalCommits, buckets, last } = logStats(data, 28);
   const maxV = Math.max(1, ...buckets);
   const spark = sparkbar(buckets, maxV);
-  // lastStr uses escapeHtml on user data; the accent span is a static wrapper
+  // Every dynamic value (date slices + project) is escapeHtml'd; the accent span
+  // is a static wrapper.
   const lastStr = last
-    ? `${last.date.slice(0, 10)} \xb7 ${last.date.slice(11, 16)} \xb7 <span class="accent">${escapeHtml(last.project || '—')}</span>`
+    ? `${escapeHtml(last.date.slice(0, 10))} \xb7 ${escapeHtml(last.date.slice(11, 16))} \xb7 <span class="accent">${escapeHtml(last.project || '—')}</span>`
     : '—';
   return `<div class="card">` +
     cardHead([['modes', '+ntr'], ['users', '1'], ['since', '2018']], '● live') +
@@ -45,18 +65,18 @@ function pinnedHome(data) {
 function pinnedProject(p, data) {
   const art = PROJECT_ART[p.channel] || '';
   const commits = data.entries.filter(e => e.ch === p.channel && e.cat === 'log').length;
-  const statusLabel = p.heat > 0.6 ? '● shipping' : p.heat > 0.3 ? '● steady' : '○ idle';
-  const statusText = p.heat > 0.6 ? 'actively shipping' : p.heat > 0.3 ? 'steady' : 'maintenance only';
+  const status = heatStatus(p.heat);
+  const demoLink = demoLinkHtml(p.channel, data.demos, { arrow: true });
   return '<div class="card">' +
-    cardHead([['heat', (p.heat * 100 | 0) + '%'], ['commits', String(commits)]], statusLabel) +
+    cardHead([['heat', (p.heat * 100 | 0) + '%'], ['commits', String(commits)]], status.label) +
     '<div class="card-body pin-grid">' +
     '<pre class="ascii">' + escapeHtml(art) + '</pre>' +
     '<div>' +
     '<p class="pin-tagline">' + escapeHtml(p.description) + '</p>' +
     '<dl class="pin-meta">' +
     '<dt>activity</dt><dd>' + commits + ' commits in feed \xb7 heat ' + (p.heat * 100 | 0) + '%</dd>' +
-    '<dt>status</dt><dd class="accent">' + statusText + '</dd>' +
-    '<dt>links</dt><dd class="links">' +
+    '<dt>status</dt><dd class="accent">' + status.text + '</dd>' +
+    '<dt>links</dt><dd class="links">' + demoLink +
     p.links.map(l => '<a href="' + escapeHtml(l.href) + '">' + escapeHtml(l.label) + '</a>').join('') +
     '</dd>' +
     '</dl>' +
@@ -71,10 +91,19 @@ function pinnedActivity(data) {
   const logEntries = data.entries.filter(e => e.cat === 'log');
   let range = '—';
   if (logEntries.length) {
-    const first = logEntries[0].date.slice(0, 10);
-    const last = logEntries[logEntries.length - 1].date.slice(0, 10);
+    const first = escapeHtml(logEntries[0].date.slice(0, 10));
+    const last = escapeHtml(logEntries[logEntries.length - 1].date.slice(0, 10));
     range = first + ' → ' + last;
   }
+  // Real recent commit rate: average log entries per ACTIVE day over the last 28
+  // days (idle days excluded so the figure reflects "when I push, ~N/day" rather
+  // than a calendar average diluted to near-zero). Recomputed every render — no
+  // stale hardcoded constant. '—' when there's been no recent activity.
+  const recent = logStats(data, 28).buckets;
+  const activeDays = recent.filter(n => n > 0).length;
+  const rate = activeDays
+    ? '~' + Math.round(recent.reduce((a, b) => a + b, 0) / activeDays) + '/day'
+    : '—';
   const artLines = [
     '  ╭─ stream ────────────────╮',
     '  │  log      ▇▇▇▇▇▇▇▇▇  ' + String(cats.log).padStart(2) + '  │',
@@ -83,7 +112,7 @@ function pinnedActivity(data) {
     '  ╰───────────────────────╯',
   ].join('\n');
   return '<div class="card">' +
-    cardHead([['modes', '+mn'], ['source', 'post-receive'], ['rate', '~12/day']], 'live tail') +
+    cardHead([['modes', '+mn'], ['source', 'post-receive'], ['rate', rate]], 'live tail') +
     '<div class="card-body pin-grid">' +
     '<pre class="ascii">' + escapeHtml(artLines) + '</pre>' +
     '<div>' +
@@ -109,17 +138,19 @@ export function renderHeroLine(id, data) {
       '<span class="sep">\xb7</span> ' +
       '<a href="https://github.com/myaiexp">github</a>';
   } else if (project) {
-    const statusText = project.heat > 0.6 ? 'shipping' : project.heat > 0.3 ? 'steady' : 'idle';
+    const status = heatStatus(project.heat);
+    const demo = demoLinkHtml(id, data.demos);
+    const demoLink = demo ? demo + ' <span class="sep">\xb7</span> ' : '';
     if (project.links && project.links.length > 0) {
       html =
-        '<span class="arr">→</span> ' +
+        '<span class="arr">→</span> ' + demoLink +
         '<a href="' + escapeHtml(project.links[0].href) + '">' + escapeHtml(project.links[0].label) + '</a> ' +
         '<span class="sep">\xb7</span> ' +
-        '<span class="status">' + statusText + '</span>';
+        '<span class="status">' + status.short + '</span>';
     } else {
       html =
-        '<span class="arr">→</span> ' +
-        '<span class="status">' + statusText + '</span>';
+        '<span class="arr">→</span> ' + demoLink +
+        '<span class="status">' + status.short + '</span>';
     }
   }
   // activity and unmatched channels: empty string — CSS :empty hides the element

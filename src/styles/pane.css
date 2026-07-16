@@ -176,6 +176,17 @@
 .pin-meta dd a { color: var(--dim); border-bottom: 1px dashed var(--faint); }
 .pin-meta dd a:hover { color: var(--ch-accent); border-bottom-color: var(--ch-accent); text-decoration: none; }
 .pin-meta dd.links { display: flex; flex-wrap: wrap; gap: 10px; }
+/* "try demo →" — a filled accent chip so it reads as the primary action,
+   distinct from the dashed-underline text links beside it. */
+.pin-meta dd .demo-link {
+  color: var(--bg);
+  background: var(--ch-accent);
+  border-radius: 3px;
+  padding: 1px 9px;
+  font-weight: 600;
+  border-bottom: 0;
+}
+.pin-meta dd .demo-link:hover { background: var(--accent); color: var(--bg); border-bottom: 0; }
 
 .pin-tagline {
   margin: 0 0 10px; color: var(--dim); font-size: 13px;

@@ -1,12 +1,6 @@
 // Unit tests for the data adapter (fetch + normalize + channel routing/bucketing).
 import { describe, it, expect, vi, afterEach } from 'vitest';
-import {
-  fetchData,
-  entriesFor,
-  totalLogCount,
-  dailyLogBuckets,
-  lastLog,
-} from './data.js';
+import { fetchData, fetchDemos, entriesFor, logStats, parseEntryDate } from './data.js';
 
 // ---- helpers -------------------------------------------------------------
 
@@ -28,7 +22,7 @@ function dataWith(entries) {
 
 // Local-time date string "YYYY-MM-DDTHH:MM" for `offsetDays` from today's local
 // midnight, defaulting to noon so DST drift (~1h) can never push it across a day
-// boundary in dailyLogBuckets' floor() math.
+// boundary in logStats' bucket floor() math.
 function dayStr(offsetDays, hour = 12) {
   const d = new Date();
   d.setHours(0, 0, 0, 0);
@@ -38,11 +32,45 @@ function dayStr(offsetDays, hour = 12) {
 }
 
 function stubFetch(payload) {
-  vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ json: async () => payload }));
+  vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: true, json: async () => payload }));
 }
 
 afterEach(() => {
   vi.unstubAllGlobals();
+  vi.restoreAllMocks();
+});
+
+function stubDemosResponse(ok, body) {
+  vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok, json: async () => body }));
+}
+
+// ---- fetchDemos ----------------------------------------------------------
+
+describe('fetchDemos', () => {
+  it('returns the channel-slug array on a successful manifest fetch', async () => {
+    stubDemosResponse(true, ['helm', 'metsuri']);
+    expect(await fetchDemos()).toEqual(['helm', 'metsuri']);
+  });
+
+  it('filters out non-string entries', async () => {
+    stubDemosResponse(true, ['helm', 3, null, 'x']);
+    expect(await fetchDemos()).toEqual(['helm', 'x']);
+  });
+
+  it('returns [] on a non-ok response (no demos dir yet)', async () => {
+    stubDemosResponse(false, ['helm']);
+    expect(await fetchDemos()).toEqual([]);
+  });
+
+  it('returns [] when the body is not an array', async () => {
+    stubDemosResponse(true, { helm: true });
+    expect(await fetchDemos()).toEqual([]);
+  });
+
+  it('returns [] on a network/parse failure', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new Error('network')));
+    expect(await fetchDemos()).toEqual([]);
+  });
 });
 
 // ---- entriesFor ----------------------------------------------------------
@@ -186,25 +214,102 @@ describe('fetchData routing', () => {
     });
     const data = await fetchData();
     expect(data.entries.map((e) => e.text)).toEqual(['older-summary', 'newer']);
+    // Project-less daily falls back to 'mase'; log → 'git'.
     expect(data.entries.map((e) => e.nick)).toEqual(['mase', 'git']);
   });
 
+  it('nicks a daily entry with its project (per-project standup), lowercased', async () => {
+    stubFetch({
+      projects: [{ name: 'Explorer', slug: 'explorer', channel: 'explorer' }],
+      entries: [
+        { category: 'daily', date: '2026-03-01', project: 'Explorer', summary: 'route fixes, dep bumps' },
+      ],
+    });
+    const data = await fetchData();
+    expect(data.entries[0].nick).toBe('explorer');
+    expect(data.entries[0].ch).toBe('explorer');
+  });
+
   it('returns empty entries/projects when fetch rejects', async () => {
+    vi.spyOn(console, 'warn').mockImplementation(() => {});
     vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new Error('network down')));
     const data = await fetchData();
     expect(data.entries).toEqual([]);
     expect(data.projects).toEqual([]);
   });
 
-  it('degrades to empty data when normalization throws (null element in entries)', async () => {
-    // A null entry makes the heat-count loop's `e.project` access throw. The fix
-    // keeps normalization inside the error boundary, so this degrades gracefully
-    // instead of escaping as an unhandled rejection that stalls the app shell.
+  it('degrades to empty data on a non-ok HTTP response (does not parse the error body)', async () => {
+    // A 4xx/5xx with a JSON error body must not be parsed as data. The r.ok guard
+    // throws, routing it to the same empty fallback as a network failure.
+    vi.spyOn(console, 'warn').mockImplementation(() => {});
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
+      ok: false,
+      status: 503,
+      json: async () => ({ entries: [{ category: 'daily', date: '2026-01-01', text: 'proxy error' }] }),
+    }));
+    const data = await fetchData();
+    expect(data.entries).toEqual([]);
+    expect(data.projects).toEqual([]);
+    expect(data.meta.nick).toBe('mase');
+  });
+
+  it('degrades to empty data when normalization throws, and logs the error', async () => {
+    // A null entry makes the heat-count loop's `e.project` access throw. The error
+    // boundary keeps normalization inside it, so this degrades gracefully instead
+    // of escaping as an unhandled rejection that stalls the app shell — and the
+    // catch warns, so a real bug isn't silently swallowed as "no data".
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
     stubFetch({ projects: [], entries: [null] });
     const data = await fetchData();
     expect(data.entries).toEqual([]);
     expect(data.projects).toEqual([]);
     expect(data.meta.nick).toBe('mase');
+    expect(warnSpy).toHaveBeenCalled();
+  });
+});
+
+// ---- fetchData: project links builder ------------------------------------
+// p.url → links[]. The builder must surface only http(s) links and drop
+// protocol-based XSS vectors (javascript:/data:/vbscript:) that parse cleanly
+// via new URL() but carry no usable host.
+
+describe('fetchData project links', () => {
+  async function linksFor(url) {
+    stubFetch({ projects: [{ name: 'P', channel: 'p', url }], entries: [] });
+    const data = await fetchData();
+    return data.projects[0].links;
+  }
+
+  it('builds an http(s) link labelled by host, stripping a www. prefix', async () => {
+    expect(await linksFor('https://www.example.com/path')).toEqual([
+      { label: 'example.com', href: 'https://www.example.com/path' },
+    ]);
+  });
+
+  it('keeps a bare https host as the label', async () => {
+    expect(await linksFor('https://mase.fi/explorer')).toEqual([
+      { label: 'mase.fi', href: 'https://mase.fi/explorer' },
+    ]);
+  });
+
+  it('drops a javascript: URL (parses cleanly but is not http/https)', async () => {
+    expect(await linksFor('javascript:alert(1)')).toEqual([]);
+  });
+
+  it('drops a data: URL', async () => {
+    expect(await linksFor('data:text/html,<script>alert(1)</script>')).toEqual([]);
+  });
+
+  it('drops a vbscript: URL', async () => {
+    expect(await linksFor('vbscript:msgbox(1)')).toEqual([]);
+  });
+
+  it('falls back to an "open" link for a schemeless/relative URL', async () => {
+    expect(await linksFor('/explorer')).toEqual([{ label: 'open', href: '/explorer' }]);
+  });
+
+  it('produces no links when the project has no url', async () => {
+    expect(await linksFor(undefined)).toEqual([]);
   });
 });
 
@@ -245,13 +350,36 @@ describe('fetchData date normalization (normalizeDate)', () => {
   it('bounds an oversized/garbage date string to the epoch fallback', async () => {
     expect(await dateOf('"><script>alert(1)</script>'.repeat(20))).toBe('1970-01-01T00:00');
   });
+
+  it('round-trips through parseEntryDate: normalized output parses as UTC', async () => {
+    // The contract that couples the two helpers — normalizeDate's output shape is
+    // exactly what parseEntryDate accepts. Change one and this test fails.
+    expect(parseEntryDate(await dateOf('2026-01-01T08:30')).toISOString())
+      .toBe('2026-01-01T08:30:00.000Z');
+  });
 });
 
-// ---- totalLogCount -------------------------------------------------------
+// ---- parseEntryDate -------------------------------------------------------
 
-describe('totalLogCount', () => {
+describe('parseEntryDate', () => {
+  it('parses a normalized entry date as UTC, not viewer-local', () => {
+    expect(parseEntryDate('2026-01-01T08:30').toISOString()).toBe('2026-01-01T08:30:00.000Z');
+  });
+
+  it('parses the epoch fallback to time zero', () => {
+    expect(parseEntryDate('1970-01-01T00:00').getTime()).toBe(0);
+  });
+
+  it('treats midnight as the same UTC day (no off-by-one day shift)', () => {
+    expect(parseEntryDate('2026-01-01T00:00').toISOString().slice(0, 10)).toBe('2026-01-01');
+  });
+});
+
+// ---- logStats.totalCommits -----------------------------------------------
+
+describe('logStats totalCommits', () => {
   it('returns 0 for empty entries', () => {
-    expect(totalLogCount(dataWith([]))).toBe(0);
+    expect(logStats(dataWith([])).totalCommits).toBe(0);
   });
 
   it('counts only log entries in a mixed dataset', () => {
@@ -262,29 +390,37 @@ describe('totalLogCount', () => {
       entry('feature', 'explorer'),
       entry('project', 'explorer'),
     ]);
-    expect(totalLogCount(data)).toBe(2);
+    expect(logStats(data).totalCommits).toBe(2);
   });
 
   it('returns 0 when there are no log entries', () => {
     const data = dataWith([entry('daily', 'home'), entry('feature', 'explorer')]);
-    expect(totalLogCount(data)).toBe(0);
+    expect(logStats(data).totalCommits).toBe(0);
+  });
+
+  it('counts a log entry whose date is unparseable', () => {
+    const data = dataWith([
+      entry('log', 'activity', { date: 'not-a-date' }),
+      entry('log', 'activity', { date: dayStr(0) }),
+    ]);
+    expect(logStats(data).totalCommits).toBe(2);
   });
 });
 
-// ---- dailyLogBuckets -----------------------------------------------------
+// ---- logStats.buckets ----------------------------------------------------
 
-describe('dailyLogBuckets', () => {
+describe('logStats buckets', () => {
   it('returns an all-zero array of the requested length for empty input', () => {
-    expect(dailyLogBuckets(dataWith([]), 3)).toEqual([0, 0, 0]);
+    expect(logStats(dataWith([]), 3).buckets).toEqual([0, 0, 0]);
   });
 
   it('defaults to a 28-element window', () => {
-    expect(dailyLogBuckets(dataWith([]))).toHaveLength(28);
+    expect(logStats(dataWith([])).buckets).toHaveLength(28);
   });
 
   it('places a single log entry today in the last bucket', () => {
     const data = dataWith([entry('log', 'activity', { date: dayStr(0) })]);
-    expect(dailyLogBuckets(data, 3)).toEqual([0, 0, 1]);
+    expect(logStats(data, 3).buckets).toEqual([0, 0, 1]);
   });
 
   it('sums multiple entries falling on the same day', () => {
@@ -293,7 +429,7 @@ describe('dailyLogBuckets', () => {
       entry('log', 'activity', { date: dayStr(0, 14) }),
       entry('log', 'activity', { date: dayStr(0, 20) }),
     ]);
-    expect(dailyLogBuckets(data, 3)).toEqual([0, 0, 3]);
+    expect(logStats(data, 3).buckets).toEqual([0, 0, 3]);
   });
 
   it('distributes entries spanning days into the correct buckets', () => {
@@ -302,7 +438,7 @@ describe('dailyLogBuckets', () => {
       entry('log', 'activity', { date: dayStr(-1) }), // index 1
       entry('log', 'activity', { date: dayStr(0) }), //  today → index 2
     ]);
-    expect(dailyLogBuckets(data, 3)).toEqual([1, 1, 1]);
+    expect(logStats(data, 3).buckets).toEqual([1, 1, 1]);
   });
 
   it('ignores entries outside the window (older than start, in the future)', () => {
@@ -311,7 +447,7 @@ describe('dailyLogBuckets', () => {
       entry('log', 'activity', { date: dayStr(1) }), //  tomorrow, after window end
       entry('log', 'activity', { date: dayStr(-2) }), // index 0 — the only one counted
     ]);
-    expect(dailyLogBuckets(data, 3)).toEqual([1, 0, 0]);
+    expect(logStats(data, 3).buckets).toEqual([1, 0, 0]);
   });
 
   it('ignores non-log entries and unparseable dates', () => {
@@ -320,20 +456,20 @@ describe('dailyLogBuckets', () => {
       entry('log', 'activity', { date: 'not-a-date' }), //  unparseable
       entry('log', 'activity', { date: dayStr(0) }), //     the only counted entry
     ]);
-    expect(dailyLogBuckets(data, 3)).toEqual([0, 0, 1]);
+    expect(logStats(data, 3).buckets).toEqual([0, 0, 1]);
   });
 });
 
-// ---- lastLog -------------------------------------------------------------
+// ---- logStats.last -------------------------------------------------------
 
-describe('lastLog', () => {
+describe('logStats last', () => {
   it('returns null for empty entries', () => {
-    expect(lastLog(dataWith([]))).toBeNull();
+    expect(logStats(dataWith([])).last).toBeNull();
   });
 
   it('returns null when there are no log entries', () => {
     const data = dataWith([entry('daily', 'home'), entry('feature', 'explorer')]);
-    expect(lastLog(data)).toBeNull();
+    expect(logStats(data).last).toBeNull();
   });
 
   it('returns the newest log entry regardless of input order', () => {
@@ -343,8 +479,13 @@ describe('lastLog', () => {
       entry('log', 'activity', { date: '2026-02-01T08:00', project: 'b' }),
       entry('daily', 'home', { date: '2026-12-31T08:00', project: 'ignored' }), // non-log, ignored
     ]);
-    const got = lastLog(data);
+    const got = logStats(data).last;
     expect(got.date).toBe('2026-03-20T08:00');
     expect(got.project).toBe('newest');
+  });
+
+  it('still considers a log entry whose date is unparseable', () => {
+    const data = dataWith([entry('log', 'activity', { date: 'zzz-unparseable' })]);
+    expect(logStats(data).last.date).toBe('zzz-unparseable');
   });
 });

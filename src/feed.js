@@ -1,22 +1,22 @@
 // Feed rendering — day separators, IRC-style rows, with modem-jitter arrival
-import { entriesFor } from './data.js';
+import { entriesFor, parseEntryDate } from './data.js';
 import { playJitter, clearJitter } from './jitter.js';
 import { relayoutAll } from './feed-layout.js';
 import { navigate } from './channels.js';
 
-export { clearJitter };
-
 const MAX_JITTER = 14;
 
-// Track ResizeObserver so we only attach it once across re-renders.
-let _resizeObs = null;
-let _resizeRaf = 0;
-let _lastMsgWidth = 0;
-let _chipNavWired = false;
+// Per-feed-element wiring state, keyed by the $feed node rather than held in
+// module-level singletons. Keeping the state on the element means a fresh feed
+// element — a new render target, or a fresh DOM in a test — gets its own wiring
+// instead of inheriting a stale "already wired" flag. The state lives and dies
+// with the element it keys on, so no reset hook is needed between renders/tests.
+const chipNavWired = new WeakSet();
+const resizeObservers = new WeakMap();
 
 const NICK_COLORS = { git: '#06b6d4', mase: '#e8a308' };
 
-function nickColor(nick) {
+export function nickColor(nick) {
   if (Object.hasOwn(NICK_COLORS, nick)) return NICK_COLORS[nick];
   const palette = ['#e8a308', '#ffbe2a', '#f59e0b', '#eab308', '#a16207', '#fcd34d', '#fbbf24'];
   let h = 0;
@@ -24,8 +24,8 @@ function nickColor(nick) {
   return palette[Math.abs(h) % palette.length];
 }
 
-function dayLabel(date) {
-  const d = new Date(date + 'Z').toISOString().slice(0, 10);
+export function dayLabel(date) {
+  const d = parseEntryDate(date).toISOString().slice(0, 10);
   const today = new Date().toISOString().slice(0, 10);
   const yest = new Date(Date.now() - 86400000).toISOString().slice(0, 10);
   if (d === today) return 'today \xb7 ' + d;
@@ -102,15 +102,12 @@ export function renderFeed(id, data, { immediate = false } = {}) {
   playJitter(tail);
 }
 
-// Re-lay out feed rows when the available .msg column width changes (e.g. the
-// pane reflowed on viewport resize). One observer per feed element — installed
-// lazily on first render. rAF-debounced so we don't thrash during drag-resize.
 // Click-delegate proj-pill chips that carry a data-target — those are the
 // chips whose slug resolves to a sidebar channel. Unmapped chips have no
-// data-target and fall through to no-op.
+// data-target and fall through to no-op. One listener per feed element.
 function ensureChipNav($feed) {
-  if (_chipNavWired) return;
-  _chipNavWired = true;
+  if (chipNavWired.has($feed)) return;
+  chipNavWired.add($feed);
   $feed.addEventListener('click', (e) => {
     const chip = e.target.closest('.proj-pill[data-target]');
     if (!chip || !$feed.contains(chip)) return;
@@ -119,24 +116,31 @@ function ensureChipNav($feed) {
   });
 }
 
+// Re-lay out feed rows when the available .msg column width changes (e.g. the
+// pane reflowed on viewport resize). One observer per feed element — installed
+// lazily on first render. rAF-debounced so we don't thrash during drag-resize.
+// The per-observer width/rAF state lives in this closure (not module scope), so
+// each feed element's observer tracks its own width independently.
 function ensureResizeObserver($feed) {
-  if (_resizeObs) return;
+  if (resizeObservers.has($feed)) return;
   // Seed with the post-initial-layout width so the observer's first auto-fire
   // doesn't trigger a redundant relayout right after renderFeed finishes.
   const seedProbe = $feed.querySelector('.feed-row .msg');
-  _lastMsgWidth = seedProbe ? seedProbe.getBoundingClientRect().width : 0;
-  _resizeObs = new ResizeObserver(() => {
-    if (_resizeRaf) return;
-    _resizeRaf = requestAnimationFrame(() => {
-      _resizeRaf = 0;
+  let lastMsgWidth = seedProbe ? seedProbe.getBoundingClientRect().width : 0;
+  let resizeRaf = 0;
+  const obs = new ResizeObserver(() => {
+    if (resizeRaf) return;
+    resizeRaf = requestAnimationFrame(() => {
+      resizeRaf = 0;
       const probe = $feed.querySelector('.feed-row .msg');
       const w = probe ? probe.getBoundingClientRect().width : 0;
-      if (!w || w === _lastMsgWidth) return;
-      _lastMsgWidth = w;
+      if (!w || w === lastMsgWidth) return;
+      lastMsgWidth = w;
       relayoutAll($feed);
       // Notify listeners (e.g. command.js search) so they can re-decorate.
       $feed.dispatchEvent(new CustomEvent('feed:relayout'));
     });
   });
-  _resizeObs.observe($feed);
+  resizeObservers.set($feed, obs);
+  obs.observe($feed);
 }

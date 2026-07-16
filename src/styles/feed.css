@@ -134,6 +134,19 @@
   100% { opacity: 1; transform: none; }
 }
 
+/* Ephemeral IRC-style server-notice lines from slash commands (/help, /uptime,
+   …). Deliberately NOT .feed-row: relayoutAll and search both query .feed-row,
+   so these are skipped by both; the next channel render wipes them. */
+.sys-notice {
+  padding: 2px 0;
+  font-size: 12.5px;
+  line-height: var(--line-h);
+  color: var(--dim);
+  white-space: pre-wrap;
+}
+.sys-notice .sys-prefix { color: var(--faint); margin-right: 10px; }
+.sys-notice .sys-body { color: var(--dim); }
+
 /* feed overlay for channel-switch scanline */
 .feed-overlay {
   position: absolute; inset: 0;
