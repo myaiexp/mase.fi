@@ -97,6 +97,15 @@ clean_lines() {
         if (low ~ /^(here (are|is)|these |output:|summary:|changes:|note:)/) next  # preamble
         if (line ~ /^[0-9]+ characters/) next          # self-check meta
         if (line ~ /:[[:space:]]*$/) next              # trailing-colon lead-in
+        # drop narration about the commits / the day / the model's own process,
+        # which Sonnet occasionally prepends ("two lines, one per project.",
+        # "commits are all from one day", "let me write the changelog") — the real
+        # changelog lines that follow it survive.
+        if (low ~ /^(one|two|three|four|five|six|seven|eight|nine|ten|[0-9]+) lines?\b/) next
+        if (low ~ /^(the )?commits (are|were|show|span|look|appear)/) next
+        if (low ~ /^today.?s (git )?(log|commits|work)/) next
+        if (low ~ /^let me\b/) next
+        if (low ~ /\bone per project\b/) next
         print line
         if (++n >= max) exit
     }
@@ -143,7 +152,7 @@ generate_summary() {
 
 Output 1 to ${MAX_LINES} lines, one line per genuinely distinct, notable thread of work, most significant first. MOST DAYS ARE ONE LINE. Use more only when the day clearly holds separate significant efforts (e.g. two unrelated features, or a feature plus a notable fix). A line reads as what happened, and may include the why when the commits make it clear. Internal churn — refactors, audits, tests, dependency bumps, lint — is NOT worth its own line: fold it into a trailing mention on another line, or drop it. The full commit list is available elsewhere.
 
-Each line: lowercase, terse, under ~110 characters. Output ONLY the lines — no numbering, no bullets, no preamble, no quotes, no project name, no commentary.
+Each line: lowercase, terse, under ~110 characters. Output ONLY the lines — no numbering, no bullets, no preamble, no quotes, no project name, no commentary. Never narrate the commits, the day, or your own process — no lines like \"one line\", \"two lines\", \"commits are all from one day\", \"distinct threads\", \"one per project\", or \"let me…\". Emit only the changelog line(s) themselves.
 
 Example — a maintenance-heavy day, one line:
 Commits:
