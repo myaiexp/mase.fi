@@ -188,15 +188,15 @@ describe('renderPinned — activity', () => {
     expect(html).toContain('<dt>range</dt><dd>—</dd>');
   });
 
-  // A local-noon naive date string N days ago. logStats parses naive ISO as
-  // local time, so building the string in local terms keeps the bucket index
-  // stable across timezones and clear of day/window boundaries.
-  const localNoonDaysAgo = (n) => {
+  // A UTC-noon date string N days ago. logStats buckets by UTC calendar day, so
+  // building the string in UTC terms keeps the bucket index deterministic in any
+  // runner timezone (noon keeps it clear of the window's start/end edges).
+  const utcNoonDaysAgo = (n) => {
     const d = new Date();
-    d.setHours(12, 0, 0, 0);
-    d.setDate(d.getDate() - n);
+    d.setUTCHours(12, 0, 0, 0);
+    d.setUTCDate(d.getUTCDate() - n);
     const p = (x) => String(x).padStart(2, '0');
-    return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}T12:00`;
+    return `${d.getUTCFullYear()}-${p(d.getUTCMonth() + 1)}-${p(d.getUTCDate())}T12:00`;
   };
 
   it('shows a recent rate computed as average commits per active day (~N/day)', () => {
@@ -204,12 +204,12 @@ describe('renderPinned — activity', () => {
       projects: [],
       entries: [
         // 4 commits one recent day + 2 another recent day → 6 / 2 active days = ~3.
-        logEntry({ cat: 'log', date: localNoonDaysAgo(3) }),
-        logEntry({ cat: 'log', date: localNoonDaysAgo(3) }),
-        logEntry({ cat: 'log', date: localNoonDaysAgo(3) }),
-        logEntry({ cat: 'log', date: localNoonDaysAgo(3) }),
-        logEntry({ cat: 'log', date: localNoonDaysAgo(7) }),
-        logEntry({ cat: 'log', date: localNoonDaysAgo(7) }),
+        logEntry({ cat: 'log', date: utcNoonDaysAgo(3) }),
+        logEntry({ cat: 'log', date: utcNoonDaysAgo(3) }),
+        logEntry({ cat: 'log', date: utcNoonDaysAgo(3) }),
+        logEntry({ cat: 'log', date: utcNoonDaysAgo(3) }),
+        logEntry({ cat: 'log', date: utcNoonDaysAgo(7) }),
+        logEntry({ cat: 'log', date: utcNoonDaysAgo(7) }),
       ],
     };
     renderPinned('activity', data);
@@ -220,7 +220,7 @@ describe('renderPinned — activity', () => {
     const data = {
       projects: [],
       // Older than the 28-day window → no active days → '—', never a stale number.
-      entries: [logEntry({ cat: 'log', date: localNoonDaysAgo(60) })],
+      entries: [logEntry({ cat: 'log', date: utcNoonDaysAgo(60) })],
     };
     renderPinned('activity', data);
     const html = pinnedEl().innerHTML;

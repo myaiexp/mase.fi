@@ -109,7 +109,15 @@ function aggregateActivity(rawEntries) {
   for (const e of rawEntries) {
     if (!e.project) continue;
     if (e.category !== 'log' && e.category !== 'feature') continue;
-    const t = Date.parse(e.date);
+    // Parse the entry's date as UTC via parseEntryDate — the same day definition
+    // the feed's separators use — so heat/recency agree with the feed. Bare
+    // Date.parse reads a zone-less "YYYY-MM-DDTHH:MM" as viewer-LOCAL, so anyone
+    // off UTC would count near-midnight entries into a different day than they see.
+    // normalizeDate first: these are RAW entries, so shapes vary (bare date, full
+    // ISO+Z); it reduces them to the zone-less form parseEntryDate expects.
+    // cutoff is an absolute instant, so the 30-day window is already viewer-
+    // independent — only the parse needed fixing here.
+    const t = parseEntryDate(normalizeDate(e.date)).getTime();
     if (!Number.isFinite(t)) continue;
     const slug = e.project.toLowerCase();
     if (t >= cutoff) counts.set(slug, (counts.get(slug) || 0) + 1);
@@ -260,28 +268,42 @@ export function entriesFor(channelId, data) {
 }
 
 /**
+ * UTC-midnight instant (ms) of a Date's UTC calendar day. Anchors day-bucketing
+ * to the same UTC day the feed's separators use (parseEntryDate → UTC), and makes
+ * day differences exact and DST-immune — every UTC day is exactly 86400000 ms.
+ */
+function utcDayStart(d) {
+  return Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate());
+}
+
+/**
  * Single-pass log aggregate for the pinned cards. Walks data.entries once:
  *   - totalCommits: count of every `log` entry
  *   - buckets:      last-`days` per-day counts, oldest first (finite, in-range
  *                   dates only) — the #home heatstrip and the #activity rate
  *   - last:         newest `log` entry by date string, or null
- * The finite-date guard is a nested branch (not `continue`) so a malformed date
- * still counts toward totalCommits and the newest-entry comparison — only the
- * day bucket needs a parseable date.
+ * Buckets are keyed by UTC calendar day (parseEntryDate → utcDayStart), the same
+ * day definition the feed's separators use, so a viewer off UTC sees a heatstrip
+ * aligned with the feed instead of a locally-shifted one. The finite-date guard
+ * is a nested branch (not `continue`) so a malformed date still counts toward
+ * totalCommits and the newest-entry comparison — only the day bucket needs a
+ * parseable date.
  */
 export function logStats(data, days = 28) {
   const buckets = new Array(days).fill(0);
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-  const start = today.getTime() - (days - 1) * 86400000;
+  const todayUTC = utcDayStart(new Date());
   let totalCommits = 0;
   let last = null;
   for (const e of data.entries) {
     if (e.cat !== 'log') continue;
     totalCommits++;
-    const t = Date.parse(e.date);
+    const d = parseEntryDate(e.date);
+    const t = d.getTime();
     if (Number.isFinite(t)) {
-      const idx = Math.floor((t - start) / 86400000);
+      // Whole UTC days between the entry and today; the index counts back from the
+      // newest (last) bucket. Both ends snap to UTC midnight, so the difference is
+      // an exact day count — no raw-ms flooring that drifts an hour across a DST edge.
+      const idx = days - 1 - Math.round((todayUTC - utcDayStart(d)) / 86400000);
       if (idx >= 0 && idx < days) buckets[idx]++;
     }
     if (!last || e.date > last.date) last = e;
