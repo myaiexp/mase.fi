@@ -21,6 +21,9 @@
 # .projects is left untouched (never wiped).
 set -euo pipefail
 
+# Shared validate + atomic-or-in-place install of updates.json (write_updates_json).
+source "$(dirname "$(readlink -f "$0")")/updates-write.sh"
+
 UPDATES="${UPDATES_FILE:-/var/www/html/updates.json}"
 API="${SHOWCASE_API:-http://localhost:9754/api/projects/showcase}"
 EXTRA="${SHOWCASE_EXTRA:-/home/mase/Projects/mase.fi/scripts/showcase-extra.json}"
@@ -55,8 +58,21 @@ if [[ "$n" -lt 1 ]]; then
     exit 0
 fi
 
-tmp="$(mktemp)"
-jq --argjson p "$projects" '.projects = $p' "$UPDATES" > "$tmp"
-jq empty "$tmp" || { echo "generated invalid JSON — aborting, .projects unchanged" >&2; exit 1; }
-cp "$tmp" "$UPDATES"
+# Serialize the read-modify-write against the other updates.json writers. This
+# rewrites the WHOLE file with .projects swapped, so an unlocked run would clobber
+# a concurrent mase-fi-update / deploy .entries append (last-writer-wins). The
+# shared lock path matches every other writer; write_updates_json validates the
+# candidate and installs it atomically when it can (see updates-write.sh).
+(
+  flock -w 30 9 || { echo "updates.json lock busy >30s — .projects unchanged" >&2; exit 1; }
+  if ! jq empty "$UPDATES" 2>/dev/null; then
+    echo "$UPDATES is malformed JSON — refusing to rewrite .projects" >&2
+    exit 1
+  fi
+  tmp="$(mktemp)"
+  jq --argjson p "$projects" '.projects = $p' "$UPDATES" > "$tmp" \
+  && write_updates_json "$tmp" "$UPDATES" \
+  || { echo "failed to write .projects to $UPDATES" >&2; rm -f "$tmp"; exit 1; }
+  rm -f "$tmp"
+) 9>/tmp/mase-updates-json.lock
 echo "wrote $n showcased projects to $UPDATES"

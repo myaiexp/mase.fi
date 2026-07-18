@@ -2,6 +2,12 @@
 # Generate daily summary entries from today's log entries in updates.json
 set -euo pipefail
 
+# Resolve the real script dir through the ~/.local/bin symlink so the sibling
+# helper + mase-fi-projects are found regardless of how we were invoked.
+SCRIPT_DIR="$(dirname "$(readlink -f "$0")")"
+# Shared validate + atomic-or-in-place install of updates.json (write_updates_json).
+source "$SCRIPT_DIR/updates-write.sh"
+
 UPDATES_FILE="${UPDATES_FILE:-/var/www/html/updates.json}"
 TODAY=$(TZ="Europe/Helsinki" date +%Y-%m-%d)
 # Summaries come from the Claude Code CLI in headless print mode. Absolute path
@@ -23,6 +29,16 @@ HELM_ENV="${HELM_ENV:-/home/mase/Projects/helm/.env}"
 # ones passed in). An empty dir has neither, so output depends only on the prompt
 # regardless of where the script runs. Removed in the exit trap.
 CLAUDE_CWD="$(mktemp -d)"
+# Private working dir (mode 0700, unpredictable name) for this run's intermediate
+# JSON — replaces the old fixed /tmp/daily_*.json paths a co-tenant could
+# pre-create as a symlink or race content into. Removed in the exit trap.
+WORK_DIR="$(mktemp -d)"
+# NB: not GROUPS — that is a bash special array (the caller's group IDs); assigning
+# to it silently fails and $GROUPS re-expands to the primary GID.
+GROUPS_JSON="$WORK_DIR/groups.json"
+ENTRIES="$WORK_DIR/entries.json"
+ENTRIES_TMP="$WORK_DIR/entries.tmp.json"
+UPD_TMP="$WORK_DIR/updates.tmp.json"
 
 # Best-effort ntfy push, isolated in a subshell so `set +e` and any failing
 # command here can't propagate into the script's `set -e`. Token from $NTFY_TOKEN
@@ -50,6 +66,7 @@ ntfy_send() (
 on_exit() {
   local rc=$?
   [[ -n "${CLAUDE_CWD:-}" && -d "${CLAUDE_CWD:-}" ]] && rm -rf "$CLAUDE_CWD"
+  [[ -n "${WORK_DIR:-}" && -d "${WORK_DIR:-}" ]] && rm -rf "$WORK_DIR"
   if [[ $rc -ne 0 ]]; then
     ntfy_send "mase.fi daily-summary FAILED (exit $rc)" \
       "${TODAY}: daily-summary aborted (exit $rc) — check: journalctl --user -u mase-fi-daily-summary"
@@ -66,7 +83,7 @@ fi
 # derived, not hand-maintained (see scripts/mase-fi-projects). Best-effort and
 # independent of the summary logic below; leaves .projects untouched if helm is
 # unreachable, so a bad run can never blank the sidebar.
-"$(dirname "$(readlink -f "$0")")/mase-fi-projects" || echo "projects refresh failed (non-fatal)" >&2
+"$SCRIPT_DIR/mase-fi-projects" || echo "projects refresh failed (non-fatal)" >&2
 
 # Skip if daily entries already exist for today (idempotency)
 DAILY_EXISTS=$(jq --arg date "$TODAY" '[.entries[] | select(.category == "daily" and .date == $date)] | length' "$UPDATES_FILE")
@@ -224,23 +241,23 @@ ${commits_text}"
 jq --arg date "$TODAY" '
   [.entries[] | select(.category == "log" and .date == $date)] | group_by(.project) |
   map({project: .[0].project, commits: [.[].text]})
-' "$UPDATES_FILE" > /tmp/daily_groups.json
+' "$UPDATES_FILE" > "$GROUPS_JSON"
 
 # Build daily entries with AI summaries
-echo '[]' > /tmp/daily_entries.json
+echo '[]' > "$ENTRIES"
 
 FALLBACK_COUNT=0     # projects where claude produced nothing usable
 SUMMARIZED_COUNT=0   # projects that actually went through claude (multi-commit)
 
-for i in $(jq -r 'range(length)' /tmp/daily_groups.json); do
-    project=$(jq -r ".[$i].project" /tmp/daily_groups.json)
-    count=$(jq -r ".[$i].commits | length" /tmp/daily_groups.json)
-    commits_json=$(jq -c ".[$i].commits" /tmp/daily_groups.json)
+for i in $(jq -r 'range(length)' "$GROUPS_JSON"); do
+    project=$(jq -r ".[$i].project" "$GROUPS_JSON")
+    count=$(jq -r ".[$i].commits | length" "$GROUPS_JSON")
+    commits_json=$(jq -c ".[$i].commits" "$GROUPS_JSON")
 
     if [[ "$count" -eq 1 ]]; then
-        summaries=$(jq -r ".[$i].commits[0]" /tmp/daily_groups.json)   # single commit → verbatim, one line
+        summaries=$(jq -r ".[$i].commits[0]" "$GROUPS_JSON")   # single commit → verbatim, one line
     else
-        commits_text=$(jq -r ".[$i].commits[]" /tmp/daily_groups.json)
+        commits_text=$(jq -r ".[$i].commits[]" "$GROUPS_JSON")
         summaries=$(generate_summary "$project" "$commits_text" "$count")   # 1..MAX_LINES lines
         SUMMARIZED_COUNT=$((SUMMARIZED_COUNT + 1))
         # generate_summary echoes exactly this one line when claude fails/times out
@@ -255,19 +272,33 @@ for i in $(jq -r 'range(length)' /tmp/daily_groups.json); do
         jq --arg date "$TODAY" --arg project "$project" --arg summary "$summary" \
            --argjson commits "$commits_json" \
            '. + [{date: $date, category: "daily", project: $project, summary: $summary, commits: $commits}]' \
-           /tmp/daily_entries.json > /tmp/daily_entries.json.tmp \
-        && mv /tmp/daily_entries.json.tmp /tmp/daily_entries.json
+           "$ENTRIES" > "$ENTRIES_TMP" \
+        && mv "$ENTRIES_TMP" "$ENTRIES"
     done <<< "$summaries"
 done
 
-rm -f /tmp/daily_groups.json
-
-# Prepend daily entries to the entries array
-jq --slurpfile daily /tmp/daily_entries.json '
-  .entries = ($daily[0] + .entries)
-' "$UPDATES_FILE" > /tmp/updates.json.tmp \
-&& cp /tmp/updates.json.tmp "$UPDATES_FILE" \
-&& rm /tmp/updates.json.tmp /tmp/daily_entries.json
+# Prepend today's daily entries to the entries array. Serialize against the other
+# updates.json writers (mase-fi-update, deploy's commit logger, mase-fi-projects)
+# via the shared flock, and re-check idempotency inside the lock so two racing
+# runs can't both prepend today's batch. write_updates_json installs atomically
+# when it can, else in-place under the lock (see updates-write.sh).
+(
+  flock -w 30 9 || { echo "updates.json lock busy >30s — daily entries not written" >&2; exit 1; }
+  if ! jq empty "$UPDATES_FILE" 2>/dev/null; then
+    echo "$UPDATES_FILE is malformed JSON — refusing to write daily entries" >&2
+    exit 1
+  fi
+  already=$(jq --arg date "$TODAY" '[.entries[] | select(.category == "daily" and .date == $date)] | length' "$UPDATES_FILE")
+  if [[ "$already" -gt 0 ]]; then
+    echo "Daily entries for $TODAY appeared during the run — skipping write"
+    exit 0
+  fi
+  jq --slurpfile daily "$ENTRIES" '
+    .entries = ($daily[0] + .entries)
+  ' "$UPDATES_FILE" > "$UPD_TMP" \
+  && write_updates_json "$UPD_TMP" "$UPDATES_FILE" \
+  || { echo "failed to write daily entries to $UPDATES_FILE" >&2; exit 1; }
+) 9>/tmp/mase-updates-json.lock
 
 DAILY_COUNT=$(jq --arg date "$TODAY" '[.entries[] | select(.category == "daily" and .date == $date)] | length' "$UPDATES_FILE")
 echo "Created $DAILY_COUNT daily summary entries for $TODAY"
