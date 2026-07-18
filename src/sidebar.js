@@ -1,5 +1,5 @@
 // Sidebar channel list + mobile tabbar rendering, plus active-channel highlight.
-import { chAccent, chHeat, getChannels, channelById } from './channels.js';
+import { chAccent, chHeat, getChannels, channelById } from './registry.js';
 import { escapeHtml } from './html.js';
 
 function chanRow(c) {

@@ -12,6 +12,9 @@
 .feed::-webkit-scrollbar { width: 8px; }
 .feed::-webkit-scrollbar-thumb { background: var(--line); border-radius: 4px; }
 .feed::-webkit-scrollbar-thumb:hover { background: #3a3a42; }
+/* Lazy-load trip wire at the top of the feed. Needs a non-zero box so the
+   IntersectionObserver reports it reliably; 1px is visually inert. */
+.feed-top-sentinel { height: 1px; }
 
 /* shared IRC-style column grid: timestamp | nick | message.
    `auto auto 1fr` — columns hug content, msg takes the rest.
