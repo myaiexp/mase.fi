@@ -10,3 +10,18 @@ export function wrapIndex(idx, direction, len) {
   if (next >= len) next = 0;
   return next;
 }
+
+// Steps from `current` by `direction` (+1/-1), wrapping at the ends and skipping
+// any index where `isDisabledAt(idx)` is truthy, returning the first enabled
+// index reached. Bounded to a single lap so an all-disabled list terminates and
+// returns -1 instead of spinning forever. Shared by base-context-menu (skip
+// separators/disabled items) and base-tabs (skip disabled tabs) so the
+// termination guarantee lives in one tested place. Callers pass len > 0.
+export function nextEnabledIndex(current, direction, len, isDisabledAt) {
+  let idx = current;
+  for (let step = 0; step < len; step++) {
+    idx = wrapIndex(idx, direction, len);
+    if (!isDisabledAt(idx)) return idx;
+  }
+  return -1;
+}

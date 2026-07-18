@@ -1,7 +1,7 @@
 // <base-context-menu> — singleton right-click context menu with zone-based registration
 
 import { MENU_ITEM_CSS, MENU_SURFACE_CSS } from '../shared/menu-styles.js';
-import { wrapIndex } from '../shared/menu-nav.js';
+import { nextEnabledIndex } from '../shared/menu-nav.js';
 import { addOverlayListeners, removeOverlayListeners } from '../shared/overlay-utils.js';
 
 const contextMenuTemplate = document.createElement('template');
@@ -194,18 +194,15 @@ class BaseContextMenu extends HTMLElement {
     const items = this.#items;
     if (!items.length) return;
 
-    let idx = this.#highlightIdx;
-    const len = items.length;
-
-    // Find next valid item
-    for (let step = 0; step < len; step++) {
-      idx = wrapIndex(idx, direction, len);
-      const item = items[idx];
-      if (!item.separator && !item.disabled) {
-        this.#highlightIdx = idx;
-        this.#updateHighlight();
-        return;
-      }
+    const idx = nextEnabledIndex(
+      this.#highlightIdx,
+      direction,
+      items.length,
+      (i) => items[i].separator || items[i].disabled,
+    );
+    if (idx !== -1) {
+      this.#highlightIdx = idx;
+      this.#updateHighlight();
     }
   }
 

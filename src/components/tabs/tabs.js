@@ -1,5 +1,5 @@
 // <base-tabs> + <base-tab> — accessible tab panel component with keyboard navigation
-import { wrapIndex } from '../shared/menu-nav.js';
+import { nextEnabledIndex } from '../shared/menu-nav.js';
 
 const tabsTemplate = document.createElement('template');
 tabsTemplate.innerHTML = [
@@ -48,15 +48,27 @@ tabsTemplate.innerHTML = [
 ].join('');
 
 class BaseTabs extends HTMLElement {
+  // Member convention (library-wide — see docs/base-components.md): `#member` is
+  // hard-private internal state; `_member` is deliberately reachable by a friend
+  // module or test. Here `_updateTabs` is reached by the sibling BaseTab class
+  // (on attribute changes) and by tabs.test.js — it stays `_`; everything else
+  // is #private.
+  #tablist = null;
+  #activeIndex = 0;
+  #tabs = [];
+  // Set while selectTab is moving the `active` attribute between tabs, so the
+  // resulting BaseTab.attributeChangedCallback → _updateTabs re-entry is skipped:
+  // selectTab already updated the buttons in place, so a full rebuild would only
+  // churn DOM (and detach live button references) to reach the same state.
+  #syncingActiveAttr = false;
+
   constructor() {
     super();
     this.attachShadow({ mode: 'open' });
     this.shadowRoot.appendChild(tabsTemplate.content.cloneNode(true));
-    this._tablist = this.shadowRoot.querySelector('[role="tablist"]');
-    this._activeIndex = 0;
-    this._tabs = [];
+    this.#tablist = this.shadowRoot.querySelector('[role="tablist"]');
 
-    this._tablist.addEventListener('keydown', (e) => this._onKeydown(e));
+    this.#tablist.addEventListener('keydown', (e) => this.#onKeydown(e));
 
     const slot = this.shadowRoot.querySelector('slot');
     if (slot) {
@@ -69,7 +81,7 @@ class BaseTabs extends HTMLElement {
   }
 
   get activeIndex() {
-    return this._activeIndex;
+    return this.#activeIndex;
   }
 
   set activeIndex(i) {
@@ -77,19 +89,22 @@ class BaseTabs extends HTMLElement {
   }
 
   _updateTabs() {
+    // Ignore the re-entrant call selectTab provokes when it moves `active`.
+    if (this.#syncingActiveAttr) return;
+
     const children = Array.from(this.children).filter(
       (el) => el.tagName && el.tagName.toLowerCase() === 'base-tab'
     );
-    this._tabs = children;
+    this.#tabs = children;
 
-    // Find initial active index: honour active attribute, else use current _activeIndex
+    // Find initial active index: honour active attribute, else use current #activeIndex
     const markedActive = children.findIndex((el) => el.hasAttribute('active'));
     const initialIndex = markedActive !== -1
       ? markedActive
-      : Math.max(0, Math.min(this._activeIndex, children.length - 1));
+      : Math.max(0, Math.min(this.#activeIndex, children.length - 1));
 
     // Rebuild tab buttons
-    this._tablist.innerHTML = '';
+    this.#tablist.innerHTML = '';
     children.forEach((tabEl, idx) => {
       const btn = document.createElement('button');
       btn.textContent = tabEl.getAttribute('label') || '';
@@ -103,21 +118,41 @@ class BaseTabs extends HTMLElement {
       btn.addEventListener('click', () => {
         if (!btn.disabled) this.selectTab(idx);
       });
-      this._tablist.appendChild(btn);
+      this.#tablist.appendChild(btn);
     });
 
     // Set active (bypassing event dispatch for initial setup)
-    this._activeIndex = initialIndex;
-    this._applyActive();
+    this.#activeIndex = initialIndex;
+    this.#applyActive();
   }
 
   selectTab(index) {
-    if (index < 0 || index >= this._tabs.length) return;
-    const tabEl = this._tabs[index];
+    if (index < 0 || index >= this.#tabs.length) return;
+    const tabEls = this.#tabs;
+    const tabEl = tabEls[index];
     if (tabEl && tabEl.hasAttribute('disabled')) return;
 
-    this._activeIndex = index;
-    this._applyActive();
+    // Persist the selection onto the light DOM by moving the `active` attribute
+    // to the chosen tab. _updateTabs reruns on every slotchange and on any
+    // observed attribute change of any tab, and it reconstructs the active index
+    // from this attribute — so without moving it, a later rebuild (e.g. a host
+    // app editing another tab's label) would snap the selection back to whichever
+    // tab carried the original `active`. Guarded to only mutate attributes that
+    // actually change. Each mutation synchronously re-enters _updateTabs via
+    // BaseTab.attributeChangedCallback; #syncingActiveAttr makes that a no-op so
+    // we update the buttons in place below instead of rebuilding the tablist.
+    this.#syncingActiveAttr = true;
+    tabEls.forEach((el, i) => {
+      if (i === index) {
+        if (!el.hasAttribute('active')) el.setAttribute('active', '');
+      } else if (el.hasAttribute('active')) {
+        el.removeAttribute('active');
+      }
+    });
+    this.#syncingActiveAttr = false;
+
+    this.#activeIndex = index;
+    this.#applyActive();
 
     this.dispatchEvent(new CustomEvent('tab-change', {
       detail: { index, label: tabEl.getAttribute('label') || '' },
@@ -126,48 +161,45 @@ class BaseTabs extends HTMLElement {
     }));
   }
 
-  _applyActive() {
-    const buttons = this._tablist.querySelectorAll('button');
+  #applyActive() {
+    const buttons = this.#tablist.querySelectorAll('button');
     buttons.forEach((btn, idx) => {
-      const isActive = idx === this._activeIndex;
+      const isActive = idx === this.#activeIndex;
       btn.setAttribute('aria-selected', isActive ? 'true' : 'false');
       btn.setAttribute('tabindex', isActive ? '0' : '-1');
     });
 
     // Show/hide panels
-    this._tabs.forEach((tabEl, idx) => {
-      tabEl.style.display = idx === this._activeIndex ? '' : 'none';
+    this.#tabs.forEach((tabEl, idx) => {
+      tabEl.style.display = idx === this.#activeIndex ? '' : 'none';
     });
   }
 
-  _onKeydown(e) {
-    if (this._tabs.length === 0) return;
+  #onKeydown(e) {
+    if (this.#tabs.length === 0) return;
 
     if (e.key === 'ArrowRight') {
       e.preventDefault();
-      this._moveActive(1);
+      this.#moveActive(1);
     } else if (e.key === 'ArrowLeft') {
       e.preventDefault();
-      this._moveActive(-1);
+      this.#moveActive(-1);
     } else if (e.key === 'Enter' || e.key === ' ') {
       e.preventDefault();
-      this.selectTab(this._activeIndex);
+      this.selectTab(this.#activeIndex);
     }
   }
 
-  // Step the active tab by `direction`, wrapping and skipping disabled tabs.
-  // Bounded to one lap so an all-disabled tablist terminates instead of spinning.
-  _moveActive(direction) {
-    const len = this._tabs.length;
-    let idx = this._activeIndex;
-
-    for (let step = 0; step < len; step++) {
-      idx = wrapIndex(idx, direction, len);
-      if (!this._tabs[idx].hasAttribute('disabled')) {
-        this.selectTab(idx);
-        return;
-      }
-    }
+  // Step the active tab by `direction`, wrapping and skipping disabled tabs via
+  // the shared bounded-lap helper (all-disabled terminates instead of spinning).
+  #moveActive(direction) {
+    const idx = nextEnabledIndex(
+      this.#activeIndex,
+      direction,
+      this.#tabs.length,
+      (i) => this.#tabs[i].hasAttribute('disabled'),
+    );
+    if (idx !== -1) this.selectTab(idx);
   }
 }
 

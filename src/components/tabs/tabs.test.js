@@ -136,4 +136,27 @@ describe('base-tabs', () => {
     expect(buttons[1].getAttribute('aria-selected')).toBe('true');
     expect(buttons[0].getAttribute('aria-selected')).toBe('false');
   });
+
+  it('user selection survives a rebuild triggered by a tab attribute change', () => {
+    // Markup marks Second (index 1) active; user then clicks First (index 0).
+    const { tabs, tabEls } = createTabs([
+      { label: 'First' },
+      { label: 'Second', active: true },
+      { label: 'Third' },
+    ]);
+    expect(tabs.activeIndex).toBe(1);
+
+    tabs.shadowRoot.querySelectorAll('[role="tablist"] button')[0].click();
+    expect(tabs.activeIndex).toBe(0);
+
+    // A host app edits an unrelated tab's label — this fires attributeChanged-
+    // Callback, which reruns _updateTabs (a full rebuild). The user's selection
+    // must survive rather than snapping back to the originally-marked Second.
+    tabEls[2].setAttribute('label', 'Third!');
+
+    expect(tabs.activeIndex).toBe(0);
+    const buttons = tabs.shadowRoot.querySelectorAll('[role="tablist"] button');
+    expect(buttons[0].getAttribute('aria-selected')).toBe('true');
+    expect(buttons[1].getAttribute('aria-selected')).toBe('false');
+  });
 });

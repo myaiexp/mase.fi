@@ -115,6 +115,11 @@ function isFocusable(el) {
 }
 
 class BaseModal extends HTMLElement {
+  // Member convention (library-wide — see docs/base-components.md): `#member` is
+  // hard-private internal state; `_member` is deliberately reachable by a friend
+  // module or test. The focus-trap internals (`_handleKeyDown`,
+  // `_getFocusableElements`, `_getLightFocusables`) are exercised directly by
+  // modal.test.js — those stay `_`; everything else is #private.
   #open = false;
   #onKeyDown = null;
 

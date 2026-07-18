@@ -49,18 +49,23 @@ template.innerHTML = `
 class BaseBadge extends HTMLElement {
   static observedAttributes = ['type', 'variant', 'color', 'size'];
 
+  // Member convention (library-wide — see docs/base-components.md): `#member` is
+  // hard-private internal state; `_member` is deliberately reachable by a friend
+  // module or test. This component has no friend module, so every member is #.
+  #span = null;
+
   constructor() {
     super();
     this.attachShadow({ mode: 'open' });
     this.shadowRoot.appendChild(template.content.cloneNode(true));
-    this._span = this.shadowRoot.querySelector('span');
+    this.#span = this.shadowRoot.querySelector('span');
   }
 
   attributeChangedCallback() {
-    this._update();
+    this.#update();
   }
 
-  _update() {
+  #update() {
     const type = this.getAttribute('type') || 'tag';
     const variant = this.getAttribute('variant');
     const colorOverride = this.getAttribute('color');
@@ -88,8 +93,8 @@ class BaseBadge extends HTMLElement {
       this.style.removeProperty('--bb-tint');
     }
 
-    this._span.classList.toggle('dot', type === 'status');
-    this._span.classList.toggle('sm', size === 'sm');
+    this.#span.classList.toggle('dot', type === 'status');
+    this.#span.classList.toggle('sm', size === 'sm');
   }
 }
 
