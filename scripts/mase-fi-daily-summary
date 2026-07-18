@@ -124,23 +124,24 @@ clean_lines() {
         # Sonnet occasionally prepends (two-lines-one-per-project, commits-are-
         # all-from-one-day, let-me-write-the-changelog) — the real changelog
         # lines that follow it survive.
-        if (low ~ /^(one|two|three|four|five|six|seven|eight|nine|ten|[0-9]+) lines?\b/) next
-        if (low ~ /\b(all |the )?commits (are|were|show|span|look|appear)\b/) next
+        # Word edges use gawk \< \> — NOT \b (gawk \b is the backspace char).
+        if (low ~ /^(one|two|three|four|five|six|seven|eight|nine|ten|[0-9]+) lines?\>/) next
+        if (low ~ /\<(all |the )?commits (are|were|show|span|look|appear)\>/) next
         if (low ~ /^today.?s (git )?(log|commits|work)/) next
-        if (low ~ /^let me\b/) next
-        if (low ~ /\bone per project\b/) next
-        if (low ~ /\bfrom a single day\b/) next
-        if (low ~ /\bappear to be\b/) next
-        if (low ~ /\bdistinct threads\b/) next
+        if (low ~ /^let me\>/) next
+        if (low ~ /\<one per project\>/) next
+        if (low ~ /\<from a single day\>/) next
+        if (low ~ /\<appear to be\>/) next
+        if (low ~ /\<distinct threads\>/) next
         # drop conversational refusals / no-input replies: Claude Code sometimes
         # tries to read a repo instead of the provided commits and then bails.
         # The prompt makes these rare; this is the safety net.
-        if (low ~ /\bno (commit|work|git|changes|actual)/) next
-        if (low ~ /\b(in|from) your message\b/) next
+        if (low ~ /\<no (commit|work|git|changes|actual)/) next
+        if (low ~ /\<(in|from) your message\>/) next
         if (low ~ /^i (don.?t|do not|only|need|can.?t|cannot|see|notice|am )/) next
         if (low ~ /(could|can) you (paste|provide|share|clarify)/) next
-        if (low ~ /^(please|paste|provide)\b/) next
-        if (low ~ /^wait\b/) next
+        if (low ~ /^(please|paste|provide)\>/) next
+        if (low ~ /^wait\>/) next
         if (low ~ /working director/) next
         if (low ~ /the user (only )?(supplied|provided|gave)/) next
         print line

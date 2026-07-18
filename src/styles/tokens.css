@@ -1,15 +1,18 @@
 /* Design tokens: font-face declarations, CSS custom properties, base resets */
+/* Two woff2 files, four weights invoked (400/500/600/700). Declared ranges map
+   in-between weights to a real file: 400-500 → Regular, 600-700 → Bold. Matches
+   base.css (type-family card). */
 @font-face {
   font-family: 'JetBrains Mono';
   src: url('../fonts/JetBrainsMono-Regular.woff2') format('woff2');
-  font-weight: 400;
+  font-weight: 400 500;
   font-style: normal;
   font-display: swap;
 }
 @font-face {
   font-family: 'JetBrains Mono';
   src: url('../fonts/JetBrainsMono-Bold.woff2') format('woff2');
-  font-weight: 700;
+  font-weight: 600 700;
   font-style: normal;
   font-display: swap;
 }
