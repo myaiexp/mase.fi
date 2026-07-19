@@ -163,6 +163,28 @@
 </section>
 
 <section>
+  <div class="recipe">Modifier</div>
+  <h2><code>.btn-stretch</code> — flanking a growing control</h2>
+  <p class="note">The one sanctioned escape from the fixed height. A composer's send/attach buttons sit in a flex row with an auto-growing textarea; without this they pin to 22px and float at the top of a tall row. <code>--btn-h</code> stays the floor, so a stretch button in a one-line row is indistinguishable from a normal one.</p>
+
+  <div class="mock" style="padding: var(--space-2);">
+    <form style="display: flex; gap: var(--space-2); align-items: stretch;">
+      <textarea class="textarea" style="min-height: 22px; height: 22px; resize: none;" rows="1">one line</textarea>
+      <button class="btn btn-primary btn-stretch">Send</button>
+    </form>
+  </div>
+
+  <div class="mock" style="padding: var(--space-2);">
+    <form style="display: flex; gap: var(--space-2); align-items: stretch;">
+      <textarea class="textarea" style="min-height: 76px; height: 76px; resize: none;" rows="4">grown to four lines — the button tracks the box instead of pinning to 22px at the top of the row</textarea>
+      <button class="btn btn-primary btn-stretch">Send</button>
+    </form>
+  </div>
+
+  <p class="note">Opt-in per call site. Don't reach for it to make a button "bigger" — one size still governs every ordinary button; this exists only for the flanking case.</p>
+</section>
+
+<section>
   <div class="recipe">Legacy</div>
   <h2>Deprecated — <code>.btn-sm</code> · <code>.btn-ghost</code></h2>
   <p class="note">Not part of the one-size/three-variant vocabulary. Retained in <code>base.css</code> only so existing consumers don't break (~250 <code>.btn-sm</code>, ~24 <code>.btn-ghost</code> across the fleet). Don't reach for them in new work — removing them is a separate migration.</p>

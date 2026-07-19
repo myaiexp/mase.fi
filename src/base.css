@@ -342,14 +342,18 @@ pre code {
    Fixed 22px control height + line-height:1 so vertical size is deterministic
    regardless of font load (same box model as .status/.tag). Tints track their
    color var via color-mix so an --accent / --red override (or a theme) re-tints
-   primary and danger for free. */
+   primary and danger for free.
+
+   --btn-h carries the height so a variant re-points one var instead of restating
+   the box (.btn-sm shrinks it; .btn-stretch floors it). */
 
 .btn {
+  --btn-h: 22px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
   gap: var(--space-2);
-  height: 22px;
+  height: var(--btn-h);
   padding: 0 var(--space-3);
   border: 1px solid var(--border);
   font-size: var(--text-sm);
@@ -385,7 +389,7 @@ pre code {
    Retained for backward compat: ~250 .btn-sm and ~24 .btn-ghost usages across the
    fleet consume this sheet. Removing them is a separate migration (see spec). */
 .btn-sm {
-  height: 18px;
+  --btn-h: 18px;
   padding: 0 var(--space-2);
   font-size: var(--text-xs);
 }
@@ -397,6 +401,19 @@ pre code {
   transition: color var(--transition), background var(--transition);
 }
 .btn-ghost:hover { color: var(--text); background: var(--bg-hover); }
+
+/* Stretch modifier — the ONE sanctioned escape from the fixed height, for a
+   button that flanks a growing sibling (composer send/attach next to an
+   auto-growing textarea). Opt-in per call site: one-size still governs every
+   ordinary button, and --btn-h stays the floor so a stretch button in a short
+   row is indistinguishable from a normal one. Must come after .btn-sm/.btn-ghost
+   — same specificity, source order decides. Sets align-self so it also works in
+   an align-items:center row, not only a stretch one. */
+.btn-stretch {
+  height: auto;
+  min-height: var(--btn-h);
+  align-self: stretch;
+}
 
 /* ===== Form Inputs ===== */
 /* Controls share the button box model — fixed 22px height + line-height:1 so an
