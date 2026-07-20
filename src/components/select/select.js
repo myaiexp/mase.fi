@@ -27,6 +27,7 @@ class BaseSelect extends HTMLElement {
   #triggerWrap = null;
   #observer = null;
   #trigger = null;
+  #sizer = null;
 
   constructor() {
     super();
@@ -39,7 +40,8 @@ class BaseSelect extends HTMLElement {
   connectedCallback() {
     this.#buildTrigger();
     buildMenu(this);
-    this.#observer = new MutationObserver(() => buildMenu(this));
+    this.#syncSizer();
+    this.#observer = new MutationObserver(() => { buildMenu(this); this.#syncSizer(); });
     this.#observer.observe(this, { childList: true, subtree: true });
   }
 
@@ -51,9 +53,9 @@ class BaseSelect extends HTMLElement {
 
   attributeChangedCallback(name) {
     if (name === 'value') this.#syncTriggerText();
-    if (name === 'placeholder') this.#syncTriggerText();
+    if (name === 'placeholder') { this.#syncTriggerText(); this.#syncSizer(); }
     if (name === 'size') this.#applySize();
-    if (name === 'searchable') { this.#buildTrigger(); buildMenu(this); }
+    if (name === 'searchable') { this.#buildTrigger(); buildMenu(this); this.#syncSizer(); }
   }
 
   // --- Public API ---
@@ -105,6 +107,11 @@ class BaseSelect extends HTMLElement {
 
   #buildTrigger() {
     this.#triggerWrap.textContent = '';
+    this.#sizer = document.createElement('span');
+    this.#sizer.className = 'sizer';
+    this.#sizer.setAttribute('aria-hidden', 'true');
+    this.#triggerWrap.appendChild(this.#sizer);
+    this.#syncSizer();
     if (this.#searchable) {
       const input = document.createElement('input');
       input.setAttribute('type', 'text');
@@ -168,9 +175,26 @@ class BaseSelect extends HTMLElement {
     return span;
   }
 
+  // Mirror every option label (plus the placeholder) into the hidden sizer, so the
+  // grid cell is as wide as the widest thing the trigger can ever display.
+  #syncSizer() {
+    if (!this.#sizer) return;
+    this.#sizer.textContent = '';
+    const labels = [...this.querySelectorAll('base-option')].map((o) => o.label);
+    const ph = this.getAttribute('placeholder');
+    if (ph) labels.push(ph);
+    for (const label of labels) {
+      const span = document.createElement('span');
+      span.textContent = label;
+      this.#sizer.appendChild(span);
+    }
+  }
+
   #applySize() {
+    const sm = this.getAttribute('size') === 'sm';
+    if (this.#sizer) this.#sizer.classList.toggle('sm', sm);
     if (!this.#trigger) return;
-    this.#trigger.classList.toggle('sm', this.getAttribute('size') === 'sm');
+    this.#trigger.classList.toggle('sm', sm);
   }
 
   // --- Selection ---

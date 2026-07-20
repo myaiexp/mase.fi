@@ -149,4 +149,6 @@ fleet-wide (every project loads `base.css`). Changes vs the pre-card sheet:
 
 - **Checkbox / radio** not documented. When first needed, add here.
 - **Select / combobox** — native `.select` shares the input box; the rich control is
-  `<base-select>`. A dedicated select card can supersede this note.
+  `<base-select>`. A dedicated select card can supersede this note. `<base-select>`
+  sizes to its widest option and opts into filling with `stretch` (the `.btn-stretch`
+  idiom); see `docs/base-components.md`.

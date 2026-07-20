@@ -3,13 +3,36 @@
 import { MENU_SURFACE_CSS } from '../shared/menu-styles.js';
 
 export const selectStyles = `<style>
+  /* Intrinsic width — the control sizes to its widest option, like a native
+     <select>, instead of filling whatever box it lands in. A width:100% default
+     is invisible inside a nowrap flex row (the item just gets squeezed) but
+     claims an entire line the moment that row wraps, so every consumer had to
+     pin a width by hand. Opt into filling with the "stretch" attribute, matching
+     base.css's .btn-stretch idiom.
+     min-width:0 + max-width:100% keep it shrinkable inside a flex row and never
+     wider than its container; the trigger ellipsizes rather than overflowing. */
   :host {
     display: inline-block;
     position: relative;
     font-family: var(--font-mono, monospace);
+    min-width: 0;
+    max-width: 100%;
+  }
+  :host([stretch]) {
+    display: block;
     width: 100%;
   }
-  button, input {
+  /* Trigger and sizer share one grid cell: the column takes the wider of the two,
+     so the width is the widest OPTION rather than the current selection — the
+     control doesn't twitch when the value changes. */
+  [part="trigger-wrap"] {
+    display: grid;
+  }
+  [part="trigger-wrap"] > * {
+    grid-area: 1 / 1;
+    min-width: 0;
+  }
+  button, input, .sizer {
     display: block;
     width: 100%;
     box-sizing: border-box;
@@ -25,7 +48,24 @@ export const selectStyles = `<style>
     outline: none;
     appearance: none;
   }
-  button.sm, input.sm {
+  button, input {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  /* Zero-height and hidden: contributes width only. box-sizing:border-box folds
+     its padding and border into the 0, so it adds nothing to the row height. */
+  .sizer {
+    height: 0;
+    visibility: hidden;
+    overflow: hidden;
+    pointer-events: none;
+  }
+  .sizer > span {
+    display: block;
+    white-space: nowrap;
+  }
+  button.sm, input.sm, .sizer.sm {
     padding: 3px 20px 3px 6px;
     font-size: 11px;
   }

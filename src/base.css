@@ -162,6 +162,19 @@ body {
 .min-h-0 { min-height: 0; }
 .min-w-0 { min-width: 0; }
 
+/* Responsive card grid — columns of at least --card-min, as many as fit.
+   The min() clamp is the load-bearing part: a bare minmax(260px, 1fr) floor is a
+   HARD minimum, so once the container is narrower than a column every card
+   overflows the viewport and the page pans sideways. Clamping the floor to 100%
+   lets the last column collapse to the container instead. Every hand-rolled copy
+   of this pattern got that wrong, which is why it lives here. */
+.card-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(var(--card-min, 260px), 100%), 1fr));
+  gap: var(--space-3);
+  align-content: start;
+}
+
 a {
   color: inherit;
   text-decoration: none;
