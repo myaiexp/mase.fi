@@ -48,6 +48,10 @@ Shared web components library built from `src/components/` via Vite library mode
 - **URL:** `https://mase.fi/base-components.js`
 - Full per-component API (props/attrs/behavior for `<base-text-fit>`, `<base-context-menu>`, etc.): `docs/base-components.md`
 
+### Cross-origin caching contract
+
+`base.css` and `base-components.js` are served from the webroot to other apps (helm, prospect, ghost, …). nginx (`$asset_cc` map) serves them **`no-cache, must-revalidate` + ETag when requested *unversioned*** — a bare `<link href="https://mase.fi/base.css">` revalidates every load (cheap 304), so a mase.fi push propagates to consumers with **no consumer redeploy** — and **`immutable, max-age=1y` when *any* `?v=` is present**. Consumer rule: **never append a `?v=` keyed to your own deploy hash** — that pins the asset immutably to a string that never changes when *mase.fi's* content does, so pushes go unseen until the consumer redeploys. Link shared assets **unversioned**, and a consumer **service worker must not `cacheFirst`** them (that defeats revalidation regardless of the HTTP header). helm currently violates both (own-hash `?v=` rewrite + SW `cacheFirst` on base.css) — tracked as helm #2701, not a mase.fi change.
+
 ## Deploy
 
 - Run `deploy` — pushes to the Forgejo `origin`, which fires a post-receive hook → `sudo forgejo-deploy mase.fi`.
