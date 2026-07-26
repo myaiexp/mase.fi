@@ -60,7 +60,15 @@
 
   /* Accent (amber — override per project) */
   --accent:      #e8a308;
-  --accent-glow: rgba(232, 163, 8, 0.12);
+  /* The accent's tint surface — the --*-bg of the accent, under an older name. Kept as
+     the one accent tint rather than adding a second --accent-bg: consumers already use
+     it as `background:`, and two near-identical accent tints is the asymmetry, not the
+     fix. color-mix rather than the equivalent frozen rgba so a re-theme reaches it —
+     value-identical on the default amber. Note the substitution rule: var(--accent) here
+     resolves against whatever wins on the element this token is DECLARED on, so an
+     override on the root (`[data-theme]`, a project's own :root) tracks, while one set on
+     a descendant does not — verified in Chrome, both ways. */
+  --accent-glow: color-mix(in srgb, var(--accent) 12%, transparent);
   --accent-text: #e8a308;
 
   /* Semantic colors */
@@ -77,6 +85,7 @@
   --orange-bg: color-mix(in srgb, var(--orange) 15%, transparent);
   --purple-bg: color-mix(in srgb, var(--purple) 15%, transparent);
   --blue-bg:   color-mix(in srgb, var(--blue) 15%, transparent);
+  --cyan-bg:   color-mix(in srgb, var(--cyan) 15%, transparent);
 
   /* Font */
   --font: 'JetBrains Mono', 'Consolas', monospace;
