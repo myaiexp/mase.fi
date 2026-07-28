@@ -24,6 +24,14 @@ function fireContextMenu(target, x = 100, y = 100) {
   return event;
 }
 
+function firePointerDown(target, pointerType) {
+  // jsdom's PointerEvent ignores pointerType in its init dict, so stamp it on.
+  const event = new MouseEvent('pointerdown', { bubbles: true, cancelable: true });
+  Object.defineProperty(event, 'pointerType', { value: pointerType });
+  target.dispatchEvent(event);
+  return event;
+}
+
 function makeSampleItems() {
   return [
     { label: 'Copy', action: vi.fn() },
@@ -443,5 +451,102 @@ describe('base-context-menu', () => {
     // Scroll should not cause errors
     window.dispatchEvent(new Event('scroll'));
     expect(cm.isOpen).toBe(false);
+  });
+
+  // 27. A touch long-press falls through to the browser — preventing it would
+  // cancel the very gesture that starts a text selection on a touchscreen.
+  it('touch long-press does not open the menu or prevent default', () => {
+    const cm = createMenu();
+    const items = vi.fn(() => [{ label: 'A', action: () => {} }]);
+    cm.register('test', { selector: '.zone', items });
+
+    const zone = document.createElement('div');
+    zone.className = 'zone';
+    document.body.appendChild(zone);
+
+    firePointerDown(zone, 'touch');
+    const event = fireContextMenu(zone);
+
+    expect(items).not.toHaveBeenCalled();
+    expect(event.defaultPrevented).toBe(false);
+    expect(cm.isOpen).toBe(false);
+  });
+
+  // 28. ...and a mouse right-click on the same device still gets the menu
+  it('mouse right-click after a touch still opens the menu', () => {
+    const cm = createMenu();
+    cm.register('test', { selector: '.zone', items: () => [{ label: 'A', action: () => {} }] });
+
+    const zone = document.createElement('div');
+    zone.className = 'zone';
+    document.body.appendChild(zone);
+
+    firePointerDown(zone, 'touch');
+    firePointerDown(zone, 'mouse');
+    const event = fireContextMenu(zone);
+
+    expect(event.defaultPrevented).toBe(true);
+    expect(cm.isOpen).toBe(true);
+  });
+
+  // 29. The event's own pointerType wins over the tracked pointerdown when the
+  // engine provides it (Chromium dispatches contextmenu as a PointerEvent).
+  it('contextmenu carrying pointerType=touch falls through with no pointerdown', () => {
+    const cm = createMenu();
+    const items = vi.fn(() => [{ label: 'A', action: () => {} }]);
+    cm.register('test', { selector: '.zone', items });
+
+    const zone = document.createElement('div');
+    zone.className = 'zone';
+    document.body.appendChild(zone);
+
+    const event = new MouseEvent('contextmenu', { bubbles: true, cancelable: true });
+    Object.defineProperty(event, 'pointerType', { value: 'touch' });
+    zone.dispatchEvent(event);
+
+    expect(items).not.toHaveBeenCalled();
+    expect(event.defaultPrevented).toBe(false);
+  });
+
+  // 30. Firefox reports the source on the MouseEvent instead of pointerType
+  it('contextmenu with mozInputSource=TOUCH falls through', () => {
+    const cm = createMenu();
+    const items = vi.fn(() => [{ label: 'A', action: () => {} }]);
+    cm.register('test', { selector: '.zone', items });
+
+    const zone = document.createElement('div');
+    zone.className = 'zone';
+    document.body.appendChild(zone);
+
+    const event = new MouseEvent('contextmenu', { bubbles: true, cancelable: true });
+    Object.defineProperty(event, 'mozInputSource', { value: 5 });
+    zone.dispatchEvent(event);
+
+    expect(items).not.toHaveBeenCalled();
+    expect(event.defaultPrevented).toBe(false);
+
+    // ...and mozInputSource=MOUSE still opens it
+    const mouseEvent = new MouseEvent('contextmenu', { bubbles: true, cancelable: true });
+    Object.defineProperty(mouseEvent, 'mozInputSource', { value: 1 });
+    zone.dispatchEvent(mouseEvent);
+    expect(items).toHaveBeenCalled();
+  });
+
+  // 31. A keyboard-invoked menu (Menu key / Shift+F10) is not a touch gesture,
+  // even when the last pointerdown on the device was a finger.
+  it('keyboard-invoked contextmenu after a touch still opens the menu', () => {
+    const cm = createMenu();
+    cm.register('test', { selector: '.zone', items: () => [{ label: 'A', action: () => {} }] });
+
+    const zone = document.createElement('div');
+    zone.className = 'zone';
+    document.body.appendChild(zone);
+
+    firePointerDown(zone, 'touch');
+    document.dispatchEvent(new KeyboardEvent('keydown', { key: 'ContextMenu', bubbles: true }));
+    const event = fireContextMenu(zone);
+
+    expect(event.defaultPrevented).toBe(true);
+    expect(cm.isOpen).toBe(true);
   });
 });

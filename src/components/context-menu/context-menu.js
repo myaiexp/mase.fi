@@ -48,7 +48,13 @@ class BaseContextMenu extends HTMLElement {
   #highlightIdx = -1;
   #items = [];
   #onContextMenu = null;
+  #onPointerDown = null;
+  #onKeyDown = null;
   #menu = null;
+  // Whether the gesture that will produce the next `contextmenu` came from a
+  // finger — see #isTouchGesture for why that has to be known before we
+  // preventDefault().
+  #lastPointerWasTouch = false;
 
   constructor() {
     super();
@@ -59,13 +65,30 @@ class BaseContextMenu extends HTMLElement {
 
   connectedCallback() {
     this.#onContextMenu = (e) => this.#handleContextMenu(e);
+    // Captured on document so a consumer that stopPropagation()s its own
+    // pointerdown can't blind the touch check below.
+    this.#onPointerDown = (e) => { this.#lastPointerWasTouch = e.pointerType === 'touch'; };
+    // A Menu-key / Shift+F10 menu is keyboard-invoked and gets no pointerdown of
+    // its own, so on a touchscreen laptop it would otherwise inherit whatever
+    // the last finger did.
+    this.#onKeyDown = () => { this.#lastPointerWasTouch = false; };
     document.addEventListener('contextmenu', this.#onContextMenu);
+    document.addEventListener('pointerdown', this.#onPointerDown, true);
+    document.addEventListener('keydown', this.#onKeyDown, true);
   }
 
   disconnectedCallback() {
     if (this.#onContextMenu) {
       document.removeEventListener('contextmenu', this.#onContextMenu);
       this.#onContextMenu = null;
+    }
+    if (this.#onPointerDown) {
+      document.removeEventListener('pointerdown', this.#onPointerDown, true);
+      this.#onPointerDown = null;
+    }
+    if (this.#onKeyDown) {
+      document.removeEventListener('keydown', this.#onKeyDown, true);
+      this.#onKeyDown = null;
     }
     this.close();
   }
@@ -134,8 +157,28 @@ class BaseContextMenu extends HTMLElement {
     return this.#open;
   }
 
+  // On a touchscreen the long-press that fires `contextmenu` is the SAME gesture
+  // that starts a text selection, so preventDefault() there doesn't swap one menu
+  // for another — it makes the page unselectable with nothing to fall back on
+  // (the browser's selection handles are the only way to copy). Custom items stay
+  // a right-click affordance; touch consumers that need them reach show()
+  // imperatively from a button of their own.
+  //
+  // `pointerType` rides on the contextmenu event itself only in Chromium; Firefox
+  // exposes mozInputSource and WebKit dispatches a plain MouseEvent — so the
+  // preceding pointerdown is the portable signal, and the event's own fields win
+  // when present.
+  #isTouchGesture(e) {
+    if (e.pointerType) return e.pointerType === 'touch';
+    if (typeof e.mozInputSource === 'number') {
+      return e.mozInputSource === 5; // MouseEvent.MOZ_SOURCE_TOUCH
+    }
+    return this.#lastPointerWasTouch;
+  }
+
   #handleContextMenu(e) {
     if (this.#open) this.close();
+    if (this.#isTouchGesture(e)) return;
 
     for (const zone of this.#zones.values()) {
       const matched = e.target.closest(zone.selector);
