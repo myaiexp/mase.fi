@@ -137,8 +137,21 @@ body {
   line-height: var(--leading);
 }
 
-/* Full-viewport app shell — opt in per project */
+/* Full-viewport app shell — opt in per project.
+
+   The flex column is load-bearing, not decoration. .scroll-region sizes itself
+   with flex:1 1 0, which is INERT on a child of a block box: the region falls
+   back to content height, so scrollH == clientH and it never scrolls, while
+   this element's overflow:hidden silently eats everything past 100dvh. That is
+   the documented page-scroll recipe (.app-shell > .scroll-region) failing in
+   the exact shape the docs prescribe — which is why every consumer that got it
+   right had hand-rolled its own flex column inside the shell (helm's #app,
+   builders' .shell-layout) or patched this rule locally (prospect), and why
+   bench, which followed the docs literally, shipped with half its page
+   unreachable. The chain belongs here so the recipe works as written. */
 .app-shell {
+  display: flex;
+  flex-direction: column;
   overflow: hidden;
   height: 100dvh;
 }
