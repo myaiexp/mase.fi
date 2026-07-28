@@ -31,6 +31,13 @@ contextMenuTemplate.innerHTML = `<style>
   .item.disabled.highlighted {
     background: transparent;
   }
+  /* A finger is not a mouse pointer: 4px rows at 13px are a target you miss. */
+  @media (pointer: coarse) {
+    .item {
+      padding: 10px 14px;
+      font-size: 15px;
+    }
+  }
   hr {
     border: none;
     border-top: 1px solid var(--border-color, #27272a);
@@ -93,10 +100,10 @@ class BaseContextMenu extends HTMLElement {
     this.close();
   }
 
-  register(id, { selector, items }) {
+  register(id, { selector, items, touch }) {
     // Map preserves insertion order, and re-setting an existing key keeps its
     // original position — so zone iteration order is derived, never duplicated.
-    this.#zones.set(id, { selector, items });
+    this.#zones.set(id, { selector, items, touch: !!touch });
   }
 
   unregister(id) {
@@ -159,10 +166,10 @@ class BaseContextMenu extends HTMLElement {
 
   // On a touchscreen the long-press that fires `contextmenu` is the SAME gesture
   // that starts a text selection, so preventDefault() there doesn't swap one menu
-  // for another — it makes the page unselectable with nothing to fall back on
-  // (the browser's selection handles are the only way to copy). Custom items stay
-  // a right-click affordance; touch consumers that need them reach show()
-  // imperatively from a button of their own.
+  // for another — it costs the page its only copy affordance. Zones therefore opt
+  // in (`touch: true`) rather than out: a zone takes the gesture only when it has
+  // something better to offer than the browser's selection handles, and every zone
+  // that doesn't ask leaves touch alone.
   //
   // `pointerType` rides on the contextmenu event itself only in Chromium; Firefox
   // exposes mozInputSource and WebKit dispatches a plain MouseEvent — so the
@@ -178,14 +185,17 @@ class BaseContextMenu extends HTMLElement {
 
   #handleContextMenu(e) {
     if (this.#open) this.close();
-    if (this.#isTouchGesture(e)) return;
+
+    const isTouch = this.#isTouchGesture(e);
+    const ctx = { x: e.clientX, y: e.clientY, pointerType: isTouch ? 'touch' : 'mouse' };
 
     for (const zone of this.#zones.values()) {
+      if (isTouch && !zone.touch) continue;
       const matched = e.target.closest(zone.selector);
       if (!matched) continue;
 
       const selection = window.getSelection().toString();
-      const result = zone.items(e.target, selection);
+      const result = zone.items(e.target, selection, ctx);
       if (result && result.length > 0) {
         e.preventDefault();
         this.show(e.clientX, e.clientY, result);

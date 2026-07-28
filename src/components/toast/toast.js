@@ -40,6 +40,10 @@ export class BaseToast {
       pointerEvents: 'auto',
       opacity: '1',
       transition: 'opacity 0.3s',
+      // The container is fixed to the top-right corner with no bound of its own,
+      // so an unconstrained message grows leftward straight off a phone viewport.
+      maxWidth: 'min(420px, calc(100vw - 2rem))',
+      overflowWrap: 'anywhere',
     });
     toast.textContent = message;
 

@@ -41,10 +41,16 @@ function makeSampleItems() {
 }
 
 describe('base-context-menu', () => {
+  // Several tests swap window.getSelection. Restoring here rather than at the end
+  // of each test means a FAILING test can't leak its stub into the next one — which
+  // it otherwise does, since the assertion throws before the restore line runs.
+  const origGetSelection = window.getSelection;
+
   afterEach(() => {
     if (el && el.parentNode) {
       el.remove();
     }
+    window.getSelection = origGetSelection;
     document.body.textContent = '';
     vi.restoreAllMocks();
   });
@@ -98,15 +104,14 @@ describe('base-context-menu', () => {
     zone.appendChild(child);
     document.body.appendChild(zone);
 
-    // Mock getSelection
-    const origGetSelection = window.getSelection;
+    // Mock getSelection (restored by afterEach, so a failure here can't leak it)
     window.getSelection = () => ({ toString: () => 'selected text' });
 
     // Fire on child — items builder should receive the child (e.target), not the zone
     fireContextMenu(child);
-    expect(items).toHaveBeenCalledWith(child, 'selected text');
-
-    window.getSelection = origGetSelection;
+    expect(items).toHaveBeenCalledWith(child, 'selected text', {
+      x: 100, y: 100, pointerType: 'mouse',
+    });
   });
 
   // 4. contextmenu on non-matching element does not prevent default
@@ -530,6 +535,106 @@ describe('base-context-menu', () => {
     Object.defineProperty(mouseEvent, 'mozInputSource', { value: 1 });
     zone.dispatchEvent(mouseEvent);
     expect(items).toHaveBeenCalled();
+  });
+
+  // 32-36. Per-zone touch opt-in. The default (fall through) is the whole point of
+  // the 302e4006 fix; a zone that has something better to offer than the browser's
+  // selection handles asks for the gesture explicitly.
+  it('a zone without touch:true still falls through on a touch long-press', () => {
+    const cm = createMenu();
+    const items = vi.fn(() => [{ label: 'A', action: () => {} }]);
+    cm.register('test', { selector: '.zone', items });
+
+    const zone = document.createElement('div');
+    zone.className = 'zone';
+    document.body.appendChild(zone);
+
+    firePointerDown(zone, 'touch');
+    const event = fireContextMenu(zone);
+
+    expect(items).not.toHaveBeenCalled();
+    expect(event.defaultPrevented).toBe(false);
+  });
+
+  it('a zone with touch:true takes the touch long-press', () => {
+    const cm = createMenu();
+    const items = vi.fn(() => [{ label: 'A', action: () => {} }]);
+    cm.register('test', { selector: '.zone', items, touch: true });
+
+    const zone = document.createElement('div');
+    zone.className = 'zone';
+    document.body.appendChild(zone);
+
+    firePointerDown(zone, 'touch');
+    const event = fireContextMenu(zone);
+
+    expect(items).toHaveBeenCalled();
+    expect(event.defaultPrevented).toBe(true);
+    expect(cm.isOpen).toBe(true);
+  });
+
+  it('a non-opted zone is skipped on touch but still wins on mouse', () => {
+    const cm = createMenu();
+    const first = vi.fn(() => [{ label: 'first', action: () => {} }]);
+    const second = vi.fn(() => [{ label: 'second', action: () => {} }]);
+    cm.register('first', { selector: '.zone', items: first });
+    cm.register('second', { selector: '.zone', items: second, touch: true });
+
+    const zone = document.createElement('div');
+    zone.className = 'zone';
+    document.body.appendChild(zone);
+
+    // Touch: the non-opted zone is skipped entirely, so the opted one answers.
+    firePointerDown(zone, 'touch');
+    fireContextMenu(zone);
+    expect(first).not.toHaveBeenCalled();
+    expect(second).toHaveBeenCalled();
+    cm.close();
+
+    // Mouse: registration order decides, as before.
+    first.mockClear(); second.mockClear();
+    firePointerDown(zone, 'mouse');
+    fireContextMenu(zone);
+    expect(first).toHaveBeenCalled();
+    expect(second).not.toHaveBeenCalled();
+  });
+
+  it('the items builder receives press coordinates and the resolved pointer type', () => {
+    const cm = createMenu();
+    const items = vi.fn(() => [{ label: 'A', action: () => {} }]);
+    cm.register('test', { selector: '.zone', items, touch: true });
+
+    const zone = document.createElement('div');
+    zone.className = 'zone';
+    document.body.appendChild(zone);
+
+    firePointerDown(zone, 'touch');
+    fireContextMenu(zone, 120, 340);
+
+    expect(items).toHaveBeenCalledWith(zone, '', { x: 120, y: 340, pointerType: 'touch' });
+
+    // ...and a mouse press reports itself as such.
+    cm.close();
+    items.mockClear();
+    firePointerDown(zone, 'mouse');
+    fireContextMenu(zone, 10, 20);
+    expect(items).toHaveBeenCalledWith(zone, '', { x: 10, y: 20, pointerType: 'mouse' });
+  });
+
+  it('a two-argument items builder still works', () => {
+    const cm = createMenu();
+    // Deliberately ignores the third argument, like every pre-existing consumer.
+    const items = (target, selection) => [{ label: 'sel:' + selection, action: () => {} }];
+    cm.register('test', { selector: '.zone', items });
+
+    const zone = document.createElement('div');
+    zone.className = 'zone';
+    document.body.appendChild(zone);
+
+    firePointerDown(zone, 'mouse');
+    fireContextMenu(zone);
+    expect(cm.isOpen).toBe(true);
+    expect(cm.shadowRoot.querySelector('.item').textContent).toBe('sel:');
   });
 
   // 31. A keyboard-invoked menu (Menu key / Shift+F10) is not a touch gesture,
