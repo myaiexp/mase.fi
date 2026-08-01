@@ -159,6 +159,46 @@ describe('base-select', () => {
     expect(el.selectedOption).toBeNull();
   });
 
+  // Regression for audit #6281: interpolating value into a CSS attribute
+  // selector (base-option[value="…"]) throws SyntaxError on " or \, which
+  // aborts #syncTriggerText mid-_selectOption (menu stuck open, no change).
+  it('selectedOption survives quote and backslash in value (click path)', () => {
+    const tricky = 'say"hi\\there';
+    const el = createSelect({
+      options: [
+        { value: 'safe', label: 'Safe' },
+        { value: tricky, label: 'Tricky Label' },
+      ],
+    });
+
+    el.open();
+    const received = [];
+    el.addEventListener('change', (e) => received.push(e.detail));
+
+    const opt = getOptions(el).find((o) => o.dataset.value === tricky);
+    expect(opt).toBeTruthy();
+    opt.click();
+
+    expect(received).toEqual([{ value: tricky, label: 'Tricky Label' }]);
+    expect(el.isOpen).toBe(false);
+    expect(el.value).toBe(tricky);
+    expect(el.selectedOption).toBe(el.querySelectorAll('base-option')[1]);
+    expect(getTrigger(el).textContent).toContain('Tricky Label');
+  });
+
+  it('selectedOption survives quote and backslash in value (programmatic set)', () => {
+    const tricky = 'say"hi\\there';
+    const el = createSelect({
+      options: [
+        { value: 'safe', label: 'Safe' },
+        { value: tricky, label: 'Tricky Label' },
+      ],
+    });
+    el.value = tricky;
+    expect(el.selectedOption).toBe(el.querySelectorAll('base-option')[1]);
+    expect(getTrigger(el).textContent).toContain('Tricky Label');
+  });
+
   it('programmatic value set updates trigger', () => {
     const el = createSelect({ options: [{ value: 'x', label: 'X Label' }] });
     el.value = 'x';

@@ -64,8 +64,12 @@ class BaseSelect extends HTMLElement {
   set value(v) { this.setAttribute('value', v); markSelected(this); }
 
   get selectedOption() {
+    // Linear scan — never interpolate value into a CSS attribute selector.
+    // Quotes/backslashes in option values would throw SyntaxError from
+    // querySelector and break #syncTriggerText mid-_selectOption (menu stuck
+    // open, no change event, no trigger label).
     const v = this.value;
-    return this.querySelector(`base-option[value="${v}"]`) ?? null;
+    return [...this.querySelectorAll('base-option')].find(o => o.value === v) ?? null;
   }
 
   get isOpen() { return this.#open; }

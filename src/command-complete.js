@@ -1,5 +1,8 @@
 // Autocomplete popup for "/" channel + slash-command matches (cc-* rows).
-import { getChannels, chAccent } from './channels.js';
+// Registry leaf — not channels.js (the hash-routing orchestrator). Same rule
+// as sidebar.js: renderers that only need getChannels/chAccent import registry
+// directly so they don't pull feed/pinned/sidebar/transition as a back-edge.
+import { getChannels, chAccent } from './registry.js';
 import { escapeHtml } from './html.js';
 import { optionAttrs, markListbox, setActive, collapseCombobox } from './command-aria.js';
 
@@ -67,7 +70,7 @@ export function createAutocomplete({
       </div>`;
     }
     return `
-    <div class="cc-item ${sel}" data-ch="${m.id}" data-i="${i}" ${optionAttrs(i, i === complete.idx)} style="--ch-accent:${chAccent(m.id)}">
+    <div class="cc-item ${sel}" data-ch="${escapeHtml(m.id)}" data-i="${i}" ${optionAttrs(i, i === complete.idx)} style="--ch-accent:${chAccent(m.id)}">
       <div class="cc-ch"><span class="hash">#</span>${hit}</div>
       <div class="cc-desc">${escapeHtml(m.topic)}</div>
       <div class="cc-last">${lastActivity(m.id)}</div>

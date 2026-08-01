@@ -12,14 +12,16 @@
 // of the production bundle.
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 
-// command.js needs getChannels/chAccent/navigate from the routing layer and
-// entriesFor from the data adapter. Stub both so these tests exercise only what
-// command.js OWNS: ranking, autocomplete rendering, and search highlighting.
+// command-complete.js reads getChannels/chAccent from the registry leaf;
+// command.js only needs navigate from the routing orchestrator. Stub both so
+// these tests exercise ranking, autocomplete rendering, and search highlighting.
 // The channel list is set per test via setChannels() (stubbing the accessor);
 // navigate is a spy.
-vi.mock('./channels.js', () => ({
+vi.mock('./registry.js', () => ({
   getChannels: vi.fn(() => []),
   chAccent: vi.fn(() => 'oklch(0.620 0.140 78.0)'),
+}));
+vi.mock('./channels.js', () => ({
   navigate: vi.fn(),
 }));
 vi.mock('./data.js', () => ({
@@ -27,9 +29,9 @@ vi.mock('./data.js', () => ({
 }));
 
 // Re-imported fresh per test so module state (the `complete` popup object, the
-// lazy DOM refs) starts clean and command.js binds to the same mocked-channel
-// instance the test sees.
-let command, channels;
+// lazy DOM refs) starts clean and command-complete binds to the same mocked
+// registry instance the test sees.
+let command, registry, channels;
 
 // The DOM nodes initCommand resolves by id. cmd-input is the only <input>.
 function setupDom() {
@@ -44,7 +46,7 @@ function setupDom() {
 
 // Point the mocked getChannels() accessor at a fresh channel list for this test.
 function setChannels(list) {
-  channels.getChannels.mockReturnValue(list);
+  registry.getChannels.mockReturnValue(list);
 }
 
 function ch(id, label = id, topic = `${id} topic`) {
@@ -66,6 +68,7 @@ beforeEach(async () => {
   vi.resetModules();
   vi.clearAllMocks();
   setupDom();
+  registry = await import('./registry.js');
   channels = await import('./channels.js');
   command = await import('./command.js');
 });
@@ -179,6 +182,25 @@ describe('renderComplete', () => {
     setChannels([ch('explorer', 'explorer', 'a <b> topic')]);
     type('/exp');
     expect(items()[0].querySelector('.cc-desc').innerHTML).toBe('a &lt;b&gt; topic');
+  });
+
+  // Regression for audit #6282: data-ch used to interpolate m.id raw into
+  // innerHTML. Quotes/angle brackets in a hostile project.channel break out of
+  // the attribute (sidebar already escapeHtml's the same field).
+  it('escapes channel id in data-ch so quote/angle breakout cannot inject attrs', () => {
+    const hostile = 'foo" onclick=alert(1) x="<img src=x onerror=1>';
+    setChannels([ch(hostile, 'foox', 'topic')]);
+    type('/foo');
+    const item = items()[0];
+    expect(item).toBeTruthy();
+    // Browser decodes the attribute — full id round-trips (not truncated at ").
+    expect(item.getAttribute('data-ch')).toBe(hostile);
+    expect(item.dataset.ch).toBe(hostile);
+    // Breakout must not create real attributes or injected nodes.
+    expect(item.hasAttribute('onclick')).toBe(false);
+    expect(item.querySelector('img')).toBeNull();
+    // Quotes were entity-escaped in the attribute source (not a raw " closer).
+    expect(item.outerHTML).toContain('&quot;');
   });
 
   it('an empty query ("/") lists every channel with no highlight spans', () => {
