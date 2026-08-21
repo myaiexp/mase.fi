@@ -1,4 +1,4 @@
-// Wrap a highlight index by ±1 within [0, len) for keyboard menu navigation
+// Shared keyboard highlight stepping for overlay menus (wrap + skip disabled)
 
 // Steps `idx` by `direction` (+1/-1) and wraps around the ends of a list of
 // `len` items. Shared by base-select and base-context-menu so the off-by-one

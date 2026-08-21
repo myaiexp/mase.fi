@@ -1,15 +1,13 @@
 // @vitest-environment jsdom
 // Unit tests for the command input module: the pure ranking helpers
 // (fuzzyScore / highlightFuzzy) and the "/" channel-autocomplete flow
-// (renderComplete + chooseFromComplete) driven through the public initCommand
-// surface.
+// driven through the public initCommand surface.
 //
 // fuzzyScore / highlightFuzzy are exported solely so the pure ranking logic can
 // be pinned directly — highlightFuzzy's no-match branch is unreachable via the
-// autocomplete UI (renderComplete pre-filters to score > 0, and both helpers
-// share the same subsequence algorithm, so a survivor always matches). Adding
-// the export keyword is behavior-preserving; the unused exports tree-shake out
-// of the production bundle.
+// autocomplete UI (both helpers share the same subsequence algorithm, so a
+// survivor always matches). Adding the export keyword is behavior-preserving;
+// the unused exports tree-shake out of the production bundle.
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 
 // command-complete.js reads getChannels/chAccent from the registry leaf;
@@ -74,9 +72,9 @@ beforeEach(async () => {
 });
 
 // ---- fuzzyScore ----------------------------------------------------------
-// Note: fuzzyScore lowercases `str` but NOT `q` — the caller (renderComplete)
-// lowercases the query first, so these tests pass lowercase queries to match
-// the real call site.
+// Note: fuzzyScore lowercases `str` but NOT `q` — the caller (autocomplete
+// render) lowercases the query first, so these tests pass lowercase queries
+// to match the real call site.
 
 describe('fuzzyScore', () => {
   it('empty query short-circuits to 1 (non-throwing baseline)', () => {
@@ -113,7 +111,7 @@ describe('fuzzyScore', () => {
 
   it('orders realistic channel labels monotonically by score', () => {
     // Query "ho": "home" (prefix, +10), "shop" (h then o adjacent), "chrome"
-    // (h then o, scattered). Sorting desc reproduces renderComplete's order.
+    // (h then o, scattered). Sorting desc reproduces the autocomplete's order.
     const labels = ['chrome', 'home', 'shop'];
     const ranked = labels
       .map((l) => ({ l, s: command.fuzzyScore(l, 'ho') }))
@@ -157,9 +155,9 @@ describe('highlightFuzzy', () => {
   });
 });
 
-// ---- renderComplete (/ autocomplete) -------------------------------------
+// ---- autocomplete render -------------------------------------------------
 
-describe('renderComplete', () => {
+describe('autocomplete render', () => {
   beforeEach(() => {
     setChannels([ch('home'), ch('explorer', 'explorer', 'file explorer'), ch('activity')]);
     command.initCommand({});
@@ -278,9 +276,9 @@ describe('combobox ARIA', () => {
   });
 });
 
-// ---- chooseFromComplete (channel navigation) -----------------------------
+// ---- autocomplete choose (channel navigation) ----------------------------
 
-describe('chooseFromComplete', () => {
+describe('autocomplete choose', () => {
   beforeEach(() => {
     setChannels([ch('home'), ch('explorer'), ch('activity')]);
     command.initCommand({});
