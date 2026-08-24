@@ -11,6 +11,8 @@ export default [
         document: 'readonly',
         addEventListener: 'readonly',
         URL: 'readonly',
+        URLSearchParams: 'readonly',
+        Element: 'readonly',
         CSS: 'readonly',
         fetch: 'readonly',
         console: 'readonly',

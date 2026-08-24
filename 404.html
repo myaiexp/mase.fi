@@ -1,0 +1,220 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="robots" content="noindex">
+  <title>mase.fi — no such page</title>
+  <style>
+    @font-face {
+      font-family: 'JetBrains Mono';
+      src: url('https://mase.fi/fonts/JetBrainsMono-Regular.woff2') format('woff2');
+      font-weight: 400 500;
+      font-style: normal;
+      font-display: swap;
+    }
+    @font-face {
+      font-family: 'JetBrains Mono';
+      src: url('https://mase.fi/fonts/JetBrainsMono-Bold.woff2') format('woff2');
+      font-weight: 600 700;
+      font-style: normal;
+      font-display: swap;
+    }
+    * { box-sizing: border-box; }
+    /* Explicit display on a class (.countbox etc.) would otherwise beat the UA's
+       [hidden] rule — author styles win over UA styles regardless of specificity. */
+    [hidden] { display: none !important; }
+    html, body { margin: 0; }
+    body {
+      min-height: 100dvh;
+      display: flex; flex-direction: column;
+      background: #09090b; color: #fafafa;
+      font-family: 'JetBrains Mono', ui-monospace, 'SF Mono', Consolas, monospace;
+      overflow-x: hidden;
+    }
+    a { color: #e8a308; text-decoration: none; }
+    a:hover { color: #ffc23d; }
+    @keyframes blink { 0%,49%{opacity:1} 50%,100%{opacity:0} }
+    @keyframes jitter {
+      0%,92%,100%{transform:translate(0,0)}
+      94%{transform:translate(-2px,1px)} 96%{transform:translate(2px,-1px)} 98%{transform:translate(-1px,0)}
+    }
+
+    .drain {
+      position: fixed; top: 0; left: 0; height: 2px; width: 100%;
+      background: #e8a308; box-shadow: 0 0 12px rgba(232,163,8,.6); z-index: 6;
+    }
+    .scan {
+      position: fixed; inset: 0; pointer-events: none; z-index: 5;
+      background: repeating-linear-gradient(to bottom, rgba(255,255,255,.022) 0 1px, transparent 1px 3px);
+    }
+    .ghost {
+      position: fixed; right: -40px; bottom: -140px;
+      font-size: 420px; font-weight: 700; line-height: .8;
+      color: #e8a308; opacity: .05; letter-spacing: -.04em;
+      pointer-events: none; user-select: none;
+    }
+    header, main, footer { position: relative; z-index: 3; }
+
+    header, footer {
+      flex: 0 0 auto; display: flex; align-items: center; gap: 10px;
+      padding: 10px 20px;
+    }
+    header { justify-content: space-between; gap: 16px; border-bottom: 1px solid #27272a; }
+    footer { border-top: 1px solid #27272a; font-size: 12px; }
+    .ident { display: flex; align-items: center; gap: 8px; font-size: 12px; }
+    .dot { width: 6px; height: 6px; background: #ef4444; display: inline-block; }
+    .dot.warn { background: #d29922; }
+    .host { font-weight: 700; }
+    .port { color: #52525b; }
+    .meta { display: flex; align-items: center; gap: 10px; font-size: 11px; color: #52525b; }
+    .badge { color: #ef4444; background: rgba(239,68,68,.15); padding: 1px 6px; font-weight: 500; }
+    .badge.warn { color: #d29922; background: rgba(210,153,34,.15); }
+
+    main { flex: 1 1 auto; min-height: 0; display: flex; align-items: center; padding: 0 20px; }
+    .col { width: 100%; max-width: 900px; margin: 0 auto; display: flex; flex-direction: column; gap: 26px; }
+
+    .diag { display: flex; flex-direction: column; gap: 10px; }
+    .cmd { font-size: 15px; line-height: 1.4; overflow-wrap: anywhere; }
+    .dollar { color: #e8a308; }
+    .open { color: #52525b; }
+    .phead { color: #fafafa; font-weight: 700; }
+    .ptail { color: #ef4444; text-decoration: line-through; opacity: .75; }
+    .pellip { color: #3f3f46; }
+    .errline { font-size: 13px; color: #ef4444; animation: jitter 6s steps(1,end) infinite; }
+    .pnote, .tailnote { font-size: 11px; color: #52525b; }
+    .pnote b, .tailnote b { color: #a1a1aa; font-weight: 400; }
+
+    .rule { height: 1px; background: repeating-linear-gradient(to right, #27272a 0 6px, transparent 6px 12px); }
+
+    .sugg { display: flex; flex-direction: column; gap: 12px; }
+    .label { font-size: 11px; text-transform: uppercase; letter-spacing: .08em; color: #52525b; }
+    .big {
+      display: flex; align-items: baseline; gap: 14px; flex-wrap: wrap;
+      font-size: 38px; font-weight: 700; letter-spacing: -.02em; color: #e8a308;
+      overflow-wrap: anywhere;
+    }
+    .big.small { font-size: 32px; }
+    .arr { font-size: 24px; opacity: .6; }
+    .bu { border-bottom: 2px solid rgba(232,163,8,.35); }
+    .bname { font-size: 12px; font-weight: 400; color: #a1a1aa; letter-spacing: 0; }
+
+    .cands { display: flex; flex-direction: column; gap: 2px; }
+    .cand {
+      display: flex; align-items: baseline; gap: 12px;
+      background: #131316; padding: 12px 14px;
+      border-left: 2px solid #3f3f46; overflow-wrap: anywhere;
+    }
+    .cand:hover { background: #18181c; }
+    .cand .croute { font-size: 20px; font-weight: 700; letter-spacing: -.01em; color: #fafafa; }
+    .cand.first { border-left-color: #e8a308; }
+    .cand.first .croute { color: #e8a308; }
+    .cand .cname { font-size: 12px; color: #a1a1aa; }
+    .cand .creason { margin-left: auto; font-size: 11px; color: #52525b; flex: 0 0 auto; }
+    .cfoot { font-size: 12px; color: #52525b; }
+    .cfoot a, .cancelnote a { color: #a1a1aa; border-bottom: 1px solid #3f3f46; }
+
+    .countbox {
+      display: flex; align-items: center; gap: 20px; flex-wrap: wrap;
+      padding: 12px 16px; background: #131316; border: 1px solid #27272a;
+    }
+    .cmeter { display: flex; align-items: center; gap: 10px; }
+    .clabel { font-size: 13px; color: #a1a1aa; }
+    .cnum { font-size: 26px; font-weight: 700; color: #e8a308; min-width: 22px; line-height: 1; }
+    .csegs { display: flex; gap: 3px; }
+    .csegs span { width: 22px; height: 10px; border: 1px solid #3f3f46; }
+    .csegs span.on { background: #e8a308; }
+    .cspace { flex: 1 1 40px; }
+    .cbtns { display: flex; gap: 8px; }
+    .cbtns button {
+      height: 26px; padding: 0 14px; font-size: 12px; font-weight: 500;
+      font-family: inherit; cursor: pointer;
+    }
+    .btn-go { border: 1px solid rgba(232,163,8,.4); background: rgba(232,163,8,.12); color: #e8a308; }
+    .btn-go:hover { background: rgba(232,163,8,.24); }
+    .btn-stay { border: 1px solid #27272a; background: #18181c; color: #fafafa; }
+    .btn-stay:hover { background: #27272a; }
+    .cancelnote { font-size: 12px; color: #a1a1aa; }
+    .cancelnote .x { color: #52525b; }
+
+    .fprompt { color: #e8a308; }
+    .fhints { color: #52525b; }
+    .fhints a { color: #a1a1aa; border-bottom: 1px solid #3f3f46; }
+    .cursor {
+      width: 7px; height: 14px; background: #e8a308; display: inline-block;
+      animation: blink 1.1s steps(1,end) infinite;
+    }
+    .hint-m { display: none; }
+
+    @media (max-width: 720px) {
+      main { padding: 0 14px; }
+      header, footer { padding: 10px 14px; }
+      .cmd { font-size: 13px; }
+      .cmd .phead { display: inline-block; }
+      .big { font-size: 28px; }
+      .big .bname { flex-basis: 100%; }
+      .cnum { font-size: 22px; }
+      .ghost { font-size: 200px; right: -20px; bottom: -60px; }
+      .countbox { flex-direction: column; align-items: stretch; }
+      .cspace { display: none; }
+      .cbtns { width: 100%; }
+      .cbtns button { flex: 1 1 0; height: 46px; }
+      .hint-d { display: none; }
+      .hint-m { display: inline; }
+    }
+    @media (prefers-reduced-motion: reduce) {
+      .errline, .cursor { animation: none; }
+    }
+  </style>
+</head>
+<body>
+  <div class="drain" id="drain" hidden></div>
+  <div class="scan"></div>
+  <div class="ghost" id="ghost" aria-hidden="true">404</div>
+  <header>
+    <div class="ident">
+      <span class="dot" id="dot"></span>
+      <span class="host">mase.fi</span>
+      <span class="port">:443</span>
+    </div>
+    <div class="meta">
+      <span>nginx · static</span>
+      <span class="badge" id="badge">HTTP 404</span>
+    </div>
+  </header>
+  <main>
+    <div class="col">
+      <section class="diag" id="diag">
+        <div class="cmd"><span class="dollar">$</span><span class="open"> open </span><span class="phead" id="phead"></span><span class="ptail" id="ptail"></span><span class="pellip" id="pellip" hidden>…</span></div>
+        <div class="pnote" id="pnote" hidden></div>
+        <div class="errline" id="errline">error: no such page</div>
+        <div class="tailnote" id="tailnote" hidden></div>
+      </section>
+      <div class="rule"></div>
+      <section class="sugg" id="sugg">
+        <a class="big" href="/"><span class="arr">→</span><span class="bu">mase.fi</span><span class="bname">the full directory</span></a>
+      </section>
+      <section class="countbox" id="countbox" hidden>
+        <div class="cmeter">
+          <span class="clabel">redirecting in</span>
+          <span class="cnum" id="cnum">5</span>
+          <span class="csegs" id="csegs"><span class="on"></span><span class="on"></span><span class="on"></span><span class="on"></span><span class="on"></span></span>
+        </div>
+        <div class="cspace"></div>
+        <div class="cbtns">
+          <button id="gobtn" class="btn-go" type="button">[ go now ]</button>
+          <button id="staybtn" class="btn-stay" type="button">[ stay ]</button>
+        </div>
+      </section>
+      <div class="cancelnote" id="cancelnote" hidden></div>
+    </div>
+  </main>
+  <footer>
+    <span class="fprompt">&gt;</span>
+    <span class="fhints" id="fhints"><a href="/">mase.fi</a> for the full directory</span>
+    <span class="cursor" aria-hidden="true"></span>
+  </footer>
+  <noscript><style>.diag, .rule { display: none; }</style></noscript>
+  <script type="module" src="/src/notfound-page.js"></script>
+</body>
+</html>
