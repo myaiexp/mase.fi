@@ -108,6 +108,7 @@ function runCommand(cmd) {
 export function fuzzyScore(str, q) {
   if (q === '') return 1;
   str = str.toLowerCase();
+  q = q.toLowerCase();
   let si = 0, score = 0, streak = 0;
   for (const c of q) {
     const idx = str.indexOf(c, si);
@@ -134,7 +135,10 @@ export function highlightFuzzy(str, q) {
   return out;
 }
 
-function lastActivity(id) {
+// Relative label ('3m'/'2h'/'1d') for the autocomplete's last-seen column.
+// Not project.lastActivity (an epoch-ms timestamp used for recency sort) —
+// this walks entriesFor, which for project channels also excludes log entries.
+function formatRelativeActivity(id) {
   const es = entriesFor(id, _data);
   if (!es.length) return '—';
   const t = parseEntryDate(es[es.length - 1].date);
@@ -162,7 +166,7 @@ export function initCommand(data) {
     getCommands: () => _commands,
     fuzzyScore,
     highlightFuzzy,
-    lastActivity,
+    formatRelativeActivity,
     onChoose: onChooseMatch,
   });
   ac.bind($cmdInput, $cmdComplete);

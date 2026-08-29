@@ -2,6 +2,26 @@
 
 const SOURCE_URL = '/updates.json';
 const DEMOS_MANIFEST_URL = '/demos/manifest.json';
+// A hung fetch with no AbortSignal stalls the app shell — main.js awaits
+// fetchData with no timeout of its own. updates.json is required; the demos
+// manifest is optional chips. Time-box both, then grace-race demos so a hung
+// manifest cannot delay init after updates.json is already in.
+const FETCH_TIMEOUT_MS = 8000;
+const DEMOS_GRACE_MS = 400;
+
+async function raceTimeout(promise, ms, fallback) {
+  let timer;
+  try {
+    return await Promise.race([
+      promise,
+      new Promise((resolve) => {
+        timer = setTimeout(() => resolve(fallback), ms);
+      }),
+    ]);
+  } finally {
+    clearTimeout(timer);
+  }
+}
 
 /**
  * Fetch the list of project channels that have a published demo, from the demos
@@ -11,7 +31,9 @@ const DEMOS_MANIFEST_URL = '/demos/manifest.json';
  */
 export async function fetchDemos() {
   try {
-    const r = await fetch(DEMOS_MANIFEST_URL);
+    const r = await fetch(DEMOS_MANIFEST_URL, {
+      signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
+    });
     if (!r.ok) return [];
     const list = await r.json();
     return Array.isArray(list) ? list.filter((s) => typeof s === 'string') : [];
@@ -36,8 +58,9 @@ export async function fetchDemos() {
  */
 export async function fetchData() {
   // Kick the demos-manifest fetch off up front so it overlaps the updates fetch.
-  // fetchDemos never rejects (it degrades to [] on any failure), so awaiting it in
-  // either branch below is safe and never masks an updates.json error.
+  // fetchDemos never rejects (it degrades to [] on any failure). After updates
+  // is in, grace-race demos so a hung/slow manifest cannot stall init — chips
+  // degrade to [] if it isn't ready within DEMOS_GRACE_MS.
   const demosPromise = fetchDemos();
   // Single error boundary around fetch + the full normalization pipeline. A
   // network/parse failure OR a structural error while normalizing (e.g. a null
@@ -45,7 +68,9 @@ export async function fetchData() {
   // the same empty fallback instead of escaping as an unhandled rejection — main.js
   // awaits this without a catch, so an escape would silently stall the app shell.
   try {
-    const raw = await fetch(SOURCE_URL).then((r) => {
+    const raw = await fetch(SOURCE_URL, {
+      signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
+    }).then((r) => {
       // Assert a 2xx before parsing: a 4xx/5xx with a JSON error body (e.g. from a
       // reverse proxy) would otherwise parse as data and degrade silently to empty
       // state. Throwing routes it to the catch below, which is the same fallback.
@@ -65,7 +90,7 @@ export async function fetchData() {
       meta: { nick: 'mase', server: 'irc.mase.fi', bootTime: Date.now() },
       projects,
       entries,
-      demos: await demosPromise,
+      demos: await raceTimeout(demosPromise, DEMOS_GRACE_MS, []),
     };
   } catch (err) {
     // Deliberate degrade-to-empty so the app shell still renders, but this catch
@@ -77,7 +102,7 @@ export async function fetchData() {
       meta: { nick: 'mase', server: 'irc.mase.fi', bootTime: Date.now() },
       projects: [],
       entries: [],
-      demos: await demosPromise,
+      demos: await raceTimeout(demosPromise, DEMOS_GRACE_MS, []),
     };
   }
 }

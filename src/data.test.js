@@ -38,6 +38,7 @@ function stubFetch(payload) {
 }
 
 afterEach(() => {
+  vi.useRealTimers();
   vi.unstubAllGlobals();
   vi.restoreAllMocks();
 });
@@ -72,6 +73,20 @@ describe('fetchDemos', () => {
   it('returns [] on a network/parse failure', async () => {
     vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new Error('network')));
     expect(await fetchDemos()).toEqual([]);
+  });
+
+  it('returns [] when the manifest fetch is aborted (timeout)', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockRejectedValue(
+      Object.assign(new Error('timeout'), { name: 'TimeoutError' }),
+    ));
+    expect(await fetchDemos()).toEqual([]);
+  });
+
+  it('passes an AbortSignal so a hung manifest can be cancelled', async () => {
+    const fetchMock = vi.fn().mockResolvedValue({ ok: true, json: async () => [] });
+    vi.stubGlobal('fetch', fetchMock);
+    await fetchDemos();
+    expect(fetchMock.mock.calls[0][1]?.signal).toBeInstanceOf(AbortSignal);
   });
 });
 
@@ -238,6 +253,33 @@ describe('fetchData routing', () => {
     const data = await fetchData();
     expect(data.entries).toEqual([]);
     expect(data.projects).toEqual([]);
+  });
+
+  it('passes an AbortSignal to updates.json and the demos manifest', async () => {
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({ projects: [], entries: [] }),
+    });
+    vi.stubGlobal('fetch', fetchMock);
+    await fetchData();
+    expect(fetchMock.mock.calls.length).toBeGreaterThanOrEqual(2);
+    for (const [, init] of fetchMock.mock.calls) {
+      expect(init?.signal).toBeInstanceOf(AbortSignal);
+    }
+  });
+
+  it('does not stall on a hung demos manifest once updates.json is in', async () => {
+    // fetchDemos is documented as never rejecting, so both the success and
+    // catch paths used to await it unbounded — a hung /demos/manifest.json
+    // blocked the whole app after updates.json had already loaded (finding #8124).
+    vi.useFakeTimers();
+    vi.stubGlobal('fetch', vi.fn((url) => {
+      if (String(url).includes('/demos/')) return new Promise(() => {});
+      return Promise.resolve({ ok: true, json: async () => ({ projects: [], entries: [] }) });
+    }));
+    const p = fetchData();
+    await vi.advanceTimersByTimeAsync(1000);
+    await expect(p).resolves.toMatchObject({ demos: [], entries: [], projects: [] });
   });
 
   it('degrades to empty data on a non-ok HTTP response (does not parse the error body)', async () => {

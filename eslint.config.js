@@ -33,6 +33,7 @@ export default [
         IntersectionObserver: 'readonly',
         ResizeObserver: 'readonly',
         AbortController: 'readonly',
+        AbortSignal: 'readonly',
         MutationObserver: 'readonly',
         DOMException: 'readonly',
         Event: 'readonly',

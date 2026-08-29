@@ -72,14 +72,20 @@ beforeEach(async () => {
 });
 
 // ---- fuzzyScore ----------------------------------------------------------
-// Note: fuzzyScore lowercases `str` but NOT `q` — the caller (autocomplete
-// render) lowercases the query first, so these tests pass lowercase queries
-// to match the real call site.
 
 describe('fuzzyScore', () => {
   it('empty query short-circuits to 1 (non-throwing baseline)', () => {
     expect(command.fuzzyScore('anything', '')).toBe(1);
     expect(command.fuzzyScore('', '')).toBe(1);
+  });
+
+  it('lowercases the query so mixed-case callers match like highlightFuzzy', () => {
+    // Same contract as highlightFuzzy: a future caller must not have to
+    // pre-lowercase `q`. Mixed-case used to score 0 because only `str` was
+    // folded (finding #8129).
+    expect(command.fuzzyScore('home', 'HO')).toBe(command.fuzzyScore('home', 'ho'));
+    expect(command.fuzzyScore('Home', 'HOME')).toBe(command.fuzzyScore('home', 'home'));
+    expect(command.fuzzyScore('home', 'HO')).toBeGreaterThan(0);
   });
 
   it('exact match scores higher than a prefix, which beats a mid-string match', () => {

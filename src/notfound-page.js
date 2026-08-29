@@ -17,7 +17,7 @@ function effectivePath() {
   return location.pathname;
 }
 
-async function head(url, ms = 1500) {
+async function probeHead(url, ms = 1500) {
   const ctl = new AbortController();
   const t = setTimeout(() => ctl.abort(), ms);
   try {
@@ -32,7 +32,7 @@ async function head(url, ms = 1500) {
 // Longest-first: the deepest surviving parent is the confident target.
 async function probePrefixes(path) {
   for (const prefix of parentPrefixes(path)) {
-    const res = await head(prefix);
+    const res = await probeHead(prefix);
     if (res && res.ok) return prefix;
   }
   return null;
@@ -40,7 +40,7 @@ async function probePrefixes(path) {
 
 async function loadRoutes() {
   try {
-    const res = await fetch('/updates.json');
+    const res = await fetch('/updates.json', { signal: AbortSignal.timeout(1500) });
     if (!res.ok) throw new Error(String(res.status));
     return buildRoutes(await res.json());
   } catch {
@@ -51,7 +51,7 @@ async function loadRoutes() {
 // error_page keeps the original status but the body can't see it — re-ask nginx.
 async function applyRealStatus(path) {
   if (isPreview) return;
-  const res = await head(path, 1200);
+  const res = await probeHead(path, 1200);
   if (res && res.status === 403) {
     document.title = 'mase.fi — forbidden';
     $('badge').textContent = 'HTTP 403';

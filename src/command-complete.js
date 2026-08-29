@@ -8,14 +8,14 @@ import { optionAttrs, markListbox, setActive, collapseCombobox } from './command
 
 /**
  * Build the autocomplete controller. DOM refs are bound later via `bind()`;
- * ranking helpers + last-activity + choose callback are injected so this module
- * stays free of command.js's search/data/init state (no import cycle).
+ * ranking helpers + relative-activity label + choose callback are injected so this
+ * module stays free of command.js's search/data/init state (no import cycle).
  *
  * @param {{
  *   getCommands: () => Array<{name: string, desc: string, run: Function}>,
  *   fuzzyScore: (str: string, q: string) => number,
  *   highlightFuzzy: (str: string, q: string) => string,
- *   lastActivity: (id: string) => string,
+ *   formatRelativeActivity: (id: string) => string,
  *   onChoose: (match: object) => void,
  * }} deps
  */
@@ -23,7 +23,7 @@ export function createAutocomplete({
   getCommands,
   fuzzyScore,
   highlightFuzzy,
-  lastActivity,
+  formatRelativeActivity,
   onChoose,
 }) {
   // Selection state in one object, shared by every writer (render, setSelection,
@@ -79,7 +79,7 @@ export function createAutocomplete({
     <div class="cc-item ${sel}" data-ch="${escapeHtml(m.id)}" data-i="${i}" ${optionAttrs(i, i === complete.idx)} style="--ch-accent:${chAccent(m.id)}">
       <div class="cc-ch"><span class="hash">#</span>${hit}</div>
       <div class="cc-desc">${escapeHtml(m.topic)}</div>
-      <div class="cc-last">${lastActivity(m.id)}</div>
+      <div class="cc-last">${formatRelativeActivity(m.id)}</div>
     </div>`;
   }
 
