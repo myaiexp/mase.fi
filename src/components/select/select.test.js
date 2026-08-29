@@ -349,6 +349,14 @@ describe('base-select', () => {
     expect(el.isOpen).toBe(false);
   });
 
+  it('Tab closes the menu when there are no options', () => {
+    const el = createSelect({ options: [] });
+    el.open();
+    expect(el.isOpen).toBe(true);
+    getTrigger(el).dispatchEvent(new KeyboardEvent('keydown', { key: 'Tab', bubbles: true }));
+    expect(el.isOpen).toBe(false);
+  });
+
   it('letter key jumps to matching option (non-searchable)', () => {
     const el = createSelect({ options: [
       { value: 'a', label: 'Alpha' },
@@ -537,6 +545,20 @@ describe('base-select', () => {
     const noMatch = getMenu(el).querySelector('.no-matches');
     expect(noMatch).toBeTruthy();
     expect(noMatch.style.display).not.toBe('none');
+  });
+
+  it('Tab closes a searchable select showing no matches', () => {
+    const el = createSelect({ searchable: true, options: [{ value: 'a', label: 'Apple' }] });
+    el.open();
+
+    const input = getTrigger(el);
+    input.value = 'zzz';
+    input.dispatchEvent(new Event('input', { bubbles: true }));
+    expect(el.isOpen).toBe(true);
+    expect(getMenu(el).querySelector('.no-matches').style.display).not.toBe('none');
+
+    input.dispatchEvent(new KeyboardEvent('keydown', { key: 'Tab', bubbles: true }));
+    expect(el.isOpen).toBe(false);
   });
 
   it('clearing input shows all options', () => {

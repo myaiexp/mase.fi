@@ -224,6 +224,14 @@ class BaseSelect extends HTMLElement {
     }
     if (!this.#open) return;
 
+    // Dismissal is independent of option count: a searchable select showing
+    // "No matches" still has to close on Tab. Escape is the document listener
+    // in overlay-utils, not this handler.
+    if (e.key === 'Tab') {
+      this.close();
+      return;
+    }
+
     const opts = this.#enabledOptionDivs();
     if (!opts.length) return;
 
@@ -240,10 +248,6 @@ class BaseSelect extends HTMLElement {
       if (this.#highlightIdx >= 0 && this.#highlightIdx < opts.length) {
         this._selectOption(opts[this.#highlightIdx]);
       }
-    } else if (e.key === 'Escape') {
-      // Handled by doc listener
-    } else if (e.key === 'Tab') {
-      this.close();
     } else if (!this.#searchable && e.key.length === 1 && /[a-z]/i.test(e.key)) {
       this.#letterJump(e.key, opts);
     }
