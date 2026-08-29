@@ -3,7 +3,7 @@
 // plus the malformed-JSON / bad-category refusal paths.
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { join } from 'node:path';
-import { readFileSync, writeFileSync } from 'node:fs';
+import { readFileSync, writeFileSync, symlinkSync, mkdirSync, lstatSync } from 'node:fs';
 import { makeTempDir, cleanup, writeJson, readJson, runScript, todayHelsinki } from './test-helpers.js';
 
 let dir, file;
@@ -109,5 +109,31 @@ describe('mase-fi-update — refusal paths (no silent corruption)', () => {
     expect(r.status).not.toBe(0);
     expect(r.stderr).toMatch(/malformed JSON/i);
     expect(readFileSync(file, 'utf8')).toBe(before);
+  });
+});
+
+describe('mase-fi-update — lock file must not clobber via symlink', () => {
+  it('refuses a symlink lock path and leaves the victim file intact', () => {
+    seed();
+    const victim = join(dir, 'victim');
+    const lock = join(dir, 'updates.json.lock');
+    writeFileSync(victim, 'do-not-clobber');
+    symlinkSync(victim, lock);
+    const r = update(['feature', 'p', 'text'], { UPDATES_LOCK: lock });
+    expect(r.status).not.toBe(0);
+    expect(r.stderr).toMatch(/lock/i);
+    expect(readFileSync(victim, 'utf8')).toBe('do-not-clobber');
+    expect(readJson(file).entries).toHaveLength(0); // entry not added
+  });
+
+  it('creates the lock as a regular file owned by us, not a followable path', () => {
+    seed();
+    const lockDir = join(dir, 'locks');
+    mkdirSync(lockDir);
+    const lock = join(lockDir, 'updates.json.lock');
+    const r = update(['feature', 'p', 'text'], { UPDATES_LOCK: lock });
+    expect(r.status).toBe(0);
+    expect(readJson(file).entries).toHaveLength(1);
+    expect(lstatSync(lock).isSymbolicLink()).toBe(false);
   });
 });

@@ -4,6 +4,7 @@ import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { spawnSync } from 'node:child_process';
 import {
   chmodSync, existsSync, mkdirSync, readFileSync, writeFileSync, statSync,
+  symlinkSync, lstatSync,
 } from 'node:fs';
 import { join } from 'node:path';
 import { makeTempDir, cleanup, SCRIPTS_DIR } from './test-helpers.js';
@@ -74,5 +75,38 @@ describe('write_updates_json — in-place cp fallback (dir not writable)', () =>
     expect(JSON.parse(readFileSync(target, 'utf8')).entries[0].text).toBe('from-inplace');
     // No leftover sibling temp from the atomic branch
     expect(existsSync(join(ro, '.updates'))).toBe(false);
+  });
+});
+
+// source updates-write.sh and call ensure_updates_lock against $1
+function ensureLock(path) {
+  const script = `
+    set -e
+    source "${join(SCRIPTS_DIR, 'updates-write.sh')}"
+    UPDATES_JSON_LOCK="$1"
+    ensure_updates_lock
+  `;
+  return spawnSync('bash', ['-c', script, '--', path], { encoding: 'utf8' });
+}
+
+describe('ensure_updates_lock — O_NOFOLLOW, no truncate', () => {
+  it('creates a regular 0600 lock file when the path is free', () => {
+    const lock = join(dir, 'updates.json.lock');
+    const r = ensureLock(lock);
+    expect(r.status).toBe(0);
+    expect(lstatSync(lock).isSymbolicLink()).toBe(false);
+    expect(statSync(lock).mode & 0o777).toBe(0o600);
+  });
+
+  it('refuses a symlink and leaves the victim file intact', () => {
+    const victim = join(dir, 'victim');
+    const lock = join(dir, 'updates.json.lock');
+    writeFileSync(victim, 'do-not-clobber');
+    symlinkSync(victim, lock);
+    const r = ensureLock(lock);
+    expect(r.status).not.toBe(0);
+    expect(r.stderr).toMatch(/lock/i);
+    expect(readFileSync(victim, 'utf8')).toBe('do-not-clobber');
+    expect(lstatSync(lock).isSymbolicLink()).toBe(true);
   });
 });

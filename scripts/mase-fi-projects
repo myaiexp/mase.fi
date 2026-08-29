@@ -63,6 +63,8 @@ fi
 # a concurrent mase-fi-update / deploy .entries append (last-writer-wins). The
 # shared lock path matches every other writer; write_updates_json validates the
 # candidate and installs it atomically when it can (see updates-write.sh).
+# 9>> not 9>: O_APPEND, no truncate through a symlink.
+ensure_updates_lock || { echo "updates.json lock unusable — .projects unchanged" >&2; exit 1; }
 (
   flock -w 30 9 || { echo "updates.json lock busy >30s — .projects unchanged" >&2; exit 1; }
   if ! jq empty "$UPDATES" 2>/dev/null; then
@@ -74,5 +76,5 @@ fi
   && write_updates_json "$tmp" "$UPDATES" \
   || { echo "failed to write .projects to $UPDATES" >&2; rm -f "$tmp"; exit 1; }
   rm -f "$tmp"
-) 9>/tmp/mase-updates-json.lock
+) 9>>"$UPDATES_JSON_LOCK"
 echo "wrote $n showcased projects to $UPDATES"
