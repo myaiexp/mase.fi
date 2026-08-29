@@ -32,8 +32,14 @@ export function readJson(file) {
 // { status, stdout, stderr } for both success and non-zero exits so tests can
 // assert on the refusal paths (malformed JSON, bad category, lock busy).
 export function runScript(name, args = [], env = {}) {
+  const merged = { ...process.env, ...env };
+  // Don't flock the live /tmp/mase-updates-json.lock from tests — a concurrent
+  // deploy would wait on us, and we would wait on it.
+  if (!merged.UPDATES_LOCK) {
+    merged.UPDATES_LOCK = join(tmpdir(), `mase-fi-test-${process.pid}.lock`);
+  }
   const r = spawnSync('bash', [join(SCRIPTS_DIR, name), ...args], {
-    env: { ...process.env, ...env },
+    env: merged,
     encoding: 'utf8',
   });
   return { status: r.status, stdout: r.stdout ?? '', stderr: r.stderr ?? '' };

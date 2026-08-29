@@ -283,6 +283,8 @@ done
 # via the shared flock, and re-check idempotency inside the lock so two racing
 # runs can't both prepend today's batch. write_updates_json installs atomically
 # when it can, else in-place under the lock (see updates-write.sh).
+# 9>> not 9>: O_APPEND, no truncate through a symlink.
+ensure_updates_lock || { echo "updates.json lock unusable — daily entries not written" >&2; exit 1; }
 (
   flock -w 30 9 || { echo "updates.json lock busy >30s — daily entries not written" >&2; exit 1; }
   if ! jq empty "$UPDATES_FILE" 2>/dev/null; then
@@ -299,7 +301,7 @@ done
   ' "$UPDATES_FILE" > "$UPD_TMP" \
   && write_updates_json "$UPD_TMP" "$UPDATES_FILE" \
   || { echo "failed to write daily entries to $UPDATES_FILE" >&2; exit 1; }
-) 9>/tmp/mase-updates-json.lock
+) 9>>"$UPDATES_JSON_LOCK"
 
 DAILY_COUNT=$(jq --arg date "$TODAY" '[.entries[] | select(.category == "daily" and .date == $date)] | length' "$UPDATES_FILE")
 echo "Created $DAILY_COUNT daily summary entries for $TODAY"

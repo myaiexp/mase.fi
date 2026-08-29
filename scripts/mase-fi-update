@@ -44,8 +44,10 @@ fi
 # Serialize against concurrent writers — deploy's commit-logger and other
 # mase-fi-update calls all mutate this one shared file, and a non-atomic cp
 # once let two of them interleave bytes and tear it. Shared lock path with
-# helm/scripts/deploy; a one-shot validity gate fails loud on a bad file
-# instead of silently echoing "Added"; unique mktemp avoids a shared temp.
+# helm/scripts/deploy (see updates-write.sh); a one-shot validity gate fails
+# loud on a bad file instead of silently echoing "Added"; unique mktemp
+# avoids a shared temp. 9>> not 9>: O_APPEND, no truncate through a symlink.
+ensure_updates_lock || { echo "Error: updates.json lock unusable — not added" >&2; exit 1; }
 (
   flock -w 30 9 || { echo "Error: updates.json lock busy >30s — not added" >&2; exit 1; }
   if ! jq empty "$UPDATES_FILE" 2>/dev/null; then
@@ -76,6 +78,6 @@ fi
   && write_updates_json "$UPD_TMP" "$UPDATES_FILE" \
   || { echo "Error: failed to write $UPDATES_FILE — entry not added" >&2; rm -f "$UPD_TMP"; exit 1; }
   rm -f "$UPD_TMP"
-) 9>/tmp/mase-updates-json.lock
+) 9>>"$UPDATES_JSON_LOCK"
 
 echo "Added $CATEGORY entry: [$PROJECT] $TEXT ($DATE)"
