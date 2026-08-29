@@ -32,6 +32,9 @@ function updateMode() {
   } else if (v.startsWith('?')) {
     $cmd.classList.add('mode-help');
     $cmdPrompt.textContent = '?';
+    // Clear leftover slash matches before showing help on the same node —
+    // otherwise isOpen() stays true and Enter/Tab still choose a channel.
+    ac.hide();
     renderHelp();
     $cmdHint.innerHTML = '';
   } else {
@@ -192,7 +195,14 @@ export function initCommand(data) {
       // so it still re-renders via updateMode.
       if (e.key === 'ArrowDown') { e.preventDefault(); ac.moveSelection(1); return; }
       if (e.key === 'ArrowUp')   { e.preventDefault(); ac.moveSelection(-1); return; }
-      if (e.key === 'Tab')       { e.preventDefault(); const m = ac.selected(); $cmdInput.value = '/' + m.label; updateMode(); return; }
+      if (e.key === 'Tab') {
+        e.preventDefault();
+        const m = ac.selected();
+        if (!m) return;
+        $cmdInput.value = '/' + m.label;
+        updateMode();
+        return;
+      }
       if (e.key === 'Enter')     { e.preventDefault(); ac.choose(); return; }
     }
   });
@@ -201,7 +211,7 @@ export function initCommand(data) {
   let leader = null;
   window.addEventListener('keydown', e => {
     if (e.target === $cmdInput) return;
-    if (e.target.matches('input, textarea')) return;
+    if (e.target instanceof Element && e.target.matches('input, textarea')) return;
     if (e.key === '/') {
       e.preventDefault();
       $cmdInput.value = '/';

@@ -2,6 +2,31 @@
 import { LOGO } from './ascii.js';
 
 const BOOT_TTL_MS = 7 * 24 * 3600 * 1000;
+const BOOT_STAMP_KEY = 'mase.boot.last';
+
+// localStorage throws in Safari private mode, when cookies are disabled, and
+// when the quota is full. The boot overlay starts with #app hidden, so a
+// thrown get/set would freeze the visitor on the overlay. Treat any storage
+// failure as "no stamp" / "couldn't persist" rather than aborting the reveal.
+function readBootStamp() {
+  try {
+    return Number(localStorage.getItem(BOOT_STAMP_KEY) || 0);
+  } catch {
+    return 0;
+  }
+}
+
+function writeBootStamp() {
+  try {
+    localStorage.setItem(BOOT_STAMP_KEY, String(Date.now()));
+  } catch { /* best-effort TTL; reveal must still proceed */ }
+}
+
+function clearBootStamp() {
+  try {
+    localStorage.removeItem(BOOT_STAMP_KEY);
+  } catch { /* replay still reloads even if the stamp couldn't be cleared */ }
+}
 
 /**
  * @param {boolean} prefersReducedMotion
@@ -9,14 +34,14 @@ const BOOT_TTL_MS = 7 * 24 * 3600 * 1000;
  *                    If prefersReducedMotion is true, also writes the TTL stamp.
  */
 export function shouldSkipBoot(prefersReducedMotion) {
-  const lastBoot = Number(localStorage.getItem('mase.boot.last') || 0);
+  const lastBoot = readBootStamp();
   const fresh = Date.now() - lastBoot > BOOT_TTL_MS;
   const forceReplay = window.MASE_FORCE_BOOT === true;
 
   if (!fresh && !forceReplay) return true;
 
   if (prefersReducedMotion) {
-    localStorage.setItem('mase.boot.last', String(Date.now()));
+    writeBootStamp();
     return true;
   }
 
@@ -32,7 +57,7 @@ export function runBoot() {
   const app  = document.getElementById('app');
 
   function finish() {
-    localStorage.setItem('mase.boot.last', String(Date.now()));
+    writeBootStamp();
     boot.style.transition = 'opacity .28s ease';
     boot.style.opacity = '0';
     app.hidden = false;
@@ -144,7 +169,7 @@ export function runBoot() {
  */
 export function initReplayBoot() {
   window.__maseReplayBoot = () => {
-    localStorage.removeItem('mase.boot.last');
+    clearBootStamp();
     location.reload();
   };
 }

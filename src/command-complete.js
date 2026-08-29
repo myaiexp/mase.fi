@@ -39,6 +39,12 @@ export function createAutocomplete({
   }
 
   function hide() {
+    // Drop leftover matches so isOpen() is false once this node is no longer a
+    // listbox. Help mode reuses #cmd-complete; Enter/Tab must not choose a
+    // stale channel from the previous "/…" query (or from a hide that only
+    // collapsed the popup).
+    complete.matches = [];
+    complete.idx = 0;
     $popup.hidden = true;
     $popup.replaceChildren();
     collapseCombobox($input, $popup);
