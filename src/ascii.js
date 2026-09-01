@@ -14,7 +14,7 @@ export const LOGO = [
 
 // project-specific tiny ascii marks
 export const PROJECT_ART = {
-  explorer: [
+  wander: [
     "  ┌── ~/",
     "  ├── src/",
     "  │   ├── main.rs",
