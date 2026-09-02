@@ -346,6 +346,37 @@ describe('applySearch', () => {
     expect(document.querySelector('mark')).toBeNull();
     expect(document.querySelector('.search-dim')).toBeNull();
   });
+
+  function stripSearchMarkup() {
+    for (const row of document.querySelectorAll('.feed-row')) {
+      const msg = row.querySelector('.msg');
+      msg.textContent = row.dataset.raw;
+      row.classList.remove('search-dim');
+    }
+  }
+
+  it('re-applies marks and dimming when feed:relayout rebuilds .msg content', () => {
+    type('world');
+    stripSearchMarkup();
+    expect(document.querySelector('mark')).toBeNull();
+    expect(document.querySelector('.search-dim')).toBeNull();
+
+    document.getElementById('feed').dispatchEvent(new CustomEvent('feed:relayout'));
+
+    const rows = [...document.querySelectorAll('.feed-row')];
+    expect(rows[0].classList.contains('search-dim')).toBe(false);
+    expect(rows[0].querySelector('mark').textContent).toBe('world');
+    expect(rows[1].classList.contains('search-dim')).toBe(true);
+    expect(rows[1].querySelector('mark')).toBeNull();
+  });
+
+  it('is a no-op on feed:relayout when no search term is active', () => {
+    document.getElementById('feed').dispatchEvent(new CustomEvent('feed:relayout'));
+    expect(document.querySelector('mark')).toBeNull();
+    expect(document.querySelector('.search-dim')).toBeNull();
+    expect([...document.querySelectorAll('.feed-row .msg')].map((m) => m.textContent))
+      .toEqual(['hello world', 'goodbye moon']);
+  });
 });
 
 // ---- slash commands (easter-egg /help, /whoami, … in the "/" popup) -------

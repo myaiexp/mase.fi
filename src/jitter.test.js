@@ -93,4 +93,25 @@ describe('playJitter — motion allowed', () => {
     expect(nick.textContent).toBe('mase');
     expect(row.classList.contains('jitter')).toBe(false);
   });
+
+  it('clearJitter cancels pending scramble/restore timers so later ticks write nothing', () => {
+    stubReducedMotion(false);
+    vi.spyOn(Math, 'random').mockReturnValue(0);
+    const { row, msg, nick } = makeRow('hello world', 'mase');
+
+    playJitter([{ row }]);
+    expect(vi.getTimerCount()).toBeGreaterThan(0);
+    const msgAtCancel = msg.textContent;
+    const nickAtCancel = nick.textContent;
+
+    clearJitter();
+    expect(vi.getTimerCount()).toBe(0);
+    expect(() => clearJitter()).not.toThrow();
+
+    // Past start (40) + JITTER_MS (320). No scramble frame, no restore write.
+    vi.advanceTimersByTime(1000);
+    expect(msg.textContent).toBe(msgAtCancel);
+    expect(nick.textContent).toBe(nickAtCancel);
+    expect(msg.textContent).toBe('hello world');
+  });
 });
