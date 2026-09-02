@@ -215,6 +215,9 @@
     <span class="cursor" aria-hidden="true"></span>
   </footer>
   <noscript><style>.diag, .rule { display: none; }</style></noscript>
-  <script type="module" src="/src/notfound-page.js"></script>
+  <script type="module">
+    import { start } from '/src/notfound-page.js';
+    start();
+  </script>
 </body>
 </html>

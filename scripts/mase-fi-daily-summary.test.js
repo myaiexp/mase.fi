@@ -3,7 +3,7 @@
 // live helm showcase API and ntfy are neutralized so the run is fully hermetic.
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { join } from 'node:path';
-import { writeFileSync } from 'node:fs';
+import { writeFileSync, readFileSync } from 'node:fs';
 import { makeTempDir, cleanup, writeJson, readJson, runScript, todayHelsinki, writeClaudeStub, readClaudeArgv } from './test-helpers.js';
 
 let TODAY;
@@ -114,9 +114,10 @@ describe('mase-fi-daily-summary — fallback + skip paths', () => {
   it('falls back to "project: N commits" when claude fails/returns nothing', () => {
     seed([log('beta', 'c1'), log('beta', 'c2')]);
     const CLAUDE_BIN = writeClaudeStub(dir, { output: '', exitCode: 1 });
-    run({ CLAUDE_BIN });
+    const r = run({ CLAUDE_BIN });
     expect(dailies()).toHaveLength(1);
     expect(dailies()[0].summary).toBe('beta: 2 commits');
+    expect(r.stdout).toMatch(/Degraded run: 1\/1/);
   });
 
   it('is idempotent — skips when daily entries already exist for today', () => {
@@ -196,5 +197,36 @@ describe('mase-fi-daily-summary — clean_lines drop rules', () => {
     const { summary } = dailies()[0];
     expect(summary).not.toMatch(/\([^)]*$/); // no unclosed paren at end
     expect(summary.length).toBeLessThanOrEqual(111);
+  });
+});
+
+describe('mase-fi-daily-summary — in-lock write guards', () => {
+  // Both cases seed a valid file so grouping + claude run, then the stub
+  // mutates updates.json before the lock: that's the only way to reach the
+  // in-lock jq-empty / already-recheck branches (a malformed seed dies on
+  // the pre-lock DAILY_EXISTS jq under set -e).
+  it('refuses to write when updates.json turns malformed after grouping', () => {
+    seed([log('beta', 'c1'), log('beta', 'c2')]);
+    const CLAUDE_BIN = writeClaudeStub(dir, {
+      output: 'should not be written',
+      prelude: `printf '%s' '{ this is not json ' > "$UPDATES_FILE"`,
+    });
+    const r = run({ CLAUDE_BIN });
+    expect(r.status).not.toBe(0);
+    expect(r.stderr).toMatch(/malformed JSON/i);
+    expect(readFileSync(file, 'utf8')).toBe('{ this is not json ');
+  });
+
+  it('skips the write when a daily entry appears during the run', () => {
+    seed([log('beta', 'c1'), log('beta', 'c2')]);
+    const CLAUDE_BIN = writeClaudeStub(dir, {
+      output: 'should not be written',
+      prelude: `jq --arg date ${JSON.stringify(TODAY)} '.entries = [{date:$date,category:"daily",project:"race",summary:"injected-during-run",commits:[]}] + .entries' "$UPDATES_FILE" > "$UPDATES_FILE.tmp" && mv "$UPDATES_FILE.tmp" "$UPDATES_FILE"`,
+    });
+    const r = run({ CLAUDE_BIN });
+    expect(r.status).toBe(0);
+    expect(r.stdout).toMatch(/appeared during the run/i);
+    expect(dailies()).toHaveLength(1);
+    expect(dailies()[0]).toMatchObject({ project: 'race', summary: 'injected-during-run' });
   });
 });

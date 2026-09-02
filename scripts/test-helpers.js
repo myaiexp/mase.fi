@@ -65,12 +65,15 @@ export function todayHelsinki() {
 // Write an executable stub standing in for `claude -p` (CLAUDE_BIN). `output` is
 // printed verbatim to stdout; a non-zero `exitCode` simulates a failed/timed-out
 // call so the daily-summary fallback path can be exercised.
-export function writeClaudeStub(dir, { output = '', exitCode = 0 } = {}) {
+export function writeClaudeStub(dir, { output = '', exitCode = 0, prelude = '' } = {}) {
   const path = join(dir, 'claude-stub');
   // Record argv (NUL-separated) so tests can assert flags like --tools ""; then
   // emit canned output and exit. The live binary is never invoked.
+  // `prelude` runs first so a test can mutate updates.json mid-run (in-lock
+  // malformed-JSON / race-with-a-sibling-writer paths).
   const argvFile = join(dir, 'claude-argv');
   const body = `#!/usr/bin/env bash
+${prelude}
 printf '%s\\0' "$@" > ${JSON.stringify(argvFile)}
 cat <<'STUB_EOF'
 ${output}

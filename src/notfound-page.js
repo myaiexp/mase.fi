@@ -5,15 +5,20 @@
 import { parentPrefixes, isJunkPath, buildRoutes, fuzzyCandidates, decide, reasonFor, sameOriginPath, isSafeRedirect } from './notfound.js';
 
 const $ = (id) => document.getElementById(id);
-const reducedMotion = matchMedia('(prefers-reduced-motion: reduce)').matches;
-const isPreview = location.pathname === '/404.html';
+const prefersReducedMotion = () => matchMedia('(prefers-reduced-motion: reduce)').matches;
+const isPreview = () => location.pathname === '/404.html';
 const PATH_CLAMP = 160;
 
-function effectivePath() {
-  if (isPreview) {
+export function effectivePath() {
+  if (isPreview()) {
     const p = new URLSearchParams(location.search).get('p');
-    const safe = sameOriginPath(p, location.origin);
-    if (safe) return safe;
+    // Preview is a typed path: leading `/` AND same-origin after WHATWG parse.
+    // The slash gate rejects `p=explorer` / `p=//evil`; sameOriginPath still
+    // has to catch `/\evil.com` (backslash is a slash in the relative-slash state).
+    if (typeof p === 'string' && p.startsWith('/') && !p.startsWith('//')) {
+      const safe = sameOriginPath(p, location.origin);
+      if (safe) return safe;
+    }
   }
   return location.pathname;
 }
@@ -35,7 +40,7 @@ async function probeHead(url, ms = 1500) {
 }
 
 // Longest-first: the deepest surviving parent is the confident target.
-async function probePrefixes(path) {
+export async function probePrefixes(path) {
   for (const prefix of parentPrefixes(path)) {
     if (!sameOriginPath(prefix, location.origin)) continue;
     const res = await probeHead(prefix);
@@ -55,8 +60,8 @@ async function loadRoutes() {
 }
 
 // error_page keeps the original status but the body can't see it — re-ask nginx.
-async function applyRealStatus(path) {
-  if (isPreview) return;
+export async function applyRealStatus(path) {
+  if (isPreview()) return;
   const res = await probeHead(path, 1200);
   if (res && res.status === 403) {
     document.title = 'mase.fi — forbidden';
@@ -111,7 +116,7 @@ function suggestionLink(plan) {
   return a;
 }
 
-function renderConfident(path, plan) {
+export function renderConfident(path, plan) {
   if (plan.diff) {
     renderTyped(path, plan.target.length);
     const t = $('tailnote');
@@ -132,7 +137,7 @@ function renderConfident(path, plan) {
   startCountdown(plan, link);
 }
 
-function renderFuzzy(path, candidates) {
+export function renderFuzzy(path, candidates) {
   const sugg = $('sugg');
   sugg.textContent = '';
   sugg.append(Object.assign(document.createElement('div'), { className: 'label', textContent: 'closest matches' }));
@@ -164,7 +169,7 @@ function renderFuzzy(path, candidates) {
   });
 }
 
-function renderNone(projectCount) {
+export function renderNone(projectCount) {
   const sugg = $('sugg');
   sugg.textContent = '';
   const link = suggestionLink({
@@ -179,7 +184,7 @@ function renderNone(projectCount) {
   });
 }
 
-function startCountdown(plan, suggEl) {
+export function startCountdown(plan, suggEl) {
   const box = $('countbox');
   box.hidden = false;
   const go = () => {
@@ -187,7 +192,7 @@ function startCountdown(plan, suggEl) {
     location.replace(plan.target);
   };
   $('gobtn').addEventListener('click', go);
-  if (reducedMotion) {
+  if (prefersReducedMotion()) {
     // An involuntary navigation is a motion problem too: buttons only, no timer.
     $('cnum').textContent = '—';
     for (const s of $('csegs').children) s.classList.remove('on');
@@ -241,7 +246,7 @@ function startCountdown(plan, suggEl) {
   iv = setInterval(tick, 1000);
 }
 
-async function main() {
+export async function start() {
   const path = effectivePath();
   renderTyped(path, path.length);
   applyRealStatus(path);
@@ -264,5 +269,3 @@ async function main() {
   else if (plan.state === 'fuzzy') renderFuzzy(path, plan.candidates);
   else renderNone(routes.filter((r) => !r.extra).length);
 }
-
-main();

@@ -39,6 +39,7 @@ export default [
         Event: 'readonly',
         MouseEvent: 'readonly',
         KeyboardEvent: 'readonly',
+        WheelEvent: 'readonly',
         HTMLElement: 'readonly',
         HTMLCanvasElement: 'readonly',
         CustomEvent: 'readonly',
