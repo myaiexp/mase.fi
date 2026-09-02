@@ -1,9 +1,9 @@
 // @vitest-environment jsdom
 // Unit tests for beam.js: destructionAt() (pure curve), paintChar() (bucket
-// cache — the cheap DOM-write invariant), and mountBeam() (reduced-motion
-// fast-path + the single-active-beam singleton).
+// cache — the cheap DOM-write invariant), mountBeam() (reduced-motion
+// fast-path + the single-active-beam singleton), and unmountBeam().
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import { destructionAt, paintChar, mountBeam } from './beam.js';
+import { destructionAt, paintChar, mountBeam, unmountBeam } from './beam.js';
 
 // Keep measurement off the canvas: mountBeam only needs a positive charWidth
 // to enter the animated path, and jsdom's measureText is not a contract we pin.
@@ -144,9 +144,7 @@ describe('mountBeam', () => {
   });
 
   afterEach(() => {
-    // Public-API teardown: a reduced-motion remount runs activeCleanup first.
-    stubReducedMotion(true);
-    mountBeam(document.createElement('div'), '');
+    unmountBeam();
     vi.clearAllTimers();
     vi.useRealTimers();
     vi.unstubAllGlobals();
@@ -186,5 +184,37 @@ describe('mountBeam', () => {
     vi.advanceTimersByTime(10_000);
     expect(a.textContent).toBe(frozen);
     expect(b.classList.contains('beam-host')).toBe(true);
+  });
+
+  it('unmountBeam cancels the loop immediately and restores the host', () => {
+    stubReducedMotion(false);
+    const host = makeHost();
+    mountBeam(host, 'AB');
+    expect(host.classList.contains('beam-host')).toBe(true);
+    expect(vi.getTimerCount()).toBe(1);
+
+    unmountBeam();
+    expect(vi.getTimerCount()).toBe(0);
+    expect(host.classList.contains('beam-host')).toBe(false);
+    expect(host.textContent).toBe('AB');
+    expect(host.querySelector('.ascii-beam')).toBeNull();
+  });
+
+  it('unmountBeam is a no-op when nothing is mounted', () => {
+    expect(() => unmountBeam()).not.toThrow();
+    unmountBeam();
+  });
+
+  it('self-cleans on the next scheduled play when the host has been detached', () => {
+    // The leak: leaving #home replaces #pinned (detaching ~300 spans) without
+    // tearing down the rAF/timeout chain. play() must notice isConnected and
+    // run cleanup so a missed unmountBeam still dies. FIRST_DELAY_MS = 1600.
+    stubReducedMotion(false);
+    const host = makeHost();
+    mountBeam(host, 'AB');
+    expect(vi.getTimerCount()).toBe(1);
+    host.remove();
+    vi.advanceTimersByTime(1600);
+    expect(vi.getTimerCount()).toBe(0);
   });
 });

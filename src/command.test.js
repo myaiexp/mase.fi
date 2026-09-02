@@ -1,13 +1,7 @@
 // @vitest-environment jsdom
-// Unit tests for the command input module: the pure ranking helpers
-// (fuzzyScore / highlightFuzzy) and the "/" channel-autocomplete flow
-// driven through the public initCommand surface.
-//
-// fuzzyScore / highlightFuzzy are exported solely so the pure ranking logic can
-// be pinned directly — highlightFuzzy's no-match branch is unreachable via the
-// autocomplete UI (both helpers share the same subsequence algorithm, so a
-// survivor always matches). Adding the export keyword is behavior-preserving;
-// the unused exports tree-shake out of the production bundle.
+// Unit tests for the command input module: the "/" channel-autocomplete flow
+// driven through the public initCommand surface. Ranking helpers live in
+// command-fuzzy.js (and command-fuzzy.test.js).
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 
 // command-complete.js reads getChannels/chAccent from the registry leaf;
@@ -71,96 +65,6 @@ beforeEach(async () => {
   channels = await import('./channels.js');
   data = await import('./data.js');
   command = await import('./command.js');
-});
-
-// ---- fuzzyScore ----------------------------------------------------------
-
-describe('fuzzyScore', () => {
-  it('empty query short-circuits to 1 (non-throwing baseline)', () => {
-    expect(command.fuzzyScore('anything', '')).toBe(1);
-    expect(command.fuzzyScore('', '')).toBe(1);
-  });
-
-  it('lowercases the query so mixed-case callers match like highlightFuzzy', () => {
-    // Same contract as highlightFuzzy: a future caller must not have to
-    // pre-lowercase `q`. Mixed-case used to score 0 because only `str` was
-    // folded (finding #8129).
-    expect(command.fuzzyScore('home', 'HO')).toBe(command.fuzzyScore('home', 'ho'));
-    expect(command.fuzzyScore('Home', 'HOME')).toBe(command.fuzzyScore('home', 'home'));
-    expect(command.fuzzyScore('home', 'HO')).toBeGreaterThan(0);
-  });
-
-  it('exact match scores higher than a prefix, which beats a mid-string match', () => {
-    const exact = command.fuzzyScore('home', 'home');
-    const prefix = command.fuzzyScore('home', 'hom');
-    const mid = command.fuzzyScore('home', 'ome');
-    expect(exact).toBeGreaterThan(prefix);
-    expect(prefix).toBeGreaterThan(mid);
-  });
-
-  it('a prefix match outscores the same query appearing mid-string', () => {
-    // "or" leads "order" (prefix + startsWith bonus) but sits mid-word in "world".
-    expect(command.fuzzyScore('order', 'or')).toBeGreaterThan(command.fuzzyScore('world', 'or'));
-  });
-
-  it('returns 0 when the query is not a subsequence', () => {
-    expect(command.fuzzyScore('home', 'xyz')).toBe(0);
-    // Order matters: a, c, b is not a subsequence of "abc".
-    expect(command.fuzzyScore('abc', 'acb')).toBe(0);
-  });
-
-  it('treats query characters literally, not as a regex', () => {
-    // A "." matches a literal dot...
-    expect(command.fuzzyScore('a.b.c', '.')).toBeGreaterThan(0);
-    expect(command.fuzzyScore('[id]', '[')).toBeGreaterThan(0);
-    // ...and ".*" is NOT a wildcard: "plain" has no dot, so no match.
-    expect(command.fuzzyScore('plain', '.*')).toBe(0);
-  });
-
-  it('orders realistic channel labels monotonically by score', () => {
-    // Query "ho": "home" (prefix, +10), "shop" (h then o adjacent), "chrome"
-    // (h then o, scattered). Sorting desc reproduces the autocomplete's order.
-    const labels = ['chrome', 'home', 'shop'];
-    const ranked = labels
-      .map((l) => ({ l, s: command.fuzzyScore(l, 'ho') }))
-      .sort((a, b) => b.s - a.s)
-      .map((x) => x.l);
-    expect(ranked).toEqual(['home', 'shop', 'chrome']);
-  });
-});
-
-// ---- highlightFuzzy ------------------------------------------------------
-
-describe('highlightFuzzy', () => {
-  it('wraps each matched character in a .hit span, leaving the tail plain', () => {
-    expect(command.highlightFuzzy('explorer', 'exp')).toBe(
-      '<span class="hit">e</span><span class="hit">x</span><span class="hit">p</span>lorer'
-    );
-  });
-
-  it('wraps non-adjacent matches with the literal text between them intact', () => {
-    expect(command.highlightFuzzy('explorer', 'er')).toBe(
-      '<span class="hit">e</span>xplo<span class="hit">r</span>er'
-    );
-  });
-
-  it('no-match returns the input unchanged (escaped, no hit spans)', () => {
-    expect(command.highlightFuzzy('home', 'xyz')).toBe('home');
-    // "unchanged" still means HTML-escaped for safe interpolation.
-    expect(command.highlightFuzzy('a<b', 'zzz')).toBe('a&lt;b');
-  });
-
-  it('empty query returns the escaped input without throwing', () => {
-    expect(command.highlightFuzzy('home', '')).toBe('home');
-    expect(command.highlightFuzzy('a<b', '')).toBe('a&lt;b');
-  });
-
-  it('escapes both surrounding text and the matched character (XSS-safe)', () => {
-    // Matched "a" sits between escaped angle brackets.
-    expect(command.highlightFuzzy('<a>', 'a')).toBe('&lt;<span class="hit">a</span>&gt;');
-    // A matched special character is itself escaped inside the hit span.
-    expect(command.highlightFuzzy('a<c', '<')).toBe('a<span class="hit">&lt;</span>c');
-  });
 });
 
 // ---- autocomplete render -------------------------------------------------

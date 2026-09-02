@@ -4,25 +4,22 @@
 // directly so they don't pull feed/pinned/sidebar/transition as a back-edge.
 import { getChannels, chAccent } from './registry.js';
 import { escapeHtml } from './html.js';
+import { fuzzyScore, highlightFuzzy } from './command-fuzzy.js';
 import { optionAttrs, markListbox, setActive, collapseCombobox } from './command-aria.js';
 
 /**
  * Build the autocomplete controller. DOM refs are bound later via `bind()`;
- * ranking helpers + relative-activity label + choose callback are injected so this
+ * relative-activity label + choose callback + command list are injected so this
  * module stays free of command.js's search/data/init state (no import cycle).
  *
  * @param {{
  *   getCommands: () => Array<{name: string, desc: string, run: Function}>,
- *   fuzzyScore: (str: string, q: string) => number,
- *   highlightFuzzy: (str: string, q: string) => string,
  *   formatRelativeActivity: (id: string) => string,
  *   onChoose: (match: object) => void,
  * }} deps
  */
 export function createAutocomplete({
   getCommands,
-  fuzzyScore,
-  highlightFuzzy,
   formatRelativeActivity,
   onChoose,
 }) {

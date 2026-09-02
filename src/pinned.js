@@ -1,7 +1,7 @@
 // Pinned hero card renderers — one per channel kind
 import { LOGO, PROJECT_ART, sparkbar } from './ascii.js';
 import { logStats } from './data.js';
-import { mountBeam } from './beam.js';
+import { mountBeam, unmountBeam } from './beam.js';
 import { escapeHtml } from './html.js';
 
 // heat → status business rule. Single source for the >0.6 / >0.3 breakpoints so
@@ -33,6 +33,24 @@ export function cardHead(meta, right) {
     '</div>';
 }
 
+// Shared pinned-card skeleton. `rows` are [dt, ddHtml, ddClass?] — ddHtml is
+// already escaped at the call site; ddClass is required for CSS that targets
+// `dd.accent` / `dd.links` (colour + flex gap), not a descendant.
+function pinCard({ meta, right, art, tagline, rows }) {
+  const dl = rows.map(([dt, ddHtml, ddClass]) => {
+    const cls = ddClass ? ' class="' + escapeHtml(ddClass) + '"' : '';
+    return '<dt>' + escapeHtml(dt) + '</dt><dd' + cls + '>' + ddHtml + '</dd>';
+  }).join('');
+  return '<div class="card">' +
+    cardHead(meta, right) +
+    '<div class="card-body pin-grid">' +
+    '<pre class="ascii">' + escapeHtml(art) + '</pre>' +
+    '<div>' +
+    '<p class="pin-tagline">' + tagline + '</p>' +
+    '<dl class="pin-meta">' + dl + '</dl>' +
+    '</div></div></div>';
+}
+
 function pinnedHome(data) {
   const { totalCommits, buckets, last } = logStats(data, 28);
   const maxV = Math.max(1, ...buckets);
@@ -42,24 +60,18 @@ function pinnedHome(data) {
   const lastStr = last
     ? `${escapeHtml(last.date.slice(0, 10))} \xb7 ${escapeHtml(last.date.slice(11, 16))} \xb7 <span class="accent">${escapeHtml(last.project || '—')}</span>`
     : '—';
-  return `<div class="card">` +
-    cardHead([['modes', '+ntr'], ['users', '1'], ['since', '2018']], '● live') +
-    `<div class="card-body pin-grid">` +
-    `<pre class="ascii">${escapeHtml(LOGO)}</pre>` +
-    `<div>` +
-    `<p class="pin-tagline"><b>mase</b> — software, in progress. this is the always-on log: what i shipped, what i broke, what i thought was worth writing down.</p>` +
-    `<dl class="pin-meta">` +
-    `<dt>projects</dt><dd class="accent">${data.projects.length} active</dd>` +
-    `<dt>commits</dt><dd>${totalCommits} in feed \xb7 ${spark}</dd>` +
-    `<dt>last push</dt><dd>${lastStr}</dd>` +
-    `<dt>links</dt><dd class="links">` +
-    `<a href="#/activity">activity</a>` +
-    `<a href="https://github.com/myaiexp">github</a>` +
-    `</dd>` +
-    `</dl>` +
-    `</div>` +
-    `</div>` +
-    `</div>`;
+  return pinCard({
+    meta: [['modes', '+ntr'], ['users', '1'], ['since', '2018']],
+    right: '● live',
+    art: LOGO,
+    tagline: '<b>mase</b> — software, in progress. this is the always-on log: what i shipped, what i broke, what i thought was worth writing down.',
+    rows: [
+      ['projects', data.projects.length + ' active', 'accent'],
+      ['commits', totalCommits + ' in feed \xb7 ' + spark],
+      ['last push', lastStr],
+      ['links', '<a href="#/activity">activity</a><a href="https://github.com/myaiexp">github</a>', 'links'],
+    ],
+  });
 }
 
 function pinnedProject(p, data) {
@@ -67,22 +79,19 @@ function pinnedProject(p, data) {
   const commits = data.entries.filter(e => e.ch === p.channel && e.cat === 'log').length;
   const status = heatStatus(p.heat);
   const demoLink = demoLinkHtml(p.channel, data.demos, { arrow: true });
-  return '<div class="card">' +
-    cardHead([['heat', (p.heat * 100 | 0) + '%'], ['commits', String(commits)]], status.label) +
-    '<div class="card-body pin-grid">' +
-    '<pre class="ascii">' + escapeHtml(art) + '</pre>' +
-    '<div>' +
-    '<p class="pin-tagline">' + escapeHtml(p.description) + '</p>' +
-    '<dl class="pin-meta">' +
-    '<dt>activity</dt><dd>' + commits + ' commits in feed \xb7 heat ' + (p.heat * 100 | 0) + '%</dd>' +
-    '<dt>status</dt><dd class="accent">' + status.text + '</dd>' +
-    '<dt>links</dt><dd class="links">' + demoLink +
-    p.links.map(l => '<a href="' + escapeHtml(l.href) + '">' + escapeHtml(l.label) + '</a>').join('') +
-    '</dd>' +
-    '</dl>' +
-    '</div>' +
-    '</div>' +
-    '</div>';
+  const linksHtml = demoLink +
+    p.links.map(l => '<a href="' + escapeHtml(l.href) + '">' + escapeHtml(l.label) + '</a>').join('');
+  return pinCard({
+    meta: [['heat', (p.heat * 100 | 0) + '%'], ['commits', String(commits)]],
+    right: status.label,
+    art,
+    tagline: escapeHtml(p.description),
+    rows: [
+      ['activity', commits + ' commits in feed \xb7 heat ' + (p.heat * 100 | 0) + '%'],
+      ['status', status.text, 'accent'],
+      ['links', linksHtml, 'links'],
+    ],
+  });
 }
 
 function pinnedActivity(data) {
@@ -111,20 +120,17 @@ function pinnedActivity(data) {
     '  │  daily    ▇▇▇▇▇      ' + String(cats.daily).padStart(2) + '  │',
     '  ╰───────────────────────╯',
   ].join('\n');
-  return '<div class="card">' +
-    cardHead([['modes', '+mn'], ['source', 'post-receive'], ['rate', rate]], 'live tail') +
-    '<div class="card-body pin-grid">' +
-    '<pre class="ascii">' + escapeHtml(artLines) + '</pre>' +
-    '<div>' +
-    '<p class="pin-tagline">the unfiltered tail. git hooks push here directly, one line per commit, every project.</p>' +
-    '<dl class="pin-meta">' +
-    '<dt>total</dt><dd class="accent">' + data.entries.length + ' entries</dd>' +
-    '<dt>range</dt><dd>' + range + '</dd>' +
-    '<dt>source</dt><dd>post-receive hook → updates.json</dd>' +
-    '</dl>' +
-    '</div>' +
-    '</div>' +
-    '</div>';
+  return pinCard({
+    meta: [['modes', '+mn'], ['source', 'post-receive'], ['rate', rate]],
+    right: 'live tail',
+    art: artLines,
+    tagline: 'the unfiltered tail. git hooks push here directly, one line per commit, every project.',
+    rows: [
+      ['total', data.entries.length + ' entries', 'accent'],
+      ['range', range],
+      ['source', 'post-receive hook → updates.json'],
+    ],
+  });
 }
 
 /** Replace #hero-line content with a mobile-only quick-access row. */
@@ -166,6 +172,10 @@ export function renderPinned(id, data) {
   else if (project) html = pinnedProject(project, data);
   // html is built from escapeHtml-sanitized data; static markup only elsewhere
   const pinnedEl = document.getElementById('pinned');
+  // Tear down the home-channel beam *before* replacing markup — mountBeam only
+  // runs its previous cleanup on the next mount, which never happens if we
+  // leave #home. Home remounts immediately after this.
+  unmountBeam();
   pinnedEl.innerHTML = html;
   // Home channel only: instrument the LOGO <pre> with the pretext-measured
   // beam destruction effect. `mountBeam` no-ops on reduced-motion / hidden hosts

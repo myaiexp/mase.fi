@@ -7,6 +7,7 @@
 // parsed into live DOM (no injected <script>/<b>, no attribute breakout).
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { renderPinned, renderHeroLine, cardHead } from './pinned.js';
+import * as beam from './beam.js';
 
 // renderPinned('home', …) calls mountBeam, which probes matchMedia. jsdom doesn't
 // implement matchMedia, and we don't want the animation/pretext path here — so stub it
@@ -251,6 +252,26 @@ describe('renderPinned — unmatched channel', () => {
   it('renders nothing for a channel that is neither home/activity nor a project', () => {
     renderPinned('does-not-exist', { projects: [], entries: [] });
     expect(pinnedEl().innerHTML).toBe('');
+  });
+});
+
+describe('renderPinned — beam teardown', () => {
+  it('unmounts any live beam before replacing #pinned, remounting only on home', () => {
+    const unmount = vi.spyOn(beam, 'unmountBeam');
+    const mount = vi.spyOn(beam, 'mountBeam');
+
+    renderPinned('home', { projects: [], entries: [] });
+    expect(unmount).toHaveBeenCalled();
+    expect(mount).toHaveBeenCalled();
+
+    unmount.mockClear();
+    mount.mockClear();
+    renderPinned('activity', { projects: [], entries: [] });
+    expect(unmount).toHaveBeenCalled();
+    expect(mount).not.toHaveBeenCalled();
+
+    unmount.mockRestore();
+    mount.mockRestore();
   });
 });
 

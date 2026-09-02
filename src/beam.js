@@ -171,9 +171,19 @@ export function mountBeam(asciiEl, logoText) {
   }
 
   function play(phase) {
+    // Detached host: #pinned was replaced without unmountBeam. Tear the
+    // rAF/timeout chain down so we don't keep painting into dead nodes.
+    if (!asciiEl.isConnected) {
+      cleanup();
+      return;
+    }
     const t0 = performance.now();
     const dur = phase === 'sweep' ? SWEEP_MS : REFORM_MS;
     function step(now) {
+      if (!asciiEl.isConnected) {
+        cleanup();
+        return;
+      }
       const t = Math.min(1, (now - t0) / dur);
       // Ease in-out cubic so the beam accelerates through the middle.
       const k = t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
@@ -205,7 +215,7 @@ export function mountBeam(asciiEl, logoText) {
 
   schedule = setTimeout(() => play('sweep'), FIRST_DELAY_MS);
 
-  const cleanup = () => {
+  function cleanup() {
     if (raf) cancelAnimationFrame(raf);
     if (schedule) clearTimeout(schedule);
     asciiEl.removeEventListener('click', trigger);
@@ -214,7 +224,12 @@ export function mountBeam(asciiEl, logoText) {
     asciiEl.style.height = '';
     asciiEl.textContent = logoText;
     activeCleanup = null;
-  };
+  }
   activeCleanup = cleanup;
   return cleanup;
+}
+
+/** Tear down the active beam, if any. Safe to call when nothing is mounted. */
+export function unmountBeam() {
+  if (activeCleanup) activeCleanup();
 }

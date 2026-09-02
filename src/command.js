@@ -1,7 +1,6 @@
 // Command input — slash-jump, ?-help, plain-text search; global / ? g-leader shortcuts.
 import { navigate } from './channels.js';
 import { entriesFor, parseEntryDate } from './data.js';
-import { escapeHtml } from './html.js';
 import { buildCommands } from './slash-commands.js';
 import { applySearch } from './command-search.js';
 import { markHelp } from './command-aria.js';
@@ -105,36 +104,6 @@ function runCommand(cmd) {
   $cmdInput.blur();
 }
 
-export function fuzzyScore(str, q) {
-  if (q === '') return 1;
-  str = str.toLowerCase();
-  q = q.toLowerCase();
-  let si = 0, score = 0, streak = 0;
-  for (const c of q) {
-    const idx = str.indexOf(c, si);
-    if (idx < 0) return 0;
-    score += (idx === si ? 2 : 1);
-    streak = (idx === si ? streak + 1 : 0);
-    score += streak;
-    si = idx + 1;
-  }
-  if (str.startsWith(q)) score += 10;
-  return score;
-}
-
-export function highlightFuzzy(str, q) {
-  if (!q) return escapeHtml(str);
-  let out = '', si = 0;
-  for (const c of q.toLowerCase()) {
-    const idx = str.toLowerCase().indexOf(c, si);
-    if (idx < 0) return escapeHtml(str);
-    out += escapeHtml(str.slice(si, idx)) + `<span class="hit">${escapeHtml(str[idx])}</span>`;
-    si = idx + 1;
-  }
-  out += escapeHtml(str.slice(si));
-  return out;
-}
-
 // Relative label ('3m'/'2h'/'1d') for the autocomplete's last-seen column.
 // Not project.lastActivity (an epoch-ms timestamp used for recency sort) —
 // this walks entriesFor, which for project channels also excludes log entries.
@@ -164,8 +133,6 @@ export function initCommand(data) {
 
   ac = createAutocomplete({
     getCommands: () => _commands,
-    fuzzyScore,
-    highlightFuzzy,
     formatRelativeActivity,
     onChoose: onChooseMatch,
   });
