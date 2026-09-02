@@ -1,5 +1,6 @@
 // @vitest-environment jsdom
-import { describe, it, expect, beforeAll, afterEach } from 'vitest';
+import { describe, it, expect, beforeAll, afterEach, vi } from 'vitest';
+import { TYPEAHEAD_TIMEOUT_MS } from './letter-jump.js';
 
 beforeAll(async () => {
   await import('./select.js');
@@ -387,6 +388,52 @@ describe('base-select', () => {
 
     getTrigger(el).dispatchEvent(new KeyboardEvent('keydown', { key: 'a', bubbles: true }));
     expect(opts[0].classList.contains('active')).toBe(true);
+  });
+
+  // Regression for finding #8791: cycle state survived close(), so the first
+  // matching option became unreachable after its first use.
+  it('letter-jump restarts after close so the first match is reachable again', () => {
+    const el = createSelect({ options: [
+      { value: 'a1', label: 'Apple' },
+      { value: 'b', label: 'Banana' },
+      { value: 'a2', label: 'Avocado' },
+    ] });
+    el.open();
+
+    const opts = getOptions(el);
+    const trigger = getTrigger(el);
+    trigger.dispatchEvent(new KeyboardEvent('keydown', { key: 'a', bubbles: true }));
+    expect(opts[0].classList.contains('active')).toBe(true);
+
+    el.close();
+    el.open();
+    trigger.dispatchEvent(new KeyboardEvent('keydown', { key: 'a', bubbles: true }));
+    expect(opts[0].classList.contains('active')).toBe(true);
+    expect(opts[2].classList.contains('active')).toBe(false);
+  });
+
+  it('letter-jump restarts after a 1s idle gap (native select typeahead)', () => {
+    vi.useFakeTimers({ toFake: ['Date'] });
+    try {
+      const el = createSelect({ options: [
+        { value: 'a1', label: 'Apple' },
+        { value: 'b', label: 'Banana' },
+        { value: 'a2', label: 'Avocado' },
+      ] });
+      el.open();
+
+      const opts = getOptions(el);
+      const trigger = getTrigger(el);
+      trigger.dispatchEvent(new KeyboardEvent('keydown', { key: 'a', bubbles: true }));
+      expect(opts[0].classList.contains('active')).toBe(true);
+
+      vi.advanceTimersByTime(TYPEAHEAD_TIMEOUT_MS);
+      trigger.dispatchEvent(new KeyboardEvent('keydown', { key: 'a', bubbles: true }));
+      expect(opts[0].classList.contains('active')).toBe(true);
+      expect(opts[2].classList.contains('active')).toBe(false);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   // --- Groups ---

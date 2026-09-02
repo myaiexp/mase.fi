@@ -5,6 +5,7 @@ import { applyMenuFlip } from '../shared/menu-flip.js';
 import { wrapIndex } from '../shared/menu-nav.js';
 import { selectStyles } from './select-styles.js';
 import { buildMenu, markSelected, filterMenu, resetFilter } from './select-menu.js';
+import { createLetterJump } from './letter-jump.js';
 import './select-option.js';
 
 const selectTemplate = document.createElement('template');
@@ -22,8 +23,7 @@ class BaseSelect extends HTMLElement {
   #open = false;
   #highlightIdx = -1;
   #blurTimeout = null;
-  #lastJumpKey = '';
-  #lastJumpCycleIdx = -1;
+  #typeahead = createLetterJump();
   #triggerWrap = null;
   #observer = null;
   #trigger = null;
@@ -95,6 +95,7 @@ class BaseSelect extends HTMLElement {
     this.#open = false;
     this._menu.hidden = true;
     this.#highlightIdx = -1;
+    this.#typeahead.reset();
     removeOverlayListeners(this);
 
     // Searchable: cancelling reverts the trigger to the selected option's label
@@ -249,30 +250,12 @@ class BaseSelect extends HTMLElement {
         this._selectOption(opts[this.#highlightIdx]);
       }
     } else if (!this.#searchable && e.key.length === 1 && /[a-z]/i.test(e.key)) {
-      this.#letterJump(e.key, opts);
+      const idx = this.#typeahead.jump(e.key, opts);
+      if (idx >= 0) {
+        this.#highlightIdx = idx;
+        this.#applyHighlight();
+      }
     }
-  }
-
-  #letterJump(letter, opts) {
-    const lower = letter.toLowerCase();
-    const matches = [];
-    for (let i = 0; i < opts.length; i++) {
-      if (opts[i].textContent.toLowerCase().startsWith(lower)) matches.push(i);
-    }
-    if (!matches.length) return;
-
-    if (this.#lastJumpKey === lower && this.#lastJumpCycleIdx >= 0) {
-      // Same letter repeated — cycle to next match
-      const nextIdx = (this.#lastJumpCycleIdx + 1) % matches.length;
-      this.#highlightIdx = matches[nextIdx];
-      this.#lastJumpCycleIdx = nextIdx;
-    } else {
-      // New letter — jump to first match
-      this.#highlightIdx = matches[0];
-      this.#lastJumpKey = lower;
-      this.#lastJumpCycleIdx = 0;
-    }
-    this.#applyHighlight();
   }
 
   #enabledOptionDivs() {
