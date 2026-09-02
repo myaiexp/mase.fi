@@ -1,5 +1,6 @@
 // Feed rendering — day separators, IRC-style rows, windowed with lazy scroll-up
-import { entriesFor, parseEntryDate } from './data.js';
+import { entriesFor } from './data.js';
+import { dayOf, timeOf } from './dates.js';
 import { playJitter, clearJitter } from './jitter.js';
 import { relayoutAll, layoutRow, measureFeedMetrics } from './feed-layout.js';
 
@@ -34,16 +35,16 @@ export function nickColor(nick) {
 }
 
 export function dayLabel(date) {
-  const d = parseEntryDate(date).toISOString().slice(0, 10);
-  const today = new Date().toISOString().slice(0, 10);
-  const yest = new Date(Date.now() - 86400000).toISOString().slice(0, 10);
+  const d = dayOf(date);
+  const today = dayOf(new Date().toISOString());
+  const yest = dayOf(new Date(Date.now() - 86400000).toISOString());
   if (d === today) return 'today \xb7 ' + d;
   if (d === yest) return 'yesterday \xb7 ' + d;
   return d;
 }
 
 function populateRow(row, e, ch) {
-  const time = e.date.slice(11, 16);
+  const time = timeOf(e.date);
   const nickC = nickColor(e.nick);
 
   const ts = document.createElement('div');
@@ -88,7 +89,7 @@ function buildRows(entries, channelId) {
   const rowEls = [];
   let lastDay = null;
   for (const e of entries) {
-    const d = e.date.slice(0, 10);
+    const d = dayOf(e.date);
     if (d !== lastDay) {
       frag.appendChild(dayHeader(e.date));
       lastDay = d;
@@ -164,7 +165,7 @@ function revealOlder($feed, state, sentinel) {
   const older = entries.slice(entries.length - nextShown, entries.length - shown);
   // The day the current window opens on, and its (now-leading) day header — used
   // to dedup the seam when the older batch ends on that same calendar day.
-  const seamDay = entries[entries.length - shown].date.slice(0, 10);
+  const seamDay = dayOf(entries[entries.length - shown].date);
   const seamHeader = $feed.querySelector('.feed-day');
 
   const { frag, rowEls } = buildRows(older, channelId);
@@ -173,12 +174,13 @@ function revealOlder($feed, state, sentinel) {
   $feed.insertBefore(frag, sentinel.nextSibling);
   // Seam dedup: if the older batch's newest entry shares the window's opening day,
   // that day's header now appears twice — drop the window's (now mid-day) one.
-  if (older[older.length - 1].date.slice(0, 10) === seamDay) seamHeader?.remove();
-  $feed.scrollTop += $feed.scrollHeight - prevHeight;
+  if (dayOf(older[older.length - 1].date) === seamDay) seamHeader?.remove();
 
-  // Lay out only the freshly prepended rows (bounded), then let search re-decorate.
+  // populateRow leaves .msg empty; wrapping grows the rows. Lay them out
+  // before reading the new scrollHeight, otherwise the compensation under-shoots.
   const m = measureFeedMetrics($feed);
   if (m && m.msgWidth > 0) for (const { row } of rowEls) layoutRow(row, m.msgWidth, m.font);
+  $feed.scrollTop += $feed.scrollHeight - prevHeight;
   $feed.dispatchEvent(new CustomEvent('feed:relayout'));
 
   state.shown = nextShown;

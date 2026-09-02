@@ -113,6 +113,24 @@ describe('mase-fi-update — refusal paths (no silent corruption)', () => {
     expect(r.stderr).toMatch(/malformed JSON/i);
     expect(readFileSync(file, 'utf8')).toBe(before);
   });
+
+  it('refuses a non-YYYY-MM-DD date and leaves the file untouched', () => {
+    seed([{ date: '2026-06-01', project: 'x', text: 'y', category: 'log' }]);
+    const before = readFileSync(file, 'utf8');
+    const r = update(['feature', 'p', 'text', 'junkT12:34']);
+    expect(r.status).not.toBe(0);
+    expect(r.stdout + r.stderr).toMatch(/YYYY-MM-DD/i);
+    expect(readFileSync(file, 'utf8')).toBe(before);
+  });
+
+  it('refuses an impossible calendar day and leaves the file untouched', () => {
+    seed([{ date: '2026-06-01', project: 'x', text: 'y', category: 'log' }]);
+    const before = readFileSync(file, 'utf8');
+    const r = update(['feature', 'p', 'text', '2026-02-30']);
+    expect(r.status).not.toBe(0);
+    expect(r.stdout + r.stderr).toMatch(/valid calendar day/i);
+    expect(readFileSync(file, 'utf8')).toBe(before);
+  });
 });
 
 describe('mase-fi-update — lock file must not clobber via symlink', () => {

@@ -1,6 +1,7 @@
 // Pinned hero card renderers — one per channel kind
 import { LOGO, PROJECT_ART, sparkbar } from './ascii.js';
 import { logStats } from './data.js';
+import { dayOf, timeOf } from './dates.js';
 import { mountBeam, unmountBeam } from './beam.js';
 import { escapeHtml } from './html.js';
 
@@ -58,7 +59,7 @@ function pinnedHome(data) {
   // Every dynamic value (date slices + project) is escapeHtml'd; the accent span
   // is a static wrapper.
   const lastStr = last
-    ? `${escapeHtml(last.date.slice(0, 10))} \xb7 ${escapeHtml(last.date.slice(11, 16))} \xb7 <span class="accent">${escapeHtml(last.project || '—')}</span>`
+    ? `${escapeHtml(dayOf(last.date))} \xb7 ${escapeHtml(timeOf(last.date))} \xb7 <span class="accent">${escapeHtml(last.project || '—')}</span>`
     : '—';
   return pinCard({
     meta: [['modes', '+ntr'], ['users', '1'], ['since', '2018']],
@@ -100,8 +101,8 @@ function pinnedActivity(data) {
   const logEntries = data.entries.filter(e => e.cat === 'log');
   let range = '—';
   if (logEntries.length) {
-    const first = escapeHtml(logEntries[0].date.slice(0, 10));
-    const last = escapeHtml(logEntries[logEntries.length - 1].date.slice(0, 10));
+    const first = escapeHtml(dayOf(logEntries[0].date));
+    const last = escapeHtml(dayOf(logEntries[logEntries.length - 1].date));
     range = first + ' → ' + last;
   }
   // Real recent commit rate: average log entries per ACTIVE day over the last 28

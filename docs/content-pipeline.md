@@ -57,7 +57,7 @@ Routed by `entry.category`:
 
 ### Feature / project entries — `scripts/mase-fi-update`
 
-Manual `project`/`feature` entries. Sticky capacity enforced server-side via `jq` (2 `project` entries, 3 `feature` entries). Omitted date defaults to today in `Europe/Helsinki` (`TZ="Europe/Helsinki" date +%Y-%m-%d`), matching daily-summary.
+Manual `project`/`feature` entries. Sticky capacity enforced server-side via `jq` (2 `project` entries, 3 `feature` entries). Omitted date defaults to today in `Europe/Helsinki` (`TZ="Europe/Helsinki" date +%Y-%m-%d`), matching daily-summary. A supplied `[date]` must be a real `YYYY-MM-DD` calendar day — anything else is refused before the flock.
 
 On the laptop/desktop, `mase-fi-update` is a **machine-configs wrapper** (`.local/bin/mase-fi-update`, synced by `config-sync`) that SSHes to the VPS and runs `scripts/mase-fi-update` via `sudo -n -u mase` — `Host vps` logs in as root there, and the writer must run as mase (root can't take the mase-owned flock under `fs.protected_regular`). The wrapper forwards `UPDATES_FILE`, so `UPDATES_FILE=/tmp/x.json mase-fi-update feature wander "…"` exercises the whole chain against a throwaway file; a "broken on the laptop" report starts with that wrapper, not this script.
 

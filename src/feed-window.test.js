@@ -5,6 +5,7 @@
 // (the IO stub is hand-fired to simulate scroll-up) and assert pure DOM structure
 // — row counts, the sentinel, and day-separator seam dedup across batches.
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
+import { dayOf } from './dates.js';
 
 // Controllable IntersectionObserver: records instances so a test can fire the
 // callback as if the sentinel scrolled into view, and tracks disconnect().
@@ -31,7 +32,7 @@ function makeData(n, perDay = 30) {
 }
 
 // Distinct calendar days across a set of entries — the expected .feed-day count.
-const distinctDays = (entries) => new Set(entries.map(e => e.date.slice(0, 10))).size;
+const distinctDays = (entries) => new Set(entries.map(e => dayOf(e.date))).size;
 
 const rows = () => [...document.querySelectorAll('#feed .feed-row')];
 const dayHeaders = () => [...document.querySelectorAll('#feed .feed-day')];
@@ -192,5 +193,63 @@ describe('renderFeed chip navigation', () => {
     document.querySelector('.proj-pill[data-target]').click();
     expect(navigate).toHaveBeenCalledOnce();
     expect(navigate).toHaveBeenCalledWith('explorer');
+  });
+});
+
+// jsdom has no layout, so we cannot assert pixel heights. We CAN pin the
+// call order that makes those heights correct: layoutRow must run on the
+// prepended rows before revealOlder reads scrollHeight for compensation.
+describe('revealOlder lays out before scroll compensation', () => {
+  let order;
+  let localRender;
+
+  beforeEach(async () => {
+    vi.resetModules();
+    ioInstances = [];
+    order = [];
+    globalThis.IntersectionObserver = FakeIntersectionObserver;
+    globalThis.ResizeObserver = NoopResizeObserver;
+    document.body.replaceChildren();
+    const feed = document.createElement('div');
+    feed.id = 'feed';
+    document.body.appendChild(feed);
+
+    vi.doMock('./feed-layout.js', () => ({
+      relayoutAll: () => { order.push('relayoutAll'); },
+      measureFeedMetrics: () => {
+        order.push('measure');
+        return { msgWidth: 80, font: '13px monospace' };
+      },
+      layoutRow: () => { order.push('layout'); },
+    }));
+
+    ({ renderFeed: localRender } = await import('./feed.js'));
+
+    let scrollTop = 0;
+    Object.defineProperty(feed, 'scrollTop', {
+      configurable: true,
+      get: () => scrollTop,
+      set: (v) => { order.push('scroll'); scrollTop = v; },
+    });
+    Object.defineProperty(feed, 'scrollHeight', {
+      configurable: true,
+      get: () => 1000,
+    });
+  });
+
+  afterEach(() => {
+    vi.doUnmock('./feed-layout.js');
+  });
+
+  it('calls layoutRow on prepended rows before adjusting scrollTop', () => {
+    localRender('activity', makeData(450), { immediate: true, navigate: () => {} });
+    const start = order.length;
+    ioInstances.at(-1).fire();
+    const reveal = order.slice(start);
+    const firstLayout = reveal.indexOf('layout');
+    const firstScroll = reveal.indexOf('scroll');
+    expect(firstLayout).toBeGreaterThanOrEqual(0);
+    expect(firstScroll).toBeGreaterThanOrEqual(0);
+    expect(firstLayout).toBeLessThan(firstScroll);
   });
 });

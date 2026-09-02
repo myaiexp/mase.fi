@@ -58,4 +58,13 @@ describe('dayLabel', () => {
     // local offset could roll it forward and mislabel the separator.
     expect(dayLabel('2026-06-27T23:59:59')).toBe('today \xb7 2026-06-27');
   });
+
+  it('does not throw on a malformed date (blanking the feed)', () => {
+    // dayLabel used to call parseEntryDate(date).toISOString(), which throws
+    // RangeError on Invalid Date and aborts renderFeed. A garbage stamp must
+    // still produce a string so one bad entry cannot blank the channel.
+    expect(() => dayLabel('2026-13-45T99:99')).not.toThrow();
+    expect(() => dayLabel('junkT12:34here')).not.toThrow();
+    expect(typeof dayLabel('not-a-date')).toBe('string');
+  });
 });

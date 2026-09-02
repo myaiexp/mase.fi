@@ -1,17 +1,34 @@
-// Entry-date parse/normalize and UTC-day bucketing for the feed
+// Entry-date parse/normalize, day/time accessors, and UTC-day bucketing
+
+const EPOCH = '1970-01-01T00:00';
+// Canonical stored shape from normalizeDate: "YYYY-MM-DDTHH:MM" (16 chars).
+// dayOf / timeOf are the only callers allowed to know these offsets.
+const STAMP_LEN = 16;
+const DAY_END = 10;     // YYYY-MM-DD
+const TIME_START = 11;  // skip the T
+const TIME_END = 16;    // HH:MM
 
 /**
  * Parse an entry date into a Date. Entry dates are wall-clock Finnish-server
  * strings with no zone marker, so the 'Z' makes the parse explicitly UTC rather
  * than viewer-local — otherwise the same entry would land on a different day
  * depending on who's reading. The input is normalizeDate's output shape
- * ("YYYY-MM-DDTHH:MM", no zone suffix); keep the two in step if that changes.
+ * ("YYYY-MM-DDTHH:MM", no zone suffix). dayOf / timeOf decode that shape;
+ * keep parseEntryDate, normalizeDate, dayOf, and timeOf in step if it changes.
  */
 export function parseEntryDate(d) {
   return new Date(d + 'Z');
 }
 
-const EPOCH = '1970-01-01T00:00';
+/** Calendar-day part ("YYYY-MM-DD") of a normalized entry date. */
+export function dayOf(dateStr) {
+  return String(dateStr ?? '').slice(0, DAY_END);
+}
+
+/** Wall-clock time part ("HH:MM") of a normalized entry date. */
+export function timeOf(dateStr) {
+  return String(dateStr ?? '').slice(TIME_START, TIME_END);
+}
 
 function pad2(n) {
   return String(n).padStart(2, '0');
@@ -24,10 +41,9 @@ function utcMinuteStamp(d) {
 
 /**
  * Normalize a date string to "YYYY-MM-DDTHH:MM". Always returns that shape so
- * parseEntryDate(d + 'Z') is a real Date — feed dayLabel calls toISOString()
- * on it, which throws on Invalid Date. The timestamp branch is start-anchored
+ * parseEntryDate(d + 'Z') is a real Date. The timestamp branch is start-anchored
  * and round-tripped: a Tdd:dd buried in junk, or a calendar that isn't a real
- * UTC instant (month 13, Feb 31), must not escape as a "date".
+ * UTC instant (month 13, Feb 30, T24:00), must not escape as a "date".
  */
 export function normalizeDate(s) {
   if (typeof s !== 'string') return EPOCH;
@@ -35,7 +51,7 @@ export function normalizeDate(s) {
   if (!s) return EPOCH;
   let candidate;
   if (/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}/.test(s)) {
-    candidate = s.slice(0, 16);
+    candidate = s.slice(0, STAMP_LEN);
   } else if (/^\d{4}-\d{2}-\d{2}$/.test(s)) {
     candidate = s + 'T00:00';
   } else {

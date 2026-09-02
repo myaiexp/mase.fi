@@ -31,6 +31,15 @@ if [ "$CATEGORY" != "project" ] && [ "$CATEGORY" != "feature" ]; then
   exit 1
 fi
 
+if [[ ! "$DATE" =~ ^[0-9]{4}-[0-9]{2}-[0-9]{2}$ ]]; then
+  echo "Error: date must be YYYY-MM-DD (got '$DATE')" >&2
+  exit 1
+fi
+if [ "$(date -d "$DATE" +%Y-%m-%d 2>/dev/null)" != "$DATE" ]; then
+  echo "Error: date is not a valid calendar day (got '$DATE')" >&2
+  exit 1
+fi
+
 if [ "$CATEGORY" = "project" ]; then
   STICKY_LIMIT=2
 else
