@@ -110,3 +110,85 @@ describe('ensure_updates_lock — O_NOFOLLOW, no truncate', () => {
     expect(lstatSync(lock).isSymbolicLink()).toBe(true);
   });
 });
+
+// source updates-write.sh and call with_updates_lock <target> <label> <fn>
+function withLock(target, transformBody, { label = 'test-label', lock } = {}) {
+  const lockPath = lock || join(dir, 'updates.json.lock');
+  const script = `
+    set -e
+    source "${join(SCRIPTS_DIR, 'updates-write.sh')}"
+    UPDATES_JSON_LOCK="$3"
+    _xform() { ${transformBody}
+    }
+    with_updates_lock "$1" "$2" _xform
+  `;
+  return spawnSync('bash', ['-c', script, '--', target, label, lockPath], {
+    encoding: 'utf8',
+  });
+}
+
+describe('with_updates_lock — locked read-modify-write', () => {
+  it('applies the transform and installs the candidate', () => {
+    const target = join(dir, 'updates.json');
+    writeFileSync(target, JSON.stringify({ entries: [], projects: [] }));
+    const r = withLock(target, 'jq \'.entries += [{"text":"x"}]\' "$1" > "$2"');
+    expect(r.status).toBe(0);
+    expect(JSON.parse(readFileSync(target, 'utf8')).entries).toEqual([{ text: 'x' }]);
+  });
+
+  it('skips the write when the transform returns 2', () => {
+    const target = join(dir, 'updates.json');
+    writeFileSync(target, JSON.stringify({ entries: [{ text: 'keep' }], projects: [] }));
+    const before = readFileSync(target, 'utf8');
+    const r = withLock(target, 'echo "appeared during the run"; return 2');
+    expect(r.status).toBe(0);
+    expect(r.stdout).toMatch(/appeared during the run/);
+    expect(readFileSync(target, 'utf8')).toBe(before);
+  });
+
+  it('refuses a malformed target without touching it', () => {
+    const target = join(dir, 'updates.json');
+    writeFileSync(target, '{ not json');
+    const before = readFileSync(target, 'utf8');
+    const r = withLock(target, 'jq . "$1" > "$2"');
+    expect(r.status).not.toBe(0);
+    expect(r.stderr).toMatch(/malformed JSON/i);
+    expect(r.stderr).toMatch(/test-label/);
+    expect(readFileSync(target, 'utf8')).toBe(before);
+  });
+
+  it('does not write when the transform fails', () => {
+    const target = join(dir, 'updates.json');
+    writeFileSync(target, JSON.stringify({ entries: [], projects: [] }));
+    const before = readFileSync(target, 'utf8');
+    const r = withLock(target, 'echo "transform blew up" >&2; return 1');
+    expect(r.status).not.toBe(0);
+    expect(r.stderr).toMatch(/failed to write/i);
+    expect(readFileSync(target, 'utf8')).toBe(before);
+  });
+
+  it('does not truncate an existing lock file (9>> not 9>)', () => {
+    const target = join(dir, 'updates.json');
+    const lock = join(dir, 'updates.json.lock');
+    writeFileSync(target, JSON.stringify({ entries: [], projects: [] }));
+    writeFileSync(lock, 'sentinel-bytes');
+    const r = withLock(target, 'jq . "$1" > "$2"', { lock });
+    expect(r.status).toBe(0);
+    expect(readFileSync(lock, 'utf8')).toContain('sentinel-bytes');
+  });
+
+  it('refuses a symlink lock path and leaves the victim intact', () => {
+    const target = join(dir, 'updates.json');
+    const victim = join(dir, 'victim');
+    const lock = join(dir, 'updates.json.lock');
+    writeFileSync(target, JSON.stringify({ entries: [], projects: [] }));
+    writeFileSync(victim, 'do-not-clobber');
+    symlinkSync(victim, lock);
+    const r = withLock(target, 'jq . "$1" > "$2"', { lock });
+    expect(r.status).not.toBe(0);
+    expect(r.stderr).toMatch(/lock (open failed|unusable|not owned)/i);
+    expect(readFileSync(victim, 'utf8')).toBe('do-not-clobber');
+    expect(JSON.parse(readFileSync(target, 'utf8')).entries).toEqual([]);
+  });
+});
+

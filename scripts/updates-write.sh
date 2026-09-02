@@ -2,8 +2,9 @@
 # Shared writer for the site-served /var/www/html/updates.json.
 #
 # Sourced by the three mase.fi writers — mase-fi-update, mase-fi-daily-summary,
-# mase-fi-projects. Each acquires the shared flock around its own read-modify-write
-# and calls write_updates_json for the final validate + install step.
+# mase-fi-projects. with_updates_lock owns the locked read-modify-write; each
+# writer supplies only its transform. write_updates_json is the final validate
+# + install step (also used if a caller already holds the lock).
 #
 # Lock path is shared with helm/scripts/deploy's commit-logger. It stays at the
 # well-known /tmp name so sudo -u mase (no XDG_RUNTIME_DIR) and a session deploy
@@ -16,9 +17,9 @@
 UPDATES_JSON_LOCK="${UPDATES_LOCK:-/tmp/mase-updates-json.lock}"
 
 # Create/open $UPDATES_JSON_LOCK with O_NOFOLLOW|O_APPEND|O_CREAT. Bash redirects
-# cannot set O_NOFOLLOW, so a tiny python helper does the open; the caller's
-# `) 9>>"$UPDATES_JSON_LOCK"` then flocks the regular file. Fails loud if the
-# path is a symlink, not owned by us, or otherwise unusable.
+# cannot set O_NOFOLLOW, so a tiny python helper does the open; with_updates_lock
+# then flocks the regular file via `) 9>>`. Fails loud if the path is a symlink,
+# not owned by us, or otherwise unusable.
 ensure_updates_lock() {
   python3 -c '
 import os, stat, sys
@@ -61,6 +62,57 @@ finally:
 #
 #   Returns non-zero WITHOUT touching the target if the candidate is invalid, so a
 #   caller's `&&` chain / set -e aborts loudly instead of shipping garbage.
+
+# with_updates_lock <target> <error-label> <transform-fn>
+#
+#   Locked read-modify-write of <target>. <transform-fn> is a bash function
+#   invoked as `<transform-fn> <src> <dest>` and must write a JSON candidate
+#   to <dest>. Return codes from the transform:
+#     0  install dest via write_updates_json
+#     2  skip (no write; success) — daily-summary's in-lock idempotency re-check
+#     *  fail (no write)
+#
+#   Owns ensure_updates_lock, flock -w 30 on fd 9, the jq-empty validity gate,
+#   mktemp/rm of the candidate, and write_updates_json. Callers supply only
+#   the transform so the 9>> vs 9> choice, the 30s timeout, and the in-lock
+#   gate cannot drift across writers. 9>> is O_APPEND, never O_TRUNC.
+with_updates_lock() {
+  local target="$1" label="$2" transform="$3"
+  if ! declare -F "$transform" >/dev/null 2>&1; then
+    echo "with_updates_lock: '$transform' is not a function" >&2
+    return 1
+  fi
+  ensure_updates_lock || {
+    echo "updates.json lock unusable — $label" >&2
+    return 1
+  }
+  (
+    flock -w 30 9 || {
+      echo "updates.json lock busy >30s — $label" >&2
+      exit 1
+    }
+    if ! jq empty "$target" 2>/dev/null; then
+      echo "$target is malformed JSON — $label" >&2
+      exit 1
+    fi
+    tmp="$(mktemp)" || exit 1
+    trap 'rm -f "$tmp"' EXIT
+    rc=0
+    "$transform" "$target" "$tmp" || rc=$?
+    if [[ $rc -eq 2 ]]; then
+      exit 0
+    fi
+    if [[ $rc -ne 0 ]]; then
+      echo "failed to write $target — $label" >&2
+      exit 1
+    fi
+    write_updates_json "$tmp" "$target" || {
+      echo "failed to write $target — $label" >&2
+      exit 1
+    }
+  ) 9>>"$UPDATES_JSON_LOCK"
+}
+
 write_updates_json() {
   local candidate="$1" target="$2"
   if ! jq empty "$candidate" 2>/dev/null; then

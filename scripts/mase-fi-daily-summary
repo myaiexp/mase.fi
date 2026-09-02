@@ -38,7 +38,6 @@ WORK_DIR="$(mktemp -d)"
 GROUPS_JSON="$WORK_DIR/groups.json"
 ENTRIES="$WORK_DIR/entries.json"
 ENTRIES_TMP="$WORK_DIR/entries.tmp.json"
-UPD_TMP="$WORK_DIR/updates.tmp.json"
 
 # Best-effort ntfy push, isolated in a subshell so `set +e` and any failing
 # command here can't propagate into the script's `set -e`. Token from $NTFY_TOKEN
@@ -279,30 +278,19 @@ for i in $(jq -r 'range(length)' "$GROUPS_JSON"); do
     done <<< "$summaries"
 done
 
-# Prepend today's daily entries to the entries array. Serialize against the other
-# updates.json writers (mase-fi-update, deploy's commit logger, mase-fi-projects)
-# via the shared flock, and re-check idempotency inside the lock so two racing
-# runs can't both prepend today's batch. write_updates_json installs atomically
-# when it can, else in-place under the lock (see updates-write.sh).
-# 9>> not 9>: O_APPEND, no truncate through a symlink.
-ensure_updates_lock || { echo "updates.json lock unusable — daily entries not written" >&2; exit 1; }
-(
-  flock -w 30 9 || { echo "updates.json lock busy >30s — daily entries not written" >&2; exit 1; }
-  if ! jq empty "$UPDATES_FILE" 2>/dev/null; then
-    echo "$UPDATES_FILE is malformed JSON — refusing to write daily entries" >&2
-    exit 1
-  fi
-  already=$(jq --arg date "$TODAY" '[.entries[] | select(.category == "daily" and .date == $date)] | length' "$UPDATES_FILE")
+# Prepend today's daily entries. Re-check idempotency inside the lock so two
+# racing runs can't both prepend today's batch (with_updates_lock in updates-write.sh).
+prepend_dailies() {
+  already=$(jq --arg date "$TODAY" '[.entries[] | select(.category == "daily" and .date == $date)] | length' "$1")
   if [[ "$already" -gt 0 ]]; then
     echo "Daily entries for $TODAY appeared during the run — skipping write"
-    exit 0
+    return 2
   fi
   jq --slurpfile daily "$ENTRIES" '
     .entries = ($daily[0] + .entries)
-  ' "$UPDATES_FILE" > "$UPD_TMP" \
-  && write_updates_json "$UPD_TMP" "$UPDATES_FILE" \
-  || { echo "failed to write daily entries to $UPDATES_FILE" >&2; exit 1; }
-) 9>>"$UPDATES_JSON_LOCK"
+  ' "$1" > "$2"
+}
+with_updates_lock "$UPDATES_FILE" "daily entries not written" prepend_dailies
 
 DAILY_COUNT=$(jq --arg date "$TODAY" '[.entries[] | select(.category == "daily" and .date == $date)] | length' "$UPDATES_FILE")
 echo "Created $DAILY_COUNT daily summary entries for $TODAY"
