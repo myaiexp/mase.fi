@@ -38,7 +38,9 @@ export function destructionAt(charX, beamX) {
   return 1;
 }
 
-function paintChar(span, original, dest) {
+// Exported for unit testing — the bucket cache is the cheap invariant worth
+// pinning (same-bucket dest must not rewrite textContent).
+export function paintChar(span, original, dest) {
   // Bucket the destruction value so we only mutate textContent when state changes.
   let bucket;
   if (dest < 0.08)       bucket = 0; // pristine

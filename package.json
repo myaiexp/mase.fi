@@ -9,11 +9,13 @@
     "build": "build-lock vite build && cp src/base.css dist/base.css && pnpm run build:components",
     "preview": "vite preview",
     "test": "vitest run",
+    "test:coverage": "vitest run --coverage",
     "build:components": "build-lock vite build --config vite.components.config.js",
-    "lint": "eslint src/"
+    "lint": "eslint src/ scripts/"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
+    "@vitest/coverage-v8": "^4.1.8",
     "eslint": "^10.9.1",
     "jsdom": "^29.1.1",
     "vite": "^7.3.6",

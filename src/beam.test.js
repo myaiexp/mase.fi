@@ -1,7 +1,16 @@
 // @vitest-environment jsdom
-// Unit tests for beam.js destructionAt() — the pure destruction-progress curve.
-import { describe, it, expect } from 'vitest';
-import { destructionAt } from './beam.js';
+// Unit tests for beam.js: destructionAt() (pure curve), paintChar() (bucket
+// cache — the cheap DOM-write invariant), and mountBeam() (reduced-motion
+// fast-path + the single-active-beam singleton).
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
+import { destructionAt, paintChar, mountBeam } from './beam.js';
+
+// Keep measurement off the canvas: mountBeam only needs a positive charWidth
+// to enter the animated path, and jsdom's measureText is not a contract we pin.
+vi.mock('@chenglou/pretext', () => ({
+  prepareWithSegments: (text) => text,
+  measureNaturalWidth: (prepared) => String(prepared).length * 8,
+}));
 
 // Module-private constants, mirrored here so the boundary inputs are legible.
 // d = beamX - charX, so for a target d we pick charX = beamX - d (beamX fixed).
@@ -59,5 +68,123 @@ describe('destructionAt', () => {
       expect(v).toBeGreaterThanOrEqual(prev);
       prev = v;
     }
+  });
+});
+
+// Drain MutationObserver records synchronously — paintChar either assigns
+// textContent/className or it doesn't, and takeRecords() sees that without
+// waiting on a microtask.
+function mutationsDuring(el, fn) {
+  const obs = new MutationObserver(() => {});
+  obs.observe(el, { childList: true, characterData: true, subtree: true, attributes: true });
+  fn();
+  const records = obs.takeRecords();
+  obs.disconnect();
+  return records;
+}
+
+describe('paintChar', () => {
+  it('does not rewrite textContent when dest stays inside the same peak bucket', () => {
+    const span = document.createElement('span');
+    paintChar(span, 'A', 0.50); // bucket 2 (peak)
+    expect(span.textContent).toBe('█');
+
+    const records = mutationsDuring(span, () => {
+      paintChar(span, 'A', 0.55);
+      paintChar(span, 'A', 0.69);
+    });
+    expect(records).toHaveLength(0);
+    expect(span.textContent).toBe('█');
+  });
+
+  it('does not rewrite textContent when dest stays inside the same decay sub-bucket', () => {
+    const span = document.createElement('span');
+    // dest 0.71 and 0.75 both map to DECAY_RAMP[0] ('▓') — same sub-bucket.
+    paintChar(span, 'A', 0.71);
+    expect(span.textContent).toBe('▓');
+
+    const records = mutationsDuring(span, () => {
+      paintChar(span, 'A', 0.75);
+    });
+    expect(records).toHaveLength(0);
+    expect(span.textContent).toBe('▓');
+  });
+
+  it('does rewrite when dest crosses into a new bucket', () => {
+    const span = document.createElement('span');
+    paintChar(span, 'A', 0.50); // peak → █
+    const records = mutationsDuring(span, () => {
+      paintChar(span, 'A', 0.90); // decay
+    });
+    expect(records.length).toBeGreaterThan(0);
+    expect(span.textContent).not.toBe('█');
+  });
+});
+
+// jsdom does not implement matchMedia; bare matchMedia(...) would ReferenceError.
+function stubReducedMotion(matches) {
+  vi.stubGlobal('matchMedia', (query) => ({ matches, media: query }));
+}
+
+function makeHost() {
+  const el = document.createElement('div');
+  el.className = 'ascii';
+  document.body.appendChild(el);
+  // jsdom does not compute layout, so offsetParent is null unless we pin it.
+  Object.defineProperty(el, 'offsetParent', {
+    configurable: true,
+    get: () => document.body,
+  });
+  return el;
+}
+
+describe('mountBeam', () => {
+  beforeEach(() => {
+    vi.useFakeTimers();
+  });
+
+  afterEach(() => {
+    // Public-API teardown: a reduced-motion remount runs activeCleanup first.
+    stubReducedMotion(true);
+    mountBeam(document.createElement('div'), '');
+    vi.clearAllTimers();
+    vi.useRealTimers();
+    vi.unstubAllGlobals();
+    document.body.replaceChildren();
+  });
+
+  it('under reduced-motion sets textContent and returns without scheduling', () => {
+    stubReducedMotion(true);
+    const host = makeHost();
+    const result = mountBeam(host, 'LOGO');
+
+    expect(host.textContent).toBe('LOGO');
+    expect(result).toBeNull();
+    expect(host.classList.contains('beam-host')).toBe(false);
+    expect(vi.getTimerCount()).toBe(0);
+  });
+
+  it('a second mount on a different host leaves exactly one loop alive', () => {
+    stubReducedMotion(false);
+    const a = makeHost();
+    const b = makeHost();
+    const logo = 'AB';
+
+    mountBeam(a, logo);
+    expect(a.classList.contains('beam-host')).toBe(true);
+    expect(vi.getTimerCount()).toBe(1);
+
+    mountBeam(b, logo);
+    // First host restored; its timeout cancelled; only B's loop is scheduled.
+    expect(a.classList.contains('beam-host')).toBe(false);
+    expect(a.textContent).toBe(logo);
+    expect(a.querySelector('.ascii-beam')).toBeNull();
+    expect(b.classList.contains('beam-host')).toBe(true);
+    expect(vi.getTimerCount()).toBe(1);
+
+    const frozen = a.textContent;
+    vi.advanceTimersByTime(10_000);
+    expect(a.textContent).toBe(frozen);
+    expect(b.classList.contains('beam-host')).toBe(true);
   });
 });
