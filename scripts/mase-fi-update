@@ -10,7 +10,7 @@ usage() {
   echo "  category:  project | feature"
   echo "  project:   project name (e.g., tracker, wander)"
   echo "  text:      update description"
-  echo "  date:      optional, YYYY-MM-DD (defaults to today)"
+  echo "  date:      optional, YYYY-MM-DD (defaults to today, Europe/Helsinki)"
   exit 1
 }
 
@@ -21,7 +21,7 @@ fi
 CATEGORY="$1"
 PROJECT="$2"
 TEXT="$3"
-DATE="${4:-$(date +%Y-%m-%d)}"
+DATE="${4:-$(TZ="Europe/Helsinki" date +%Y-%m-%d)}"
 # Env-overridable (like mase-fi-daily-summary / mase-fi-projects) so the writer can
 # be exercised against a throwaway file in tests instead of the live prod webroot.
 UPDATES_FILE="${UPDATES_FILE:-/var/www/html/updates.json}"

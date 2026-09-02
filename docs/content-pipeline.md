@@ -7,7 +7,7 @@ The homepage's datastore is one JSON file. Three scripts in this repo, plus helm
 - Production file: `/var/www/html/updates.json` (default `UPDATES_FILE` in every writer)
 - Served by nginx from the webroot; the client fetches `/updates.json` (`SOURCE_URL` in `src/data.js`)
 - Shape: `{"entries": [...], "projects": [...]}` — one fetch provides both arrays
-- Dates are ISO in JSON; the client formats Finnish DD.MM
+- Dates are ISO in JSON; the client formats Finnish DD.MM. Writers that default "today" use `Europe/Helsinki` (the VPS is UTC).
 - `UPDATES_FILE` is overridable so writers can be exercised against a throwaway file (`UPDATES_FILE=/tmp/x.json mase-fi-update feature wander "…"`)
 
 Local `pnpm dev` reads `/updates.json` from Vite's `public/` dir. There is no `public/` in the checkout — drop a gitignored fixture at `public/updates.json` or the app degrades to `projects: [], entries: []`. See CLAUDE.md Deploy.
@@ -57,7 +57,7 @@ Routed by `entry.category`:
 
 ### Feature / project entries — `scripts/mase-fi-update`
 
-Manual `project`/`feature` entries. Sticky capacity enforced server-side via `jq` (2 `project` entries, 3 `feature` entries).
+Manual `project`/`feature` entries. Sticky capacity enforced server-side via `jq` (2 `project` entries, 3 `feature` entries). Omitted date defaults to today in `Europe/Helsinki` (`TZ="Europe/Helsinki" date +%Y-%m-%d`), matching daily-summary.
 
 On the laptop/desktop, `mase-fi-update` is a **machine-configs wrapper** (`.local/bin/mase-fi-update`, synced by `config-sync`) that SSHes to the VPS and runs `scripts/mase-fi-update` via `sudo -n -u mase` — `Host vps` logs in as root there, and the writer must run as mase (root can't take the mase-owned flock under `fs.protected_regular`). The wrapper forwards `UPDATES_FILE`, so `UPDATES_FILE=/tmp/x.json mase-fi-update feature wander "…"` exercises the whole chain against a throwaway file; a "broken on the laptop" report starts with that wrapper, not this script.
 

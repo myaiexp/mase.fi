@@ -6,7 +6,7 @@ import { join } from 'node:path';
 import { writeFileSync } from 'node:fs';
 import { makeTempDir, cleanup, writeJson, readJson, runScript, todayHelsinki, writeClaudeStub } from './test-helpers.js';
 
-const TODAY = todayHelsinki();
+let TODAY;
 let dir, file, extraFile;
 
 const seed = (entries) => writeJson(file, { entries, projects: [] });
@@ -26,6 +26,9 @@ const baseEnv = () => ({
 const run = (env = {}) => runScript('mase-fi-daily-summary', [], { ...baseEnv(), ...env });
 
 beforeEach(() => {
+  // Capture per-test, not at module load — a file that straddles Helsinki
+  // midnight would otherwise seed yesterday into a script computing today.
+  TODAY = todayHelsinki();
   dir = makeTempDir();
   file = join(dir, 'updates.json');
   extraFile = join(dir, 'extra.json');

@@ -14,7 +14,7 @@
 
 ## Content Management
 
-Store is `/var/www/html/updates.json`, served and fetched as `/updates.json`. Shape: `{"entries": [...], "projects": [...]}` — one fetch provides both arrays. Dates are ISO in JSON, Finnish DD.MM client-side.
+Store is `/var/www/html/updates.json`, served and fetched as `/updates.json`. Shape: `{"entries": [...], "projects": [...]}` — one fetch provides both arrays. Dates are ISO in JSON, Finnish DD.MM client-side. Writers default omitted dates to today in `Europe/Helsinki`.
 
 - **Categories → channels:** `daily` → `#home`, `log` → `#activity`, `feature`/`project` → per-project channel
 - **Channel mapping:** `entry.project` (slug) is matched case-insensitively against `project.slug`, falling back to `project.channel`

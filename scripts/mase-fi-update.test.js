@@ -38,9 +38,12 @@ describe('mase-fi-update — write + prepend', () => {
     expect(readJson(file).entries.every((e) => e.sticky === true)).toBe(true);
   });
 
-  it('defaults the date to today when omitted', () => {
+  it('defaults the date to Helsinki today, ignoring host TZ', () => {
     seed();
-    update(['feature', 'p', 'no-date-given']);
+    // Hostile TZ: the script must not inherit the host calendar. Helsinki is
+    // the site's date, matching mase-fi-daily-summary. runScript also pins
+    // Helsinki by default; this override proves the script itself is pinned.
+    update(['feature', 'p', 'no-date-given'], { TZ: 'Pacific/Kiritimati' });
     expect(readJson(file).entries[0].date).toBe(todayHelsinki());
   });
 

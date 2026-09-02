@@ -32,7 +32,12 @@ export function readJson(file) {
 // { status, stdout, stderr } for both success and non-zero exits so tests can
 // assert on the refusal paths (malformed JSON, bad category, lock busy).
 export function runScript(name, args = [], env = {}) {
-  const merged = { ...process.env, ...env };
+  // Pin Helsinki unless the caller overrides TZ. Both pipeline scripts that
+  // compute "today" also force it internally; this keeps fixtures, helpers,
+  // and any future date call on the same calendar even if a host TZ leaks in
+  // (e.g. `TZ=Pacific/Kiritimati vitest`). Only an explicit per-call env.TZ
+  // wins over the pin.
+  const merged = { ...process.env, TZ: 'Europe/Helsinki', ...env };
   // Don't flock the live /tmp/mase-updates-json.lock from tests — a concurrent
   // deploy would wait on us, and we would wait on it.
   if (!merged.UPDATES_LOCK) {
@@ -45,9 +50,10 @@ export function runScript(name, args = [], env = {}) {
   return { status: r.status, stdout: r.stdout ?? '', stderr: r.stderr ?? '' };
 }
 
-// The exact date string the scripts use for "today" (mase-fi-daily-summary keys
-// idempotency + grouping on `TZ="Europe/Helsinki" date +%Y-%m-%d`). Shell out so
-// there is zero chance of TZ drift between the fixture and the script.
+// The exact date string the scripts use for "today" (both force
+// `TZ="Europe/Helsinki" date +%Y-%m-%d`; runScript pins the same TZ so a
+// fixture seeded before spawn cannot drift). Shell out so there is zero chance
+// of TZ drift between the fixture and the script.
 export function todayHelsinki() {
   const r = spawnSync('date', ['+%Y-%m-%d'], {
     env: { ...process.env, TZ: 'Europe/Helsinki' },
