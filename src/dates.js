@@ -11,17 +11,39 @@ export function parseEntryDate(d) {
   return new Date(d + 'Z');
 }
 
-/** Normalize a date string to "YYYY-MM-DDTHH:MM" form used by the UI. */
+const EPOCH = '1970-01-01T00:00';
+
+function pad2(n) {
+  return String(n).padStart(2, '0');
+}
+
+/** UTC calendar stamp matching normalizeDate's output shape. */
+function utcMinuteStamp(d) {
+  return `${String(d.getUTCFullYear()).padStart(4, '0')}-${pad2(d.getUTCMonth() + 1)}-${pad2(d.getUTCDate())}T${pad2(d.getUTCHours())}:${pad2(d.getUTCMinutes())}`;
+}
+
+/**
+ * Normalize a date string to "YYYY-MM-DDTHH:MM". Always returns that shape so
+ * parseEntryDate(d + 'Z') is a real Date — feed dayLabel calls toISOString()
+ * on it, which throws on Invalid Date. The timestamp branch is start-anchored
+ * and round-tripped: a Tdd:dd buried in junk, or a calendar that isn't a real
+ * UTC instant (month 13, Feb 31), must not escape as a "date".
+ */
 export function normalizeDate(s) {
-  if (!s || typeof s !== 'string') return '1970-01-01T00:00';
-  // Already has time component
-  if (/T\d{2}:\d{2}/.test(s)) return s.slice(0, 16);
-  // Bare YYYY-MM-DD → append T00:00
-  if (/^\d{4}-\d{2}-\d{2}$/.test(s)) return s + 'T00:00';
-  // Anything else is malformed: don't let unbounded/garbage strings reach e.date
-  // (downstream renderers slice and inject it into innerHTML). Bound to the epoch
-  // fallback so the function always returns a known, ASCII-only date string.
-  return '1970-01-01T00:00';
+  if (typeof s !== 'string') return EPOCH;
+  s = s.trim();
+  if (!s) return EPOCH;
+  let candidate;
+  if (/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}/.test(s)) {
+    candidate = s.slice(0, 16);
+  } else if (/^\d{4}-\d{2}-\d{2}$/.test(s)) {
+    candidate = s + 'T00:00';
+  } else {
+    return EPOCH;
+  }
+  const parsed = new Date(candidate + 'Z');
+  if (Number.isNaN(parsed.getTime())) return EPOCH;
+  return utcMinuteStamp(parsed) === candidate ? candidate : EPOCH;
 }
 
 /**

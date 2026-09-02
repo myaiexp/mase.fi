@@ -1,6 +1,6 @@
 // Unit tests for the data adapter (fetch + normalize + channel routing/bucketing).
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { fetchData, fetchDemos, entriesFor, logStats, parseEntryDate } from './data.js';
+import { fetchData, fetchDemos, entriesFor, logStats } from './data.js';
 
 // ---- helpers -------------------------------------------------------------
 
@@ -371,65 +371,24 @@ describe('fetchData project links', () => {
   });
 });
 
-// ---- normalizeDate (via fetchData) ---------------------------------------
-// normalizeDate is module-private (not exported), so it's exercised through its
-// only caller: fetchData maps each entry's raw date through it into entry.date.
-// These pin every branch of the normalizer by asserting the resulting .date.
+// ---- fetchData date routing ----------------------------------------------
+// Contract tests for normalizeDate / parseEntryDate / utcDayStart live in
+// dates.test.js. These only pin that fetchData runs each raw entry.date
+// through the normalizer into the UI-shaped entry.
 
-describe('fetchData date normalization (normalizeDate)', () => {
-  // Push one daily entry (no project → routes to #home regardless of date) and
-  // read back the normalized date fetchData produced.
+describe('fetchData date normalization', () => {
   async function dateOf(rawDate) {
     stubFetch({ projects: [], entries: [{ category: 'daily', date: rawDate, text: 't' }] });
     const data = await fetchData();
     return data.entries[0].date;
   }
 
-  it('appends T00:00 to a bare YYYY-MM-DD date', async () => {
+  it('runs a bare YYYY-MM-DD through normalizeDate', async () => {
     expect(await dateOf('2026-01-01')).toBe('2026-01-01T00:00');
   });
 
-  it('truncates a full ISO timestamp to minute precision (YYYY-MM-DDTHH:MM)', async () => {
+  it('runs a full ISO timestamp through normalizeDate', async () => {
     expect(await dateOf('2026-01-01T08:30:45.123Z')).toBe('2026-01-01T08:30');
-  });
-
-  it('leaves an already-minute-precision timestamp unchanged', async () => {
-    expect(await dateOf('2026-01-01T08:30')).toBe('2026-01-01T08:30');
-  });
-
-  it('falls back to the epoch for an empty/missing date', async () => {
-    expect(await dateOf('')).toBe('1970-01-01T00:00');
-  });
-
-  it('bounds an unrecognized date format to the epoch fallback', async () => {
-    expect(await dateOf('01/02/2026')).toBe('1970-01-01T00:00');
-  });
-
-  it('bounds an oversized/garbage date string to the epoch fallback', async () => {
-    expect(await dateOf('"><script>alert(1)</script>'.repeat(20))).toBe('1970-01-01T00:00');
-  });
-
-  it('round-trips through parseEntryDate: normalized output parses as UTC', async () => {
-    // The contract that couples the two helpers — normalizeDate's output shape is
-    // exactly what parseEntryDate accepts. Change one and this test fails.
-    expect(parseEntryDate(await dateOf('2026-01-01T08:30')).toISOString())
-      .toBe('2026-01-01T08:30:00.000Z');
-  });
-});
-
-// ---- parseEntryDate -------------------------------------------------------
-
-describe('parseEntryDate', () => {
-  it('parses a normalized entry date as UTC, not viewer-local', () => {
-    expect(parseEntryDate('2026-01-01T08:30').toISOString()).toBe('2026-01-01T08:30:00.000Z');
-  });
-
-  it('parses the epoch fallback to time zero', () => {
-    expect(parseEntryDate('1970-01-01T00:00').getTime()).toBe(0);
-  });
-
-  it('treats midnight as the same UTC day (no off-by-one day shift)', () => {
-    expect(parseEntryDate('2026-01-01T00:00').toISOString().slice(0, 10)).toBe('2026-01-01');
   });
 });
 
