@@ -23,13 +23,13 @@ function demoLinkHtml(channel, demos, { arrow = false } = {}) {
     (arrow ? ' →' : '') + '</a>';
 }
 
-function cardHead(meta, right) {
+export function cardHead(meta, right) {
   const chips = meta
-    .map(([k, v]) => '<span class="ch-meta"><i>' + k + '</i><b>' + v + '</b></span>')
+    .map(([k, v]) => '<span class="ch-meta"><i>' + escapeHtml(k) + '</i><b>' + escapeHtml(v) + '</b></span>')
     .join('');
   return '<div class="card-head">' + chips +
     '<span class="spacer"></span>' +
-    '<span class="right">' + (right || '') + '</span>' +
+    '<span class="right">' + escapeHtml(right || '') + '</span>' +
     '</div>';
 }
 

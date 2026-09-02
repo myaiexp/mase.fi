@@ -67,9 +67,21 @@ export function todayHelsinki() {
 // call so the daily-summary fallback path can be exercised.
 export function writeClaudeStub(dir, { output = '', exitCode = 0 } = {}) {
   const path = join(dir, 'claude-stub');
-  // Ignore args (-p "<prompt>" --model sonnet); emit canned output, then exit.
-  const body = `#!/usr/bin/env bash\ncat <<'STUB_EOF'\n${output}\nSTUB_EOF\nexit ${exitCode}\n`;
+  // Record argv (NUL-separated) so tests can assert flags like --tools ""; then
+  // emit canned output and exit. The live binary is never invoked.
+  const argvFile = join(dir, 'claude-argv');
+  const body = `#!/usr/bin/env bash
+printf '%s\\0' "$@" > ${JSON.stringify(argvFile)}
+cat <<'STUB_EOF'
+${output}
+STUB_EOF
+exit ${exitCode}
+`;
   writeFileSync(path, body);
   chmodSync(path, 0o755);
   return path;
+}
+
+export function readClaudeArgv(dir) {
+  return readFileSync(join(dir, 'claude-argv'), 'utf8').split('\0');
 }

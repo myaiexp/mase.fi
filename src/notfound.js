@@ -133,3 +133,37 @@ export function reasonFor(cand) {
   if (cand.distance === 2) return '2 chars off';
   return 'fuzzy';
 }
+
+// Resolve `raw` against `origin` and return pathname+search only when the
+// result stays on that origin. Prefix-blacklisting `//` is not enough:
+// WHATWG's relative-slash state treats `\` like `/`, so `/\evil.com` (and
+// `//evil.com`, `\\evil.com`) parse as an off-origin URL. Empty/non-string
+// input is rejected rather than collapsing to `/`.
+export function sameOriginPath(raw, origin) {
+  if (typeof raw !== 'string' || raw.length === 0) return null;
+  try {
+    const base = new URL(origin);
+    const u = new URL(raw, origin);
+    if (u.origin !== base.origin) return null;
+    return u.pathname + u.search;
+  } catch {
+    return null;
+  }
+}
+
+// Navigation-sink guard for the 404 auto-redirect. Same-origin paths are
+// fine; so are http(s) URLs on mase.fi / *.mase.fi (buildRoutes' "moved to
+// a subdomain" targets). Everything else — scheme-relative, backslash,
+// javascript:, foreign hosts, `mase.fi.evil.com` — is refused.
+export function isSafeRedirect(target, origin) {
+  if (typeof target !== 'string' || target.length === 0) return false;
+  try {
+    const base = new URL(origin);
+    const u = new URL(target, origin);
+    if (u.origin === base.origin) return true;
+    if (u.protocol !== 'http:' && u.protocol !== 'https:') return false;
+    return u.hostname === 'mase.fi' || u.hostname.endsWith('.mase.fi');
+  } catch {
+    return false;
+  }
+}

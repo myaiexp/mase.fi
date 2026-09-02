@@ -2,7 +2,7 @@
 // Pure matching logic lives in notfound.js. Served as /404.html via nginx error_page,
 // so location.pathname is the path the visitor actually typed — except when the page
 // is opened as /404.html itself, where ?p=/some/path previews a typed path.
-import { parentPrefixes, isJunkPath, buildRoutes, fuzzyCandidates, decide, reasonFor } from './notfound.js';
+import { parentPrefixes, isJunkPath, buildRoutes, fuzzyCandidates, decide, reasonFor, sameOriginPath, isSafeRedirect } from './notfound.js';
 
 const $ = (id) => document.getElementById(id);
 const reducedMotion = matchMedia('(prefers-reduced-motion: reduce)').matches;
@@ -12,9 +12,14 @@ const PATH_CLAMP = 160;
 function effectivePath() {
   if (isPreview) {
     const p = new URLSearchParams(location.search).get('p');
-    if (p && p.startsWith('/') && !p.startsWith('//')) return p;
+    const safe = sameOriginPath(p, location.origin);
+    if (safe) return safe;
   }
   return location.pathname;
+}
+
+function safeHref(target) {
+  return isSafeRedirect(target, location.origin) ? target : '/';
 }
 
 async function probeHead(url, ms = 1500) {
@@ -32,6 +37,7 @@ async function probeHead(url, ms = 1500) {
 // Longest-first: the deepest surviving parent is the confident target.
 async function probePrefixes(path) {
   for (const prefix of parentPrefixes(path)) {
+    if (!sameOriginPath(prefix, location.origin)) continue;
     const res = await probeHead(prefix);
     if (res && res.ok) return prefix;
   }
@@ -95,7 +101,7 @@ function setHints(desktop, mobile) {
 function suggestionLink(plan) {
   const a = document.createElement('a');
   a.className = 'big';
-  a.href = plan.target;
+  a.href = safeHref(plan.target);
   const arr = Object.assign(document.createElement('span'), { className: 'arr', textContent: '→' });
   const u = Object.assign(document.createElement('span'), { className: 'bu', textContent: plan.targetLabel });
   a.append(arr, u);
@@ -134,7 +140,7 @@ function renderFuzzy(path, candidates) {
   candidates.forEach((c, i) => {
     const a = document.createElement('a');
     a.className = i === 0 ? 'cand first' : 'cand';
-    a.href = c.route.href;
+    a.href = safeHref(c.route.href);
     a.append(Object.assign(document.createElement('span'), { className: 'croute', textContent: '→ ' + c.route.label }));
     if (c.route.name) a.append(Object.assign(document.createElement('span'), { className: 'cname', textContent: c.route.name }));
     a.append(Object.assign(document.createElement('span'), { className: 'creason', textContent: reasonFor(c) }));
@@ -153,7 +159,7 @@ function renderFuzzy(path, candidates) {
   document.addEventListener('keydown', (e) => {
     if (e.metaKey || e.ctrlKey || e.altKey) return;
     const n = Number(e.key);
-    if (n >= 1 && n <= candidates.length) location.href = candidates[n - 1].route.href;
+    if (n >= 1 && n <= candidates.length) location.href = safeHref(candidates[n - 1].route.href);
     else if (e.key === 'h') location.href = '/';
   });
 }
@@ -176,7 +182,10 @@ function renderNone(projectCount) {
 function startCountdown(plan, suggEl) {
   const box = $('countbox');
   box.hidden = false;
-  const go = () => location.replace(plan.target);
+  const go = () => {
+    if (!isSafeRedirect(plan.target, location.origin)) return;
+    location.replace(plan.target);
+  };
   $('gobtn').addEventListener('click', go);
   if (reducedMotion) {
     // An involuntary navigation is a motion problem too: buttons only, no timer.
@@ -201,7 +210,7 @@ function startCountdown(plan, suggEl) {
     note.hidden = false;
     note.append(Object.assign(document.createElement('span'), { className: 'x', textContent: '✕ ' }));
     note.append('redirect cancelled — staying put. ');
-    note.append(Object.assign(document.createElement('a'), { href: plan.target, textContent: plan.targetLabel }));
+    note.append(Object.assign(document.createElement('a'), { href: safeHref(plan.target), textContent: plan.targetLabel }));
     note.append(' · ');
     note.append(Object.assign(document.createElement('a'), { href: '/', textContent: 'mase.fi' }));
     setHints([{ href: '/', textContent: 'mase.fi' }, ' for the full directory'], [{ href: '/', textContent: 'mase.fi' }]);

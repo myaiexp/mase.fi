@@ -315,7 +315,8 @@ describe('fetchData routing', () => {
 // ---- fetchData: project links builder ------------------------------------
 // p.url → links[]. The builder must surface only http(s) links and drop
 // protocol-based XSS vectors (javascript:/data:/vbscript:) that parse cleanly
-// via new URL() but carry no usable host.
+// via new URL() but carry no usable host. Scheme-relative / backslash forms
+// (`//host`, `/\host`) throw without a base and must not be kept as-is.
 
 describe('fetchData project links', () => {
   async function linksFor(url) {
@@ -350,6 +351,19 @@ describe('fetchData project links', () => {
 
   it('falls back to an "open" link for a schemeless/relative URL', async () => {
     expect(await linksFor('/explorer')).toEqual([{ label: 'open', href: '/explorer' }]);
+  });
+
+  it('drops scheme-relative and backslash forms that resolve off-origin', async () => {
+    expect(await linksFor('//evil.com')).toEqual([]);
+    expect(await linksFor('//evil.com/x')).toEqual([]);
+    expect(await linksFor('/\\evil.com')).toEqual([]);
+    expect(await linksFor('\\\\evil.com')).toEqual([]);
+  });
+
+  it('keeps an absolute http(s) URL even when the host is not mase.fi', async () => {
+    expect(await linksFor('https://github.com/mase/explorer')).toEqual([
+      { label: 'github.com', href: 'https://github.com/mase/explorer' },
+    ]);
   });
 
   it('produces no links when the project has no url', async () => {

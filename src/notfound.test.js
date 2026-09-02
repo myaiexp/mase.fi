@@ -3,6 +3,7 @@ import { describe, it, expect } from 'vitest';
 import {
   parentPrefixes, isJunkPath, buildRoutes, levenshtein,
   fuzzyCandidates, decide, reasonFor, EXTRA_ROUTES,
+  sameOriginPath, isSafeRedirect,
 } from './notfound.js';
 
 // Shape mirrors the live /updates.json .projects entries.
@@ -139,5 +140,51 @@ describe('reasonFor', () => {
     expect(reasonFor({ route: { kind: 'subdomain' }, distance: 0 })).toBe('moved');
     expect(reasonFor({ route: { kind: 'path' }, distance: 1 })).toBe('1 char off');
     expect(reasonFor({ route: { kind: 'path' }, distance: 3 })).toBe('fuzzy');
+  });
+});
+
+// Origin check for the 404 preview `?p=` parameter and the auto-redirect sink.
+// Prefix-blacklisting `//` is not enough: WHATWG treats `\` like `/` in the
+// relative-slash state, so `/\evil.com` resolves off-origin.
+const ORIGIN = 'https://mase.fi';
+
+describe('sameOriginPath', () => {
+  it('keeps a same-origin path (and its query)', () => {
+    expect(sameOriginPath('/explorer', ORIGIN)).toBe('/explorer');
+    expect(sameOriginPath('/explorer?x=1', ORIGIN)).toBe('/explorer?x=1');
+    expect(sameOriginPath('/', ORIGIN)).toBe('/');
+  });
+  it('rejects scheme-relative and backslash forms that leave the origin', () => {
+    expect(sameOriginPath('//evil.com', ORIGIN)).toBeNull();
+    expect(sameOriginPath('//evil.com/x', ORIGIN)).toBeNull();
+    expect(sameOriginPath('/\\evil.com', ORIGIN)).toBeNull();
+    expect(sameOriginPath('/\\evil.com/x', ORIGIN)).toBeNull();
+    expect(sameOriginPath('\\\\evil.com', ORIGIN)).toBeNull();
+  });
+  it('rejects absolute off-origin URLs and empty/non-string input', () => {
+    expect(sameOriginPath('https://evil.com/x', ORIGIN)).toBeNull();
+    expect(sameOriginPath('javascript:alert(1)', ORIGIN)).toBeNull();
+    expect(sameOriginPath('', ORIGIN)).toBeNull();
+    expect(sameOriginPath(null, ORIGIN)).toBeNull();
+  });
+  it('collapses an absolute same-origin URL to its path', () => {
+    expect(sameOriginPath('https://mase.fi/explorer', ORIGIN)).toBe('/explorer');
+  });
+});
+
+describe('isSafeRedirect', () => {
+  it('allows same-origin paths and known mase.fi hosts (moved-app routes)', () => {
+    expect(isSafeRedirect('/explorer', ORIGIN)).toBe(true);
+    expect(isSafeRedirect('https://mase.fi/explorer', ORIGIN)).toBe(true);
+    expect(isSafeRedirect('https://diet.mase.fi', ORIGIN)).toBe(true);
+    expect(isSafeRedirect('http://diet.mase.fi', ORIGIN)).toBe(true);
+  });
+  it('refuses scheme-relative, backslash, and foreign-host targets', () => {
+    expect(isSafeRedirect('//evil.com', ORIGIN)).toBe(false);
+    expect(isSafeRedirect('/\\evil.com', ORIGIN)).toBe(false);
+    expect(isSafeRedirect('https://evil.com/x', ORIGIN)).toBe(false);
+    expect(isSafeRedirect('https://mase.fi.evil.com', ORIGIN)).toBe(false);
+    expect(isSafeRedirect('javascript:alert(1)', ORIGIN)).toBe(false);
+    expect(isSafeRedirect('', ORIGIN)).toBe(false);
   });
 });

@@ -6,7 +6,7 @@
 // and, critically, prove that HTML-special characters in user data are ESCAPED — never
 // parsed into live DOM (no injected <script>/<b>, no attribute breakout).
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import { renderPinned, renderHeroLine } from './pinned.js';
+import { renderPinned, renderHeroLine, cardHead } from './pinned.js';
 
 // renderPinned('home', …) calls mountBeam, which probes matchMedia. jsdom doesn't
 // implement matchMedia, and we don't want the animation/pretext path here — so stub it
@@ -27,6 +27,23 @@ afterEach(() => {
 
 const pinnedEl = () => document.getElementById('pinned');
 const heroEl = () => document.getElementById('hero-line');
+
+describe('cardHead', () => {
+  it('escapes chip keys, values, and the right-hand slot (no live markup)', () => {
+    const html = cardHead(
+      [['<script>', 'a & b'], ['"q"', "<img>"]],
+      '<b>live</b>',
+    );
+    expect(html).toContain('&lt;script&gt;');
+    expect(html).toContain('a &amp; b');
+    expect(html).toContain('&quot;q&quot;');
+    expect(html).toContain('&lt;img&gt;');
+    expect(html).toContain('&lt;b&gt;live&lt;/b&gt;');
+    expect(html).not.toContain('<script>');
+    expect(html).not.toContain('<img>');
+    expect(html).not.toContain('<b>live</b>');
+  });
+});
 
 // A normalized entry matching data.js fetchData() output: { ch, cat, date, nick, text }.
 function logEntry(extra = {}) {

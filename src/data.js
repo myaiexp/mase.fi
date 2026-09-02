@@ -1,4 +1,7 @@
 // Data adapter: fetches updates.json and normalizes it to the shape the UI expects.
+import { projectLink } from './project-link.js';
+import { parseEntryDate, normalizeDate, utcDayStart } from './dates.js';
+export { parseEntryDate };
 
 const SOURCE_URL = '/updates.json';
 const DEMOS_MANIFEST_URL = '/demos/manifest.json';
@@ -167,23 +170,8 @@ function normalizeProjects(rawProjects, counts, lastActivity) {
     const slug = (p.slug || p.channel || '').toLowerCase();
     const heat = Math.min(1, (counts.get(slug) || 0) / maxCount);
     const links = [];
-    if (p.url) {
-      try {
-        const u = new URL(p.url);
-        // Only surface http(s) links. Non-special schemes (javascript:, data:,
-        // vbscript:) parse successfully with an empty host and would otherwise
-        // pass straight through to escapeHtml(), which doesn't strip protocols —
-        // a protocol-based XSS vector. Drop anything that isn't http/https.
-        if (u.protocol === 'http:' || u.protocol === 'https:') {
-          const host = u.host.replace(/^www\./, '');
-          links.push({ label: host, href: p.url });
-        }
-      } catch {
-        // URL() throws only on schemeless/relative inputs (e.g. "/explorer"),
-        // which are inherently same-origin and safe to link as-is.
-        links.push({ label: 'open', href: p.url });
-      }
-    }
+    const link = projectLink(p.url);
+    if (link) links.push(link);
     return {
       name: p.name,
       channel: p.channel,
@@ -238,30 +226,6 @@ function normalizeEntries(rawEntries, slugToChannel) {
 }
 
 /**
- * Parse an entry date into a Date. Entry dates are wall-clock Finnish-server
- * strings with no zone marker, so the 'Z' makes the parse explicitly UTC rather
- * than viewer-local — otherwise the same entry would land on a different day
- * depending on who's reading. The input is normalizeDate's output shape
- * ("YYYY-MM-DDTHH:MM", no zone suffix); keep the two in step if that changes.
- */
-export function parseEntryDate(d) {
-  return new Date(d + 'Z');
-}
-
-/** Normalize a date string to "YYYY-MM-DDTHH:MM" form used by the UI. */
-function normalizeDate(s) {
-  if (!s || typeof s !== 'string') return '1970-01-01T00:00';
-  // Already has time component
-  if (/T\d{2}:\d{2}/.test(s)) return s.slice(0, 16);
-  // Bare YYYY-MM-DD → append T00:00
-  if (/^\d{4}-\d{2}-\d{2}$/.test(s)) return s + 'T00:00';
-  // Anything else is malformed: don't let unbounded/garbage strings reach e.date
-  // (downstream renderers slice and inject it into innerHTML). Bound to the epoch
-  // fallback so the function always returns a known, ASCII-only date string.
-  return '1970-01-01T00:00';
-}
-
-/**
  * Pick a nick for an entry based on category.
  * - log → 'git' (commit firehose)
  * - daily → the project slug, so #home reads as a per-project standup: each
@@ -290,15 +254,6 @@ export function entriesFor(channelId, data) {
     return data.entries.filter((e) => e.cat === 'log');
   }
   return data.entries.filter((e) => e.ch === channelId && e.cat !== 'log');
-}
-
-/**
- * UTC-midnight instant (ms) of a Date's UTC calendar day. Anchors day-bucketing
- * to the same UTC day the feed's separators use (parseEntryDate → UTC), and makes
- * day differences exact and DST-immune — every UTC day is exactly 86400000 ms.
- */
-function utcDayStart(d) {
-  return Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate());
 }
 
 /**
