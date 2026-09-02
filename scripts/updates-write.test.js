@@ -232,6 +232,7 @@ describe('compact_updates_json — strip commits + archive old logs (finding #88
     ]);
     expect(hot.stats).toMatchObject({
       totalCommits: 2,
+      archivedLogs: 1,
       archive: true,
       logFirst: '2026-01-01',
       logLast: '2026-08-20',

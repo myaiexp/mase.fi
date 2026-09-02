@@ -222,11 +222,12 @@ describe('renderPinned — activity', () => {
         logEntry({ cat: 'log', date: '2026-08-01T08:00' }),
         { ch: 'home', cat: 'daily', date: '2026-08-01T08:00', nick: 'mase', text: 'd' },
       ],
-      stats: { totalCommits: 9668, totalEntries: 11736, logFirst: '2026-03-05', logLast: '2026-09-02' },
+      stats: { archivedLogs: 11735, logFirst: '2026-03-05', logLast: '2026-09-02' },
     };
     renderPinned('activity', data);
     const html = pinnedEl().innerHTML;
-    expect(html).toContain('11736 entries');
+    // 1 non-log in memory + (11735 archived + 1 hot log) = 11737
+    expect(html).toContain('11737 entries');
     expect(html).toContain('2026-03-05 → 2026-09-02');
     expect(html).not.toContain('2026-08-01 → 2026-08-01');
   });

@@ -451,15 +451,34 @@ describe('logStats totalCommits', () => {
     expect(logStats(data).totalCommits).toBe(2);
   });
 
-  it('prefers precomputed stats.totalCommits over the in-memory log count', () => {
+  it('adds stats.archivedLogs to the in-memory log count for the all-history total', () => {
     // After a retention cut the hot file holds only recent logs; the pinned
-    // "N in feed" figure must keep the all-history total (finding #8804).
+    // "N in feed" figure must keep the all-history total (finding #8804),
+    // including logs prepended since the last compact.
+    const data = {
+      entries: [entry('log', 'activity'), entry('log', 'activity')],
+      stats: { archivedLogs: 9666 },
+      archiveLoaded: false,
+    };
+    expect(logStats(data).totalCommits).toBe(9668);
+    expect(logStats(data).buckets.length).toBe(28); // buckets still from in-memory
+  });
+
+  it('does not add archivedLogs after the archive has been merged into memory', () => {
+    const data = {
+      entries: [entry('log', 'activity'), entry('log', 'activity')],
+      stats: { archivedLogs: 100 },
+      archiveLoaded: true,
+    };
+    expect(logStats(data).totalCommits).toBe(2);
+  });
+
+  it('falls back to a snapshot totalCommits when archivedLogs is absent', () => {
     const data = {
       entries: [entry('log', 'activity'), entry('log', 'activity')],
       stats: { totalCommits: 9668 },
     };
     expect(logStats(data).totalCommits).toBe(9668);
-    expect(logStats(data).buckets.length).toBe(28); // buckets still from in-memory
   });
 
   it('ignores a non-numeric stats.totalCommits and falls back to counting', () => {

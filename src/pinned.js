@@ -116,7 +116,10 @@ function pinnedActivity(data) {
   // days (idle days excluded so the figure reflects "when I push, ~N/day" rather
   // than a calendar average diluted to near-zero). Recomputed every render — no
   // stale hardcoded constant. '—' when there's been no recent activity.
-  const recent = logStats(data, 28).buckets;
+  const { buckets: recent, totalCommits } = logStats(data, 28);
+  const totalEntries = data.archiveLoaded
+    ? data.entries.length
+    : data.entries.filter((e) => e.cat !== 'log').length + totalCommits;
   const activeDays = recent.filter(n => n > 0).length;
   const rate = activeDays
     ? '~' + Math.round(recent.reduce((a, b) => a + b, 0) / activeDays) + '/day'
@@ -134,7 +137,7 @@ function pinnedActivity(data) {
     art: artLines,
     tagline: 'the unfiltered tail. git hooks push here directly, one line per commit, every project.',
     rows: [
-      ['total', (Number.isFinite(data.stats?.totalEntries) ? data.stats.totalEntries : data.entries.length) + ' entries', 'accent'],
+      ['total', totalEntries + ' entries', 'accent'],
       ['range', range],
       ['source', 'post-receive hook → updates.json'],
     ],

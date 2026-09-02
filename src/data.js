@@ -88,12 +88,14 @@ function normalizeStats(raw) {
   if (!raw || typeof raw !== 'object') return {};
   const totalCommits = Number(raw.totalCommits);
   const totalEntries = Number(raw.totalEntries);
+  const archivedLogs = Number(raw.archivedLogs);
   const commitsByProject = (raw.commitsByProject && typeof raw.commitsByProject === 'object')
     ? raw.commitsByProject
     : undefined;
   return {
     totalCommits: Number.isFinite(totalCommits) ? totalCommits : undefined,
     totalEntries: Number.isFinite(totalEntries) ? totalEntries : undefined,
+    archivedLogs: Number.isFinite(archivedLogs) ? archivedLogs : undefined,
     logFirst: typeof raw.logFirst === 'string' ? raw.logFirst : undefined,
     logLast: typeof raw.logLast === 'string' ? raw.logLast : undefined,
     commitsByProject,
@@ -279,10 +281,16 @@ export function logStats(data, days = 28) {
     }
     if (!last || e.date > last.date) last = e;
   }
-  // Prefer the precomputed all-history total after a retention cut; buckets and
-  // `last` still come from the in-memory (hot) window, which covers 28/30 days.
-  const precomputed = data.stats?.totalCommits;
-  const totalCommits = Number.isFinite(precomputed) ? precomputed : counted;
+  // All-history total: archivedLogs (from compact) plus whatever is in memory.
+  // After loadArchive merges the archive, counted already includes those rows
+  // so we must not add archivedLogs again. Fall back to a snapshot totalCommits
+  // when archivedLogs is absent (a compact from before that field existed).
+  const archived = data.stats?.archivedLogs;
+  let totalCommits = counted;
+  if (Number.isFinite(archived) && !data.archiveLoaded) totalCommits = archived + counted;
+  else if (Number.isFinite(data.stats?.totalCommits) && !Number.isFinite(archived)) {
+    totalCommits = data.stats.totalCommits;
+  }
   return { totalCommits, buckets, last };
 }
 

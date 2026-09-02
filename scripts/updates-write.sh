@@ -182,7 +182,8 @@ compact_updates_json() {
                 | map({key: (.[0].project // ""), value: length})
                 | from_entries
               ),
-              archive: (($arch_entries | length) > 0)
+              archive: (($arch_entries | length) > 0),
+              archivedLogs: ($arch_entries | length)
             }
         ),
         archive: { entries: $arch_entries }
