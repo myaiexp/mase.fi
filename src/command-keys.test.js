@@ -11,6 +11,7 @@ vi.mock('./channels.js', () => ({
 }));
 vi.mock('./data.js', () => ({
   entriesFor: vi.fn(() => []),
+  parseEntryDate: (d) => new Date(d + 'Z'),
 }));
 
 let command, registry, channels;

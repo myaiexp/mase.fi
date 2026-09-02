@@ -8,7 +8,7 @@
 // autocomplete UI (both helpers share the same subsequence algorithm, so a
 // survivor always matches). Adding the export keyword is behavior-preserving;
 // the unused exports tree-shake out of the production bundle.
-import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 
 // command-complete.js reads getChannels/chAccent from the registry leaf;
 // command.js only needs navigate from the routing orchestrator. Stub both so
@@ -24,12 +24,13 @@ vi.mock('./channels.js', () => ({
 }));
 vi.mock('./data.js', () => ({
   entriesFor: vi.fn(() => []),
+  parseEntryDate: (d) => new Date(d + 'Z'),
 }));
 
 // Re-imported fresh per test so module state (the `complete` popup object, the
 // lazy DOM refs) starts clean and command-complete binds to the same mocked
 // registry instance the test sees.
-let command, registry, channels;
+let command, registry, channels, data;
 
 // The DOM nodes initCommand resolves by id. cmd-input is the only <input>.
 function setupDom() {
@@ -68,6 +69,7 @@ beforeEach(async () => {
   setupDom();
   registry = await import('./registry.js');
   channels = await import('./channels.js');
+  data = await import('./data.js');
   command = await import('./command.js');
 });
 
@@ -387,5 +389,56 @@ describe('slash commands', () => {
     input = type('/clear');
     input.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
     expect(notices()).toHaveLength(0);
+  });
+});
+
+// ---- formatRelativeActivity (autocomplete .cc-last column) ----------------
+
+describe('formatRelativeActivity (cc-last column)', () => {
+  const NOW = new Date('2026-06-13T12:00:00Z');
+
+  function lastCell() {
+    type('/home');
+    return items()[0].querySelector('.cc-last').textContent;
+  }
+
+  function entryAt(iso) {
+    return [{ date: iso }];
+  }
+
+  beforeEach(() => {
+    vi.useFakeTimers();
+    vi.setSystemTime(NOW);
+    setChannels([ch('home')]);
+    command.initCommand({});
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+    data.entriesFor.mockImplementation(() => []);
+  });
+
+  it("renders '3m' for an entry three minutes ago", () => {
+    data.entriesFor.mockReturnValue(entryAt('2026-06-13T11:57'));
+    expect(lastCell()).toBe('3m');
+  });
+
+  it("renders '2h' for an entry two hours ago", () => {
+    data.entriesFor.mockReturnValue(entryAt('2026-06-13T10:00'));
+    expect(lastCell()).toBe('2h');
+  });
+
+  it("renders '3d' for an entry three days ago", () => {
+    data.entriesFor.mockReturnValue(entryAt('2026-06-10T12:00'));
+    expect(lastCell()).toBe('3d');
+  });
+
+  it("renders '—' when the channel has no entries", () => {
+    expect(lastCell()).toBe('—');
+  });
+
+  it("clamps a future-dated entry to '0m'", () => {
+    data.entriesFor.mockReturnValue(entryAt('2026-06-13T12:05'));
+    expect(lastCell()).toBe('0m');
   });
 });

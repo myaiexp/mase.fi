@@ -177,6 +177,82 @@ describe('runBoot finish', () => {
       spy.mockRestore();
     }
   });
+
+  // Drain line-render timers until #boot stops growing for longer than the
+  // max inter-line delay (200ms) but shorter than the 400ms finish pause.
+  // Leaves us in that pause — the window where a click used to race finish().
+  function drainScript() {
+    const boot = document.getElementById('boot');
+    let prev = boot.childElementCount;
+    let staleMs = 0;
+    for (let t = 0; t < 5000; t += 10) {
+      vi.advanceTimersByTime(10);
+      const n = boot.childElementCount;
+      if (n !== prev) {
+        prev = n;
+        staleMs = 0;
+      } else {
+        staleMs += 10;
+        if (staleMs >= 250) return;
+      }
+    }
+    throw new Error('boot script did not settle');
+  }
+
+  it('natural completion renders the script, reveals #app, and fires mase:booted once', () => {
+    const booted = vi.fn();
+    window.addEventListener('mase:booted', booted);
+
+    runBoot();
+    drainScript();
+
+    const boot = document.getElementById('boot');
+    expect(boot.querySelectorAll('.boot-ok').length).toBeGreaterThan(0);
+    expect(boot.querySelector('.boot-warn').textContent).toBe('[ WARN ]');
+    expect(boot.querySelectorAll('.boot-dim').length).toBeGreaterThan(0);
+    expect(boot.querySelector('pre.boot-logo')).toBeTruthy();
+    expect([...boot.querySelectorAll('.boot-dim')].some((el) =>
+      el.textContent.includes('welcome, mase')
+    )).toBe(true);
+    expect(document.getElementById('app').hidden).toBe(true);
+
+    vi.advanceTimersByTime(800);
+    expect(document.getElementById('app').hidden).toBe(false);
+    expect(document.getElementById('boot')).toBeNull();
+    expect(booted).toHaveBeenCalledOnce();
+    // Stamp is written at finish time, which is after ~1.6s of fake-timer
+    // advances — not NOW. Presence + finiteness is the contract.
+    const stamp = Number(localStorage.getItem(KEY));
+    expect(Number.isFinite(stamp)).toBe(true);
+    expect(stamp).toBeGreaterThan(NOW);
+
+    // Keydown skip stays armed after natural completion unless finish() sets
+    // done. A first keypress must not dispatch a second mase:booted.
+    window.dispatchEvent(new KeyboardEvent('keydown', { key: 'x' }));
+    vi.advanceTimersByTime(300);
+    expect(booted).toHaveBeenCalledOnce();
+  });
+
+  it('a click inside the final 400ms pause still fires mase:booted exactly once', () => {
+    const booted = vi.fn();
+    window.addEventListener('mase:booted', booted);
+
+    runBoot();
+    drainScript();
+    expect(document.getElementById('app').hidden).toBe(true);
+
+    document.getElementById('boot').click();
+    expect(document.getElementById('app').hidden).toBe(false);
+
+    // Drain the click's 300ms remove + the leftover natural-completion finish().
+    vi.advanceTimersByTime(800);
+    expect(booted).toHaveBeenCalledOnce();
+    expect(document.getElementById('boot')).toBeNull();
+
+    window.dispatchEvent(new KeyboardEvent('keydown', { key: 'x' }));
+    vi.advanceTimersByTime(300);
+    expect(booted).toHaveBeenCalledOnce();
+  });
 });
 
 describe('initReplayBoot', () => {

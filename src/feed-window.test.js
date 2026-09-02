@@ -119,3 +119,78 @@ describe('renderFeed windowing', () => {
     expect(first.disconnected).toBe(true);
   });
 });
+
+// ---- project-chip click navigation (ensureChipNav) ------------------------
+
+describe('renderFeed chip navigation', () => {
+  let layoutRow;
+
+  function chipEntry({ project, mappedChannel, text = 'commit' }) {
+    return {
+      ch: 'activity',
+      cat: 'log',
+      date: '2026-06-01T10:00',
+      nick: 'git',
+      text,
+      project,
+      mappedChannel,
+    };
+  }
+
+  // jsdom reports 0 width, so relayoutAll no-ops and pills never materialize.
+  // layoutRow(0) takes the fallback path and copies row.dataset.target onto
+  // the .proj-pill — the same DOM the click delegate consumes.
+  function materializePills() {
+    for (const row of document.querySelectorAll('#feed .feed-row')) {
+      layoutRow(row, 0, '13px monospace');
+    }
+  }
+
+  beforeEach(async () => {
+    ({ layoutRow } = await import('./feed-layout.js'));
+  });
+
+  it('navigates to the mapped channel when a data-target chip is clicked', () => {
+    const navigate = vi.fn();
+    renderFeed('activity', {
+      entries: [chipEntry({ project: 'explorer', mappedChannel: 'explorer' })],
+    }, { immediate: true, navigate });
+    materializePills();
+
+    const pill = document.querySelector('.proj-pill[data-target]');
+    expect(pill).toBeTruthy();
+    expect(pill.dataset.target).toBe('explorer');
+    pill.click();
+    expect(navigate).toHaveBeenCalledOnce();
+    expect(navigate).toHaveBeenCalledWith('explorer');
+  });
+
+  it('does not navigate when an unmapped pill (no data-target) is clicked', () => {
+    const navigate = vi.fn();
+    renderFeed('activity', {
+      entries: [chipEntry({ project: 'secret-tool' })],
+    }, { immediate: true, navigate });
+    materializePills();
+
+    const pill = document.querySelector('.proj-pill');
+    expect(pill).toBeTruthy();
+    expect(pill.dataset.target).toBeUndefined();
+    pill.click();
+    expect(navigate).not.toHaveBeenCalled();
+  });
+
+  it('does not stack click listeners across re-renders of the same feed', () => {
+    const navigate = vi.fn();
+    const data = {
+      entries: [chipEntry({ project: 'explorer', mappedChannel: 'explorer' })],
+    };
+    renderFeed('activity', data, { immediate: true, navigate });
+    materializePills();
+    renderFeed('activity', data, { immediate: true, navigate });
+    materializePills();
+
+    document.querySelector('.proj-pill[data-target]').click();
+    expect(navigate).toHaveBeenCalledOnce();
+    expect(navigate).toHaveBeenCalledWith('explorer');
+  });
+});

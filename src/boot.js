@@ -56,7 +56,13 @@ export function runBoot() {
   const boot = document.getElementById('boot');
   const app  = document.getElementById('app');
 
+  let done = false;
+  // Single reveal path for skip() and natural completion. Must stay
+  // idempotent: the 400ms post-script pause still has skip armed, and the
+  // window keydown listener is installed with done===false until this runs.
   function finish() {
+    if (done) return;
+    done = true;
     writeBootStamp();
     boot.style.transition = 'opacity .28s ease';
     boot.style.opacity = '0';
@@ -101,16 +107,10 @@ export function runBoot() {
     ...TAIL.map(x => [...x, 40]),
   ];
 
-  let done = false;
-  function skip() {
-    if (done) return;
-    done = true;
-    finish();
-  }
-  boot.addEventListener('click', skip);
+  boot.addEventListener('click', finish);
   // delay the keydown skip so stray keystrokes from the preceding interaction don't insta-skip
   setTimeout(() => {
-    addEventListener('keydown', skip, { once: true });
+    addEventListener('keydown', finish, { once: true });
   }, 400);
 
   // render
