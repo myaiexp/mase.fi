@@ -16,7 +16,7 @@ function readBootStamp() {
   }
 }
 
-function writeBootStamp() {
+export function writeBootStamp() {
   try {
     localStorage.setItem(BOOT_STAMP_KEY, String(Date.now()));
   } catch { /* best-effort TTL; reveal must still proceed */ }
@@ -29,22 +29,19 @@ function clearBootStamp() {
 }
 
 /**
+ * Pure query: should the boot overlay be skipped?
+ * Does not write the TTL stamp — the caller stamps on the reduced-motion skip
+ * path (main.js) and runBoot stamps on natural completion / click-skip.
  * @param {boolean} prefersReducedMotion
  * @returns {boolean} true if boot should be skipped entirely.
- *                    If prefersReducedMotion is true, also writes the TTL stamp.
  */
 export function shouldSkipBoot(prefersReducedMotion) {
   const lastBoot = readBootStamp();
-  const fresh = Date.now() - lastBoot > BOOT_TTL_MS;
+  const ttlExpired = Date.now() - lastBoot > BOOT_TTL_MS;
   const forceReplay = window.MASE_FORCE_BOOT === true;
 
-  if (!fresh && !forceReplay) return true;
-
-  if (prefersReducedMotion) {
-    writeBootStamp();
-    return true;
-  }
-
+  if (!ttlExpired && !forceReplay) return true;
+  if (prefersReducedMotion) return true;
   return false;
 }
 

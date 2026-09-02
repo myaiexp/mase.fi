@@ -134,3 +134,123 @@ write_updates_json() {
   # Fallback: directory not writable (current prod). In-place, needs only file-write.
   cp "$candidate" "$target"
 }
+
+# compact_updates_json <hot_src> <archive_src> <hot_dst> <archive_dst> <cutoff>
+#
+# Pure transform (no lock, no install). Strips the unused `commits` array from
+# every entry, moves `log` entries older than <cutoff> (YYYY-MM-DD) into the
+# archive, and writes precomputed stats onto the hot object so the client can
+# keep all-history totals after the retention cut (finding #8804).
+# <archive_src> may be missing or malformed — treated as {entries:[]}.
+compact_updates_json() {
+  local hot_src="$1" arch_src="$2" hot_dst="$3" arch_dst="$4" cutoff="$5"
+  local arch_for_jq empty_arch="" combined=""
+  if [[ -f "$arch_src" ]] && jq empty "$arch_src" 2>/dev/null; then
+    arch_for_jq="$arch_src"
+  else
+    empty_arch="$(mktemp)" || return 1
+    printf '%s\n' '{"entries":[]}' > "$empty_arch"
+    arch_for_jq="$empty_arch"
+  fi
+  combined="$(mktemp)" || { rm -f "$empty_arch"; return 1; }
+  if ! jq --arg cutoff "$cutoff" --slurpfile arch "$arch_for_jq" '
+    def entry_day: (.date // "") | split("T")[0];
+    def log_key: [(.date // ""), (.project // ""), (.text // .summary // ""), (.category // "")];
+
+    . as $root
+    | ($arch[0].entries // []) as $prev_arch
+    | (($root.entries // []) | map(del(.commits))) as $stripped
+    | ($stripped | map(select(.category != "log" or (entry_day >= $cutoff)))) as $hot_entries
+    | ($stripped | map(select(.category == "log" and (entry_day < $cutoff)))) as $aged
+    | ($prev_arch + $aged | unique_by(log_key)) as $arch_entries
+    | (($hot_entries | map(select(.category == "log"))) + $arch_entries | unique_by(log_key)) as $all_logs
+    | {
+        hot: (
+          $root
+          | .entries = $hot_entries
+          | .stats = {
+              totalCommits: ($all_logs | length),
+              totalEntries: (
+                ($hot_entries | map(select(.category != "log")) | length)
+                + ($all_logs | length)
+              ),
+              logFirst: (($all_logs | map(entry_day) | map(select(length > 0)) | min) // null),
+              logLast:  (($all_logs | map(entry_day) | map(select(length > 0)) | max) // null),
+              commitsByProject: (
+                $all_logs
+                | group_by(.project // "")
+                | map({key: (.[0].project // ""), value: length})
+                | from_entries
+              ),
+              archive: (($arch_entries | length) > 0)
+            }
+        ),
+        archive: { entries: $arch_entries }
+      }
+  ' "$hot_src" > "$combined"; then
+    rm -f "$empty_arch" "$combined"
+    return 1
+  fi
+  if ! jq '.hot' "$combined" > "$hot_dst" || ! jq '.archive' "$combined" > "$arch_dst"; then
+    rm -f "$empty_arch" "$combined"
+    return 1
+  fi
+  rm -f "$empty_arch" "$combined"
+}
+
+# compact_and_install — caller holds the updates.json flock.
+# Uses UPDATES_FILE, ARCHIVE_FILE (optional), CUTOFF (YYYY-MM-DD).
+# If ARCHIVE_FILE is unset/unwritable, still strips commits and writes stats
+# but leaves old logs in the hot file (degraded, never drops history).
+compact_and_install() {
+  local cutoff="${CUTOFF:?compact_and_install: CUTOFF is required}"
+  local hot="${UPDATES_FILE:?compact_and_install: UPDATES_FILE is required}"
+  local arch="${ARCHIVE_FILE:-}"
+  local hot_tmp arch_tmp
+  hot_tmp="$(mktemp)" || return 1
+  arch_tmp="$(mktemp)" || { rm -f "$hot_tmp"; return 1; }
+
+  if [[ -z "$arch" ]]; then
+    arch="$(dirname "$hot")/updates-archive.json"
+  fi
+
+  local split=1
+  if [[ ! -f "$arch" ]]; then
+    if ! printf '%s\n' '{"entries":[]}' > "$arch" 2>/dev/null; then
+      echo "compact: cannot create $arch — stripping commits, leaving logs in the hot file" >&2
+      split=0
+    fi
+  fi
+
+  if [[ "$split" -eq 0 ]]; then
+    # No-split path: strip commits, write stats over the full in-file history.
+    if ! compact_updates_json "$hot" /dev/null "$hot_tmp" "$arch_tmp" "1970-01-01"; then
+      rm -f "$hot_tmp" "$arch_tmp"
+      return 1
+    fi
+    # Force archive:false so the client does not fetch a file we could not write.
+    if ! jq '.stats.archive = false' "$hot_tmp" > "$hot_tmp.n" || ! mv "$hot_tmp.n" "$hot_tmp"; then
+      rm -f "$hot_tmp" "$arch_tmp" "$hot_tmp.n"
+      return 1
+    fi
+    local rc=0
+    write_updates_json "$hot_tmp" "$hot" || rc=$?
+    rm -f "$hot_tmp" "$arch_tmp"
+    return $rc
+  fi
+
+  if ! compact_updates_json "$hot" "$arch" "$hot_tmp" "$arch_tmp" "$cutoff"; then
+    rm -f "$hot_tmp" "$arch_tmp"
+    return 1
+  fi
+  if ! write_updates_json "$hot_tmp" "$hot"; then
+    rm -f "$hot_tmp" "$arch_tmp"
+    return 1
+  fi
+  if ! write_updates_json "$arch_tmp" "$arch"; then
+    echo "compact: hot file updated but archive install failed ($arch)" >&2
+    rm -f "$hot_tmp" "$arch_tmp"
+    return 1
+  fi
+  rm -f "$hot_tmp" "$arch_tmp"
+}

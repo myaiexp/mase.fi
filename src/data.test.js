@@ -1,6 +1,6 @@
 // Unit tests for the data adapter (fetch + normalize + channel routing/bucketing).
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { fetchData, fetchDemos, entriesFor, logStats } from './data.js';
+import { fetchData, fetchDemos, entriesFor, logStats, loadArchive } from './data.js';
 
 // ---- helpers -------------------------------------------------------------
 
@@ -297,6 +297,34 @@ describe('fetchData routing', () => {
     expect(data.meta.nick).toBe('mase');
   });
 
+  it('folds raw.stats onto the returned data object (hasArchive from stats.archive)', async () => {
+    stubFetch({
+      projects: [],
+      entries: [],
+      stats: {
+        totalCommits: 12,
+        logFirst: '2026-03-05',
+        logLast: '2026-09-02',
+        archive: true,
+        commitsByProject: { helm: 4 },
+      },
+    });
+    const data = await fetchData();
+    expect(data.stats.totalCommits).toBe(12);
+    expect(data.stats.logFirst).toBe('2026-03-05');
+    expect(data.stats.logLast).toBe('2026-09-02');
+    expect(data.stats.commitsByProject).toEqual({ helm: 4 });
+    expect(data.hasArchive).toBe(true);
+    expect(data.archiveLoaded).toBe(false);
+  });
+
+  it('defaults hasArchive to false when stats are absent', async () => {
+    stubFetch({ projects: [], entries: [] });
+    const data = await fetchData();
+    expect(data.hasArchive).toBe(false);
+    expect(data.stats.totalCommits).toBeUndefined();
+  });
+
   it('degrades to empty data when normalization throws, and logs the error', async () => {
     // A null entry makes the heat-count loop's `e.project` access throw. The error
     // boundary keeps normalization inside it, so this degrades gracefully instead
@@ -421,6 +449,25 @@ describe('logStats totalCommits', () => {
       entry('log', 'activity', { date: dayStr(0) }),
     ]);
     expect(logStats(data).totalCommits).toBe(2);
+  });
+
+  it('prefers precomputed stats.totalCommits over the in-memory log count', () => {
+    // After a retention cut the hot file holds only recent logs; the pinned
+    // "N in feed" figure must keep the all-history total (finding #8804).
+    const data = {
+      entries: [entry('log', 'activity'), entry('log', 'activity')],
+      stats: { totalCommits: 9668 },
+    };
+    expect(logStats(data).totalCommits).toBe(9668);
+    expect(logStats(data).buckets.length).toBe(28); // buckets still from in-memory
+  });
+
+  it('ignores a non-numeric stats.totalCommits and falls back to counting', () => {
+    const data = {
+      entries: [entry('log', 'activity')],
+      stats: { totalCommits: 'nope' },
+    };
+    expect(logStats(data).totalCommits).toBe(1);
   });
 });
 
@@ -657,5 +704,66 @@ describe('fetchData project heat + recency', () => {
     expect(data.projects[0].lastActivity).toBeGreaterThan(0);
     // Two mixed-case hits against one project — if either side skipped toLowerCase
     // the counts lookup would miss and heat would stay 0.
+  });
+});
+
+// ---- loadArchive ---------------------------------------------------------
+// The hot file keeps recent logs; older ones live at /updates-archive.json
+// and merge into data.entries when the activity sentinel exhausts.
+
+describe('loadArchive', () => {
+  it('is a no-op when hasArchive is false (does not fetch)', async () => {
+    const fetchMock = vi.fn();
+    vi.stubGlobal('fetch', fetchMock);
+    const data = { entries: [entry('log', 'activity')], projects: [], hasArchive: false, archiveLoaded: false };
+    await loadArchive(data);
+    expect(fetchMock).not.toHaveBeenCalled();
+    expect(data.archiveLoaded).toBe(false);
+  });
+
+  it('is a no-op when the archive was already merged', async () => {
+    const fetchMock = vi.fn();
+    vi.stubGlobal('fetch', fetchMock);
+    const data = { entries: [], projects: [], hasArchive: true, archiveLoaded: true };
+    await loadArchive(data);
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it('merges archived logs into data.entries, normalized and sorted, without duplicating', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        entries: [
+          { category: 'log', project: 'helm', date: '2026-01-01T10:00', text: 'ancient' },
+          { category: 'log', project: 'helm', date: '2026-08-20T10:00', text: 'already-hot' },
+        ],
+      }),
+    }));
+    const data = {
+      projects: [{ name: 'Helm', channel: 'helm', slug: 'helm' }],
+      entries: [
+        entry('log', 'activity', { date: '2026-08-20T10:00', text: 'already-hot', project: 'helm' }),
+        entry('log', 'activity', { date: '2026-09-01T10:00', text: 'recent', project: 'helm' }),
+      ],
+      hasArchive: true,
+      archiveLoaded: false,
+    };
+    await loadArchive(data);
+    expect(data.archiveLoaded).toBe(true);
+    expect(data.entries.map((e) => e.text)).toEqual(['ancient', 'already-hot', 'recent']);
+    expect(data.entries[0]).toMatchObject({ cat: 'log', nick: 'git', project: 'helm' });
+  });
+
+  it('marks archiveLoaded and leaves entries untouched on a failed fetch', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new Error('timeout')));
+    const data = {
+      entries: [entry('log', 'activity')],
+      projects: [],
+      hasArchive: true,
+      archiveLoaded: false,
+    };
+    await loadArchive(data);
+    expect(data.archiveLoaded).toBe(true);
+    expect(data.entries).toHaveLength(1);
   });
 });

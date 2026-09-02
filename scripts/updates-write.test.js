@@ -127,6 +127,18 @@ function withLock(target, transformBody, { label = 'test-label', lock } = {}) {
   });
 }
 
+// source updates-write.sh and call compact_updates_json
+function compactViaShell(hotSrc, archSrc, hotDst, archDst, cutoff) {
+  const script = `
+    set -e
+    source "${join(SCRIPTS_DIR, 'updates-write.sh')}"
+    compact_updates_json "$1" "$2" "$3" "$4" "$5"
+  `;
+  return spawnSync('bash', ['-c', script, '--', hotSrc, archSrc, hotDst, archDst, cutoff], {
+    encoding: 'utf8',
+  });
+}
+
 describe('with_updates_lock — locked read-modify-write', () => {
   it('applies the transform and installs the candidate', () => {
     const target = join(dir, 'updates.json');
@@ -192,3 +204,98 @@ describe('with_updates_lock — locked read-modify-write', () => {
   });
 });
 
+describe('compact_updates_json — strip commits + archive old logs (finding #8804)', () => {
+  it('strips commits from daily entries and keeps recent logs in the hot file', () => {
+    const hotSrc = join(dir, 'in.json');
+    const archSrc = join(dir, 'arch-in.json');
+    const hotDst = join(dir, 'hot-out.json');
+    const archDst = join(dir, 'arch-out.json');
+    writeFileSync(hotSrc, JSON.stringify({
+      projects: [{ channel: 'beta' }],
+      entries: [
+        { date: '2026-08-01', category: 'daily', project: 'beta', summary: 'shipped', commits: ['c1', 'c2'] },
+        { date: '2026-08-20', category: 'log', project: 'beta', text: 'recent' },
+        { date: '2026-01-01', category: 'log', project: 'beta', text: 'ancient' },
+        { date: '2026-08-15', category: 'feature', project: 'beta', text: 'feat' },
+      ],
+    }));
+    writeFileSync(archSrc, JSON.stringify({ entries: [] }));
+    const r = compactViaShell(hotSrc, archSrc, hotDst, archDst, '2026-06-01');
+    expect(r.status).toBe(0);
+    expect(r.stderr).toBe('');
+    const hot = JSON.parse(readFileSync(hotDst, 'utf8'));
+    const arch = JSON.parse(readFileSync(archDst, 'utf8'));
+    expect(hot.entries.every((e) => !('commits' in e))).toBe(true);
+    expect(hot.entries.map((e) => e.text || e.summary).sort()).toEqual(['feat', 'recent', 'shipped']);
+    expect(arch.entries).toEqual([
+      { date: '2026-01-01', category: 'log', project: 'beta', text: 'ancient' },
+    ]);
+    expect(hot.stats).toMatchObject({
+      totalCommits: 2,
+      archive: true,
+      logFirst: '2026-01-01',
+      logLast: '2026-08-20',
+      commitsByProject: { beta: 2 },
+    });
+    expect(hot.stats.totalEntries).toBe(4); // 2 non-logs in hot + 2 logs overall
+  });
+
+  it('is idempotent — a second compact does not duplicate archived logs', () => {
+    const hotSrc = join(dir, 'in.json');
+    const archSrc = join(dir, 'arch.json');
+    const hotDst = join(dir, 'hot-out.json');
+    const archDst = join(dir, 'arch-out.json');
+    writeFileSync(hotSrc, JSON.stringify({
+      projects: [],
+      entries: [
+        { date: '2026-08-20', category: 'log', project: 'beta', text: 'recent' },
+        { date: '2026-01-01', category: 'log', project: 'beta', text: 'ancient' },
+      ],
+    }));
+    writeFileSync(archSrc, JSON.stringify({ entries: [] }));
+    expect(compactViaShell(hotSrc, archSrc, hotDst, archDst, '2026-06-01').status).toBe(0);
+    // Feed the first output back in as the next input.
+    const r = compactViaShell(hotDst, archDst, hotSrc, archSrc, '2026-06-01');
+    expect(r.status).toBe(0);
+    const arch = JSON.parse(readFileSync(archSrc, 'utf8'));
+    expect(arch.entries).toHaveLength(1);
+    expect(arch.entries[0].text).toBe('ancient');
+    const hot = JSON.parse(readFileSync(hotSrc, 'utf8'));
+    expect(hot.entries.filter((e) => e.category === 'log')).toHaveLength(1);
+    expect(hot.stats.totalCommits).toBe(2);
+  });
+
+  it('keeps every log in the hot file when none are older than the cutoff', () => {
+    const hotSrc = join(dir, 'in.json');
+    const archSrc = join(dir, 'arch-in.json');
+    const hotDst = join(dir, 'hot-out.json');
+    const archDst = join(dir, 'arch-out.json');
+    writeFileSync(hotSrc, JSON.stringify({
+      projects: [],
+      entries: [{ date: '2026-08-20', category: 'log', project: 'beta', text: 'recent' }],
+    }));
+    writeFileSync(archSrc, JSON.stringify({ entries: [] }));
+    expect(compactViaShell(hotSrc, archSrc, hotDst, archDst, '2026-06-01').status).toBe(0);
+    const hot = JSON.parse(readFileSync(hotDst, 'utf8'));
+    const arch = JSON.parse(readFileSync(archDst, 'utf8'));
+    expect(hot.entries).toHaveLength(1);
+    expect(arch.entries).toHaveLength(0);
+    expect(hot.stats.archive).toBe(false);
+    expect(hot.stats.totalCommits).toBe(1);
+  });
+
+  it('treats a missing archive source as empty rather than failing', () => {
+    const hotSrc = join(dir, 'in.json');
+    const archSrc = join(dir, 'no-such-archive.json');
+    const hotDst = join(dir, 'hot-out.json');
+    const archDst = join(dir, 'arch-out.json');
+    writeFileSync(hotSrc, JSON.stringify({
+      projects: [],
+      entries: [{ date: '2026-01-01', category: 'log', project: 'beta', text: 'ancient' }],
+    }));
+    const r = compactViaShell(hotSrc, archSrc, hotDst, archDst, '2026-06-01');
+    expect(r.status).toBe(0);
+    const arch = JSON.parse(readFileSync(archDst, 'utf8'));
+    expect(arch.entries).toHaveLength(1);
+  });
+});

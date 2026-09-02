@@ -77,7 +77,11 @@ function pinnedHome(data) {
 
 function pinnedProject(p, data) {
   const art = PROJECT_ART[p.channel] || '';
-  const commits = data.entries.filter(e => e.ch === p.channel && e.cat === 'log').length;
+  const commits = Number.isFinite(data.stats?.commitsByProject?.[p.slug])
+    ? data.stats.commitsByProject[p.slug]
+    : Number.isFinite(data.stats?.commitsByProject?.[p.channel])
+      ? data.stats.commitsByProject[p.channel]
+      : data.entries.filter(e => e.ch === p.channel && e.cat === 'log').length;
   const status = heatStatus(p.heat);
   const demoLink = demoLinkHtml(p.channel, data.demos, { arrow: true });
   const linksHtml = demoLink +
@@ -100,10 +104,13 @@ function pinnedActivity(data) {
   data.entries.forEach(e => { cats[e.cat] = (cats[e.cat] || 0) + 1; });
   const logEntries = data.entries.filter(e => e.cat === 'log');
   let range = '—';
-  if (logEntries.length) {
-    const first = escapeHtml(dayOf(logEntries[0].date));
-    const last = escapeHtml(dayOf(logEntries[logEntries.length - 1].date));
-    range = first + ' → ' + last;
+  const statsFirst = typeof data.stats?.logFirst === 'string' ? data.stats.logFirst : '';
+  const statsLast = typeof data.stats?.logLast === 'string' ? data.stats.logLast : '';
+  if (statsFirst && statsLast) {
+    range = escapeHtml(statsFirst) + ' → ' + escapeHtml(statsLast);
+  } else if (logEntries.length) {
+    range = escapeHtml(dayOf(logEntries[0].date)) + ' → ' +
+      escapeHtml(dayOf(logEntries[logEntries.length - 1].date));
   }
   // Real recent commit rate: average log entries per ACTIVE day over the last 28
   // days (idle days excluded so the figure reflects "when I push, ~N/day" rather
@@ -127,7 +134,7 @@ function pinnedActivity(data) {
     art: artLines,
     tagline: 'the unfiltered tail. git hooks push here directly, one line per commit, every project.',
     rows: [
-      ['total', data.entries.length + ' entries', 'accent'],
+      ['total', (Number.isFinite(data.stats?.totalEntries) ? data.stats.totalEntries : data.entries.length) + ' entries', 'accent'],
       ['range', range],
       ['source', 'post-receive hook → updates.json'],
     ],

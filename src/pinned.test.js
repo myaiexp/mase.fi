@@ -119,6 +119,20 @@ describe('renderPinned — project', () => {
     expect(html).toContain('>mase.fi</a>');
   });
 
+  it('uses stats.commitsByProject when the hot file no longer holds all logs', () => {
+    const project = {
+      channel: 'explorer',
+      slug: 'explorer',
+      heat: 0.5,
+      description: 'desc',
+      links: [],
+    };
+    const data = projectData(project, [logEntry({ ch: 'explorer' })]);
+    data.stats = { commitsByProject: { explorer: 42 } };
+    renderPinned('explorer', data);
+    expect(pinnedEl().innerHTML).toContain('42 commits in feed');
+  });
+
   it('labels a mid-heat project as steady', () => {
     renderPinned('explorer', projectData({ channel: 'explorer', heat: 0.5, description: 'd', links: [] }));
     const html = pinnedEl().innerHTML;
@@ -197,6 +211,24 @@ describe('renderPinned — activity', () => {
     const html = pinnedEl().innerHTML;
     expect(html).toContain('3 entries');               // data.entries.length (incl. daily)
     expect(html).toContain('2026-01-01 → 2026-03-15'); // first → last log entry
+  });
+
+  it('uses precomputed stats for total and range when the hot file is a window', () => {
+    // After compact, data.entries is the recent slice; the card must still
+    // show all-history figures from stats (finding #8804).
+    const data = {
+      projects: [],
+      entries: [
+        logEntry({ cat: 'log', date: '2026-08-01T08:00' }),
+        { ch: 'home', cat: 'daily', date: '2026-08-01T08:00', nick: 'mase', text: 'd' },
+      ],
+      stats: { totalCommits: 9668, totalEntries: 11736, logFirst: '2026-03-05', logLast: '2026-09-02' },
+    };
+    renderPinned('activity', data);
+    const html = pinnedEl().innerHTML;
+    expect(html).toContain('11736 entries');
+    expect(html).toContain('2026-03-05 → 2026-09-02');
+    expect(html).not.toContain('2026-08-01 → 2026-08-01');
   });
 
   it('shows an em-dash range when there are no log entries', () => {

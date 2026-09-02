@@ -54,6 +54,7 @@ beforeEach(async () => {
 afterEach(() => {
   delete globalThis.IntersectionObserver;
   delete globalThis.ResizeObserver;
+  vi.unstubAllGlobals();
 });
 
 describe('renderFeed windowing', () => {
@@ -118,6 +119,38 @@ describe('renderFeed windowing', () => {
     const first = ioInstances.at(-1);
     renderFeed('activity', makeData(450), { immediate: true, navigate: () => {} });
     expect(first.disconnected).toBe(true);
+  });
+
+  it('keeps the sentinel when in-memory logs fit but an archive remains', () => {
+    const data = makeData(80);
+    data.hasArchive = true;
+    data.archiveLoaded = false;
+    renderFeed('activity', data, { immediate: true, navigate: () => {} });
+    expect(rows().length).toBe(80);
+    expect(sentinel()).toBeTruthy();
+  });
+
+  it('fetches the archive when the sentinel exhausts in-memory logs and prepends them', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        entries: [
+          { category: 'log', project: 'helm', date: '2026-01-01T10:00', text: 'archived-old' },
+        ],
+      }),
+    }));
+    const data = makeData(250);
+    data.hasArchive = true;
+    data.archiveLoaded = false;
+    data.projects = [{ name: 'Helm', channel: 'helm', slug: 'helm' }];
+    renderFeed('activity', data, { immediate: true, navigate: () => {} });
+    expect(rows().length).toBe(200);
+    ioInstances.at(-1).fire(); // 200 → 250, in-memory exhausted → archive fetch
+    await vi.waitFor(() => {
+      expect(rows().some((r) => r.dataset.raw === 'archived-old')).toBe(true);
+    });
+    expect(data.archiveLoaded).toBe(true);
+    vi.unstubAllGlobals();
   });
 });
 

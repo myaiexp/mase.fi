@@ -3,7 +3,7 @@
 // animation runs, runBoot() must always unhide #app + fire mase:booted, and
 // neither path may abort when localStorage throws (private mode / quota).
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import { shouldSkipBoot, runBoot, initReplayBoot } from './boot.js';
+import { shouldSkipBoot, writeBootStamp, runBoot, initReplayBoot } from './boot.js';
 
 const KEY = 'mase.boot.last';
 const TTL_MS = 7 * 24 * 3600 * 1000;
@@ -31,12 +31,13 @@ describe('shouldSkipBoot', () => {
     expect(shouldSkipBoot(true)).toBe(true);
   });
 
-  it('writes the TTL stamp when reduced-motion forces a skip', () => {
+  it('does not write the TTL stamp (pure query, even on reduced-motion skip)', () => {
     expect(localStorage.getItem(KEY)).toBeNull();
-    shouldSkipBoot(true);
-    // The reduced-motion branch stamps "now" so the boot stays suppressed on
-    // subsequent visits within the TTL.
-    expect(Number(localStorage.getItem(KEY))).toBe(NOW);
+    expect(shouldSkipBoot(true)).toBe(true);
+    expect(shouldSkipBoot(true)).toBe(true);
+    // Stamp write lives at the caller (main.js) / runBoot, so evaluating the
+    // gate twice cannot silently extend the TTL (finding #8830).
+    expect(localStorage.getItem(KEY)).toBeNull();
   });
 
   it('does NOT skip (shows boot) when no stamp is stored and motion is allowed', () => {
@@ -69,7 +70,7 @@ describe('shouldSkipBoot', () => {
   });
 
   it('handles a malformed (non-numeric) stamp gracefully without throwing', () => {
-    // Number('garbage') is NaN; NaN comparisons are false → fresh=false → skip.
+    // Number('garbage') is NaN; NaN > TTL is false → ttlExpired=false → skip.
     // The point is it degrades to a boolean decision rather than throwing.
     localStorage.setItem(KEY, 'garbage');
     expect(() => shouldSkipBoot(false)).not.toThrow();
@@ -119,11 +120,28 @@ describe('shouldSkipBoot with throwing storage', () => {
     }
   });
 
-  it('reduced-motion still skips when setItem throws (stamp is best-effort)', () => {
+  it('reduced-motion still skips when setItem throws (query never writes)', () => {
     const spy = throwOn('setItem', new DOMException('The quota has been exceeded.', 'QuotaExceededError'));
     try {
       expect(() => shouldSkipBoot(true)).not.toThrow();
       expect(shouldSkipBoot(true)).toBe(true);
+      expect(spy).not.toHaveBeenCalled();
+    } finally {
+      spy.mockRestore();
+    }
+  });
+});
+
+describe('writeBootStamp', () => {
+  it('persists Date.now() under the boot stamp key', () => {
+    writeBootStamp();
+    expect(Number(localStorage.getItem(KEY))).toBe(NOW);
+  });
+
+  it('does not throw when setItem fails (stamp is best-effort)', () => {
+    const spy = throwOn('setItem', new DOMException('The quota has been exceeded.', 'QuotaExceededError'));
+    try {
+      expect(() => writeBootStamp()).not.toThrow();
     } finally {
       spy.mockRestore();
     }

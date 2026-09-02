@@ -71,7 +71,7 @@ export function scramble(str, p = 0.6) {
   for (const ch of str) {
     if (ch === " " || ch === "\n") { out += ch; continue; }
     if (Math.random() < p) {
-      const pool = /[a-zA-Z]/.test(ch) ? GLYPHS : (/[0-9]/.test(ch) ? DIGITS : GLYPHS);
+      const pool = /[0-9]/.test(ch) ? DIGITS : GLYPHS;
       out += pool[Math.floor(Math.random() * pool.length)];
     } else out += ch;
   }

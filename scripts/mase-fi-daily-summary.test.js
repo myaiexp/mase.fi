@@ -70,11 +70,12 @@ describe('mase-fi-daily-summary — grouping + summary branch', () => {
     expect(byProject).toEqual({ alpha: 'feat(alpha): only', beta: 'hardened the auth layer' });
   });
 
-  it('carries the raw commit list onto each daily entry', () => {
+  it('does not persist a commits array on daily entries (finding #8804)', () => {
     seed([log('beta', 'c1'), log('beta', 'c2')]);
     const CLAUDE_BIN = writeClaudeStub(dir, { output: 'did the thing' });
     run({ CLAUDE_BIN });
-    expect(dailies()[0].commits).toEqual(['c1', 'c2']);
+    expect(dailies()[0].summary).toBe('did the thing');
+    expect(dailies()[0].commits).toBeUndefined();
   });
 
   it('invokes claude with an empty --tools grant', () => {
@@ -130,6 +131,8 @@ describe('mase-fi-daily-summary — fallback + skip paths', () => {
     const r = run({ CLAUDE_BIN });
     expect(r.stdout).toMatch(/already exist/i);
     expect(dailies().map((e) => e.summary)).toEqual(['already summarized']);
+    // Skip still compacts: the unused commits[] copy is stripped (finding #8804).
+    expect(dailies()[0].commits).toBeUndefined();
   });
 
   it('skips when there are no log entries for today', () => {

@@ -79,6 +79,11 @@ describe('scramble', () => {
 
     const digits = scramble('012789', 1);
     for (const ch of digits) expect(DIGITS.includes(ch)).toBe(true);
+
+    // Letters and punctuation share GLYPHS — there is no distinct letter pool.
+    // Digits are the only characters that pick DIGITS (finding #8829).
+    const punct = scramble('!?#', 1);
+    for (const ch of punct) expect(GLYPHS.includes(ch)).toBe(true);
   });
 
   it('uses the deterministic first pool char when Math.random is stubbed to 0', () => {

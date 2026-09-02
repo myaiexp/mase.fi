@@ -1,53 +1,20 @@
 // Data adapter: fetches updates.json and normalizes it to the shape the UI expects.
 import { projectLink } from './project-link.js';
 import { parseEntryDate, normalizeDate, utcDayStart } from './dates.js';
-export { parseEntryDate };
+import { fetchDemos, raceTimeout, DEMOS_GRACE_MS } from './data-demos.js';
+export { parseEntryDate, fetchDemos };
+export { loadArchive } from './data-archive.js';
 
 const SOURCE_URL = '/updates.json';
-const DEMOS_MANIFEST_URL = '/demos/manifest.json';
 // A hung fetch with no AbortSignal stalls the app shell — main.js awaits
 // fetchData with no timeout of its own. updates.json is required; the demos
 // manifest is optional chips. Time-box both, then grace-race demos so a hung
 // manifest cannot delay init after updates.json is already in.
 const FETCH_TIMEOUT_MS = 8000;
-const DEMOS_GRACE_MS = 400;
-
-async function raceTimeout(promise, ms, fallback) {
-  let timer;
-  try {
-    return await Promise.race([
-      promise,
-      new Promise((resolve) => {
-        timer = setTimeout(() => resolve(fallback), ms);
-      }),
-    ]);
-  } finally {
-    clearTimeout(timer);
-  }
-}
-
-/**
- * Fetch the list of project channels that have a published demo, from the demos
- * repo's manifest (written by its post-deploy from synced-dirs.txt). Tolerant of
- * absence (no demos dir, local dev, 404) — returns [] so callers can always
- * `.includes(channel)` without guarding. Returns a string[] of channel slugs.
- */
-export async function fetchDemos() {
-  try {
-    const r = await fetch(DEMOS_MANIFEST_URL, {
-      signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
-    });
-    if (!r.ok) return [];
-    const list = await r.json();
-    return Array.isArray(list) ? list.filter((s) => typeof s === 'string') : [];
-  } catch {
-    return [];
-  }
-}
 
 /**
  * Fetch + normalize the live updates.json into the canonical shape used by the UI:
- *   { meta:{nick,server,bootTime}, projects:[{name,channel,description,tag,links[],heat}], entries:[{ch,date,cat,nick,text,project?}], demos:[channelSlug] }
+ *   { meta, projects, entries, demos, stats, hasArchive, archiveLoaded }
  *
  * The real /updates.json carries a different shape — see docs/content-pipeline.md — so we map here.
  *  - entry.category → cat
@@ -88,12 +55,16 @@ export async function fetchData() {
     const { counts, lastActivity } = aggregateActivity(rawEntries);
     const projects = normalizeProjects(rawProjects, counts, lastActivity);
     const entries = normalizeEntries(rawEntries, slugToChannel);
+    const stats = normalizeStats(raw.stats);
 
     return {
       meta: { nick: 'mase', server: 'irc.mase.fi', bootTime: Date.now() },
       projects,
       entries,
       demos: await raceTimeout(demosPromise, DEMOS_GRACE_MS, []),
+      stats,
+      hasArchive: stats.archive === true,
+      archiveLoaded: false,
     };
   } catch (err) {
     // Deliberate degrade-to-empty so the app shell still renders, but this catch
@@ -106,8 +77,28 @@ export async function fetchData() {
       projects: [],
       entries: [],
       demos: await raceTimeout(demosPromise, DEMOS_GRACE_MS, []),
+      stats: {},
+      hasArchive: false,
+      archiveLoaded: false,
     };
   }
+}
+
+function normalizeStats(raw) {
+  if (!raw || typeof raw !== 'object') return {};
+  const totalCommits = Number(raw.totalCommits);
+  const totalEntries = Number(raw.totalEntries);
+  const commitsByProject = (raw.commitsByProject && typeof raw.commitsByProject === 'object')
+    ? raw.commitsByProject
+    : undefined;
+  return {
+    totalCommits: Number.isFinite(totalCommits) ? totalCommits : undefined,
+    totalEntries: Number.isFinite(totalEntries) ? totalEntries : undefined,
+    logFirst: typeof raw.logFirst === 'string' ? raw.logFirst : undefined,
+    logLast: typeof raw.logLast === 'string' ? raw.logLast : undefined,
+    commitsByProject,
+    archive: raw.archive === true,
+  };
 }
 
 /**
@@ -272,11 +263,11 @@ export function entriesFor(channelId, data) {
 export function logStats(data, days = 28) {
   const buckets = new Array(days).fill(0);
   const todayUTC = utcDayStart(new Date());
-  let totalCommits = 0;
+  let counted = 0;
   let last = null;
   for (const e of data.entries) {
     if (e.cat !== 'log') continue;
-    totalCommits++;
+    counted++;
     const d = parseEntryDate(e.date);
     const t = d.getTime();
     if (Number.isFinite(t)) {
@@ -288,6 +279,10 @@ export function logStats(data, days = 28) {
     }
     if (!last || e.date > last.date) last = e;
   }
+  // Prefer the precomputed all-history total after a retention cut; buckets and
+  // `last` still come from the in-memory (hot) window, which covers 28/30 days.
+  const precomputed = data.stats?.totalCommits;
+  const totalCommits = Number.isFinite(precomputed) ? precomputed : counted;
   return { totalCommits, buckets, last };
 }
 

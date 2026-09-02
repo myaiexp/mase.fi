@@ -1,5 +1,5 @@
 // Feed rendering — day separators, IRC-style rows, windowed with lazy scroll-up
-import { entriesFor } from './data.js';
+import { entriesFor, loadArchive } from './data.js';
 import { dayOf, timeOf } from './dates.js';
 import { playJitter, clearJitter } from './jitter.js';
 import { relayoutAll, layoutRow, measureFeedMetrics } from './feed-layout.js';
@@ -133,9 +133,10 @@ export function renderFeed(id, data, { immediate = false, navigate } = {}) {
 
   $feed.scrollTop = $feed.scrollHeight;
 
-  const state = { entries, shown, channelId: id, io: null };
+  const needsArchive = id === 'activity' && data.hasArchive && !data.archiveLoaded;
+  const state = { entries, shown, channelId: id, io: null, data, loadingArchive: false };
   windowState.set($feed, state);
-  if (shown < entries.length) ensureWindow($feed, state, sentinel);
+  if (shown < entries.length || needsArchive) ensureWindow($feed, state, sentinel);
   else sentinel.remove();
 
   if (immediate || matchMedia('(prefers-reduced-motion: reduce)').matches) return;
@@ -158,8 +159,27 @@ function ensureWindow($feed, state, sentinel) {
 // scroll so the viewport stays put as content grows above it. Only the newly
 // added rows are laid out, so a reveal costs one batch, not the full history.
 function revealOlder($feed, state, sentinel) {
-  const { entries, shown, channelId } = state;
-  if (shown >= entries.length) { state.io?.disconnect(); sentinel.remove(); return; }
+  const { entries, shown, channelId, data } = state;
+  if (shown >= entries.length) {
+    if (channelId === 'activity' && data?.hasArchive && !data.archiveLoaded && !state.loadingArchive) {
+      state.loadingArchive = true;
+      loadArchive(data).then(() => {
+        if (windowState.get($feed) !== state) return;
+        state.entries = entriesFor(channelId, data);
+        state.loadingArchive = false;
+        revealOlder($feed, state, sentinel);
+      }).catch(() => {
+        if (windowState.get($feed) !== state) return;
+        state.loadingArchive = false;
+        state.io?.disconnect();
+        sentinel.remove();
+      });
+      return;
+    }
+    state.io?.disconnect();
+    sentinel.remove();
+    return;
+  }
 
   const nextShown = Math.min(shown + WINDOW_SIZE, entries.length);
   const older = entries.slice(entries.length - nextShown, entries.length - shown);
@@ -184,7 +204,8 @@ function revealOlder($feed, state, sentinel) {
   $feed.dispatchEvent(new CustomEvent('feed:relayout'));
 
   state.shown = nextShown;
-  if (nextShown >= entries.length) { state.io?.disconnect(); sentinel.remove(); }
+  // Re-enter so an exhausted in-memory window can still kick off the archive fetch.
+  if (nextShown >= entries.length) revealOlder($feed, state, sentinel);
 }
 
 // Click-delegate proj-pill chips that carry a data-target — those are the
