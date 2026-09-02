@@ -18,7 +18,7 @@ All three mase.fi writers source this file. It owns the safety contract:
 
 - **Lock:** `/tmp/mase-updates-json.lock` (`UPDATES_LOCK` override for tests). Well-known `/tmp` path so `sudo -u mase` (no `XDG_RUNTIME_DIR`) and a session `deploy` still serialize against each other.
 - **`ensure_updates_lock`:** opens the path with `O_NOFOLLOW|O_APPEND|O_CREAT` (Python; bash redirects cannot set `O_NOFOLLOW`), refuses a symlink or a file owned by someone else. Finding #8125 / commit `c2a5c8d`.
-- **flock:** callers wrap the read-modify-write in `( … ) 9>>"$UPDATES_JSON_LOCK"` — `9>>` is `O_APPEND`, never `O_TRUNC`, so a race that skipped the O_NOFOLLOW open still cannot clobber through a symlink.
+- **`with_updates_lock <target> <error-label> <transform-fn>`:** the locked read-modify-write. Owns `ensure_updates_lock`, `flock -w 30` on fd 9 with `9>>` (`O_APPEND`, never `O_TRUNC`), the in-lock `jq empty` gate, mktemp/rm of the candidate, and `write_updates_json`. The transform is a bash function `fn src dest` that writes a JSON candidate to `dest` (return 2 = skip, no write). All three mase.fi writers go through this so the lock discipline cannot drift.
 - **`write_updates_json <candidate> <target>`:** `jq empty` the candidate, then install: sibling `mktemp` + `mv` when the target dir is writable (atomic rename); in-place `cp` when it isn't (`/var/www/html` is www-data-owned, so production currently takes the cp path). Invalid candidate → non-zero, target untouched.
 
 helm's `deploy` (Step 3) does **not** source this file — it flocks the same path and writes with in-place `cp` — but it must keep using `/tmp/mase-updates-json.lock`. A new writer that skips the flock will interleave bytes with a concurrent deploy and tear the file.

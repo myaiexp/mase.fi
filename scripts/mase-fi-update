@@ -41,20 +41,9 @@ if [ ! -f "$UPDATES_FILE" ]; then
   echo '{"entries":[],"projects":[]}' > "$UPDATES_FILE"
 fi
 
-# Serialize against concurrent writers — deploy's commit-logger and other
-# mase-fi-update calls all mutate this one shared file, and a non-atomic cp
-# once let two of them interleave bytes and tear it. Shared lock path with
-# helm/scripts/deploy (see updates-write.sh); a one-shot validity gate fails
-# loud on a bad file instead of silently echoing "Added"; unique mktemp
-# avoids a shared temp. 9>> not 9>: O_APPEND, no truncate through a symlink.
-ensure_updates_lock || { echo "Error: updates.json lock unusable — not added" >&2; exit 1; }
-(
-  flock -w 30 9 || { echo "Error: updates.json lock busy >30s — not added" >&2; exit 1; }
-  if ! jq empty "$UPDATES_FILE" 2>/dev/null; then
-    echo "Error: $UPDATES_FILE is malformed JSON — fix it before adding entries" >&2
-    exit 1
-  fi
-  UPD_TMP=$(mktemp)
+# Serialize against concurrent writers — a non-atomic cp once tore the file
+# when deploy's commit-logger raced us. with_updates_lock owns the flock.
+prepend_entry() {
   jq --arg date "$DATE" \
      --arg project "$PROJECT" \
      --arg text "$TEXT" \
@@ -74,10 +63,8 @@ ensure_updates_lock || { echo "Error: updates.json lock unusable — not added" 
            end
        )
      ' \
-     "$UPDATES_FILE" > "$UPD_TMP" \
-  && write_updates_json "$UPD_TMP" "$UPDATES_FILE" \
-  || { echo "Error: failed to write $UPDATES_FILE — entry not added" >&2; rm -f "$UPD_TMP"; exit 1; }
-  rm -f "$UPD_TMP"
-) 9>>"$UPDATES_JSON_LOCK"
+     "$1" > "$2"
+}
+with_updates_lock "$UPDATES_FILE" "not added" prepend_entry
 
 echo "Added $CATEGORY entry: [$PROJECT] $TEXT ($DATE)"
