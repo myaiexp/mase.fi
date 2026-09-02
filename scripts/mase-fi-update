@@ -8,7 +8,7 @@ usage() {
   echo "Usage: mase-fi-update <category> <project> <text> [date]"
   echo ""
   echo "  category:  project | feature"
-  echo "  project:   project name (e.g., tracker, explorer)"
+  echo "  project:   project name (e.g., tracker, wander)"
   echo "  text:      update description"
   echo "  date:      optional, YYYY-MM-DD (defaults to today)"
   exit 1

@@ -46,7 +46,7 @@ export async function fetchDemos() {
  * Fetch + normalize the live updates.json into the canonical shape used by the UI:
  *   { meta:{nick,server,bootTime}, projects:[{name,channel,description,tag,links[],heat}], entries:[{ch,date,cat,nick,text,project?}], demos:[channelSlug] }
  *
- * The real /updates.json carries a different shape — see README — so we map here.
+ * The real /updates.json carries a different shape — see docs/content-pipeline.md — so we map here.
  *  - entry.category → cat
  *  - entry.project (slug) → ch (via project.slug or project.channel match)
  *  - entry.text || entry.summary → text
