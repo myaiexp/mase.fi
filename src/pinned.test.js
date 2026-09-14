@@ -358,6 +358,38 @@ describe('renderHeroLine', () => {
     expect(a.textContent).toBe('<b>x</b>');
   });
 
+  // Exact markup, so the separators and single spaces between parts are pinned.
+  it.each([
+    {
+      name: 'home',
+      id: 'home',
+      data: { projects: [] },
+      html: '<span class="arr">→</span> <a href="#/activity">activity</a> ' +
+        '<span class="sep">·</span> <a href="https://github.com/myaiexp">github</a>',
+    },
+    {
+      name: 'demo + first link + status',
+      id: 'explorer',
+      data: {
+        projects: [{ channel: 'explorer', heat: 0.8, links: [{ href: 'https://x.test/', label: 'site' }, { href: 'https://y.test/', label: 'two' }] }],
+        demos: ['explorer'],
+      },
+      html: '<span class="arr">→</span> <a class="demo-link" href="/demos/explorer/">try demo</a> ' +
+        '<span class="sep">·</span> <a href="https://x.test/">site</a> ' +
+        '<span class="sep">·</span> <span class="status">shipping</span>',
+    },
+    {
+      name: 'demo + status, no links',
+      id: 'explorer',
+      data: { projects: [{ channel: 'explorer', heat: 0.1, links: [] }], demos: ['explorer'] },
+      html: '<span class="arr">→</span> <a class="demo-link" href="/demos/explorer/">try demo</a> ' +
+        '<span class="sep">·</span> <span class="status">idle</span>',
+    },
+  ])('renders the exact hero line for $name', ({ id, data, html }) => {
+    renderHeroLine(id, data);
+    expect(heroEl().innerHTML).toBe(html);
+  });
+
   it('clears the hero line for activity and unmatched channels', () => {
     heroEl().textContent = 'stale';
     renderHeroLine('activity', { projects: [] });

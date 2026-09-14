@@ -206,6 +206,44 @@ describe('accessibility attributes', () => {
   });
 });
 
+describe('renderChanlist escaping', () => {
+  // Channel ids come straight from project.channel in updates.json, and the
+  // registry reuses the id as the label, so one hostile value reaches data-ch,
+  // aria-label and the visible name on both the sidebar row and the mobile tab.
+  const hostile = 'foo" onclick=alert(1) x="<img src=x onerror=1>';
+
+  beforeEach(() => {
+    mountContainers();
+    const data = { projects: [{ name: 'X', channel: hostile, description: 'd', heat: 0.5 }] };
+    initChannels(data);
+    renderChanlist(data, () => {});
+  });
+
+  it.each([
+    { sel: '.chan', name: '.name' },
+    { sel: '.tab', name: '.tab-name' },
+  ])('$sel round-trips a hostile id without attribute or node injection', ({ sel, name }) => {
+    const el = [...document.querySelectorAll(sel)].find(e => e.dataset.ch !== 'home' && e.dataset.ch !== 'activity');
+    expect(el).toBeTruthy();
+    // The browser decodes the escaped attribute, so the full id comes back
+    // intact rather than cut at the first quote.
+    expect(el.getAttribute('data-ch')).toBe(hostile);
+    expect(el.getAttribute('aria-label')).toBe(hostile + ' channel');
+    expect(el.querySelector(name).textContent).toBe(hostile);
+    // No breakout: no attributes or nodes created from the payload.
+    expect(el.hasAttribute('onclick')).toBe(false);
+    expect(el.hasAttribute('x')).toBe(false);
+    expect(el.querySelector('img')).toBeNull();
+    // The quote was entity-escaped in the markup, not emitted as a raw closer.
+    expect(el.outerHTML).toContain('&quot;');
+  });
+
+  it('injects no element or handler anywhere in either container', () => {
+    expect(document.querySelector('#chanlist img, #tabbar img')).toBeNull();
+    expect(document.querySelector('[onclick], [onerror]')).toBeNull();
+  });
+});
+
 describe('keyboard navigation', () => {
   function press(el, key) {
     el.dispatchEvent(new KeyboardEvent('keydown', { key, bubbles: true, cancelable: true }));

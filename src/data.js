@@ -199,7 +199,9 @@ export function entriesFor(channelId, data) {
 
 /**
  * Single-pass log aggregate for the pinned cards. Walks data.entries once:
- *   - totalCommits: count of every `log` entry
+ *   - totalCommits: all-history `log` count (allHistoryLogs below)
+ *   - totalEntries: all-history entry count — the non-log rows (never archived,
+ *                   so all of them are in memory) plus totalCommits
  *   - buckets:      last-`days` per-day counts, oldest first (finite, in-range
  *                   dates only) — the #home heatstrip and the #activity rate
  *   - last:         newest `log` entry by date string, or null
@@ -214,9 +216,13 @@ export function logStats(data, days = 28) {
   const buckets = new Array(days).fill(0);
   const todayUTC = utcDayStart(new Date());
   let counted = 0;
+  let nonLog = 0;
   let last = null;
   for (const e of data.entries) {
-    if (e.cat !== 'log') continue;
+    if (e.cat !== 'log') {
+      nonLog++;
+      continue;
+    }
     counted++;
     const d = parseEntryDate(e.date);
     const t = d.getTime();
@@ -229,16 +235,33 @@ export function logStats(data, days = 28) {
     }
     if (!last || e.date > last.date) last = e;
   }
-  // All-history total: archivedLogs (from compact) plus whatever is in memory.
-  // After loadArchive merges the archive, counted already includes those rows
-  // so we must not add archivedLogs again. Fall back to a snapshot totalCommits
-  // when archivedLogs is absent (a compact from before that field existed).
-  const archived = data.stats?.archivedLogs;
-  let totalCommits = counted;
-  if (Number.isFinite(archived) && !data.archiveLoaded) totalCommits = archived + counted;
-  else if (Number.isFinite(data.stats?.totalCommits) && !Number.isFinite(archived)) {
-    totalCommits = data.stats.totalCommits;
-  }
-  return { totalCommits, buckets, last };
+  const totalCommits = allHistoryLogs(data, counted);
+  return { totalCommits, totalEntries: nonLog + totalCommits, buckets, last };
+}
+
+// All-history log count from `counted`, the log rows in memory. The one home of
+// the archive-cut rule; both pinned cards read it through logStats.
+//   - archive merged: every log row is in memory, so counted is the total
+//   - archivedLogs present: the compact's archived count plus the hot rows, which
+//     stays live while deploys prepend logs between nightly compacts
+//   - neither: a compact from before archivedLogs existed, so its totalCommits
+//     snapshot; else counted (an uncompacted file holds every row)
+function allHistoryLogs(data, counted) {
+  if (data.archiveLoaded) return counted;
+  if (Number.isFinite(data.stats?.archivedLogs)) return data.stats.archivedLogs + counted;
+  if (Number.isFinite(data.stats?.totalCommits)) return data.stats.totalCommits;
+  return counted;
+}
+
+/**
+ * All-history commit count for one project channel: the compact's
+ * commitsByProject (a compact-time snapshot) keyed by slug, then by channel for
+ * projects without a slug; else the project's log rows in memory.
+ */
+export function commitsForProject(project, data) {
+  const byProject = data.stats?.commitsByProject;
+  if (Number.isFinite(byProject?.[project.slug])) return byProject[project.slug];
+  if (Number.isFinite(byProject?.[project.channel])) return byProject[project.channel];
+  return data.entries.filter((e) => e.ch === project.channel && e.cat === 'log').length;
 }
 

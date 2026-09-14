@@ -51,8 +51,8 @@ describe('loadArchive', () => {
     expect(data.entries[0]).toMatchObject({ cat: 'log', nick: 'git', project: 'helm' });
   });
 
-  // A failed load must not set archiveLoaded: logStats and pinnedActivity read it
-  // as "archive rows are in memory" and would drop stats.archivedLogs from the
+  // A failed load must not set archiveLoaded: logStats (behind both pinned cards)
+  // reads it as "archive rows are in memory" and would drop stats.archivedLogs from the
   // all-history totals for the rest of the session (findings #9433, #9444).
   describe('failed load keeps archiveLoaded false and the totals intact', () => {
     const failures = {

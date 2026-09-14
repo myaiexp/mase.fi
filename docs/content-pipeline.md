@@ -7,7 +7,7 @@ The homepage's datastore is one JSON file plus an optional log archive. Four scr
 - Production file: `/var/www/html/updates.json` (default `UPDATES_FILE` in every writer)
 - Log archive: `/var/www/html/updates-archive.json` (default `ARCHIVE_FILE`) — `log` entries older than `LOG_HOT_DAYS` (90). The `#activity` feed fetches it when the scroll-up sentinel exhausts the hot list.
 - Served by nginx from the webroot; the client fetches `/updates.json` (`SOURCE_URL` in `src/data.js`) on every load
-- Shape: `{"entries": [...], "projects": [...], "stats": {...}}` — one fetch provides the hot window. `stats` holds all-history `totalCommits`, `totalEntries`, `logFirst`/`logLast`, `commitsByProject`, and `archive` (whether the archive file has rows).
+- Shape: `{"entries": [...], "projects": [...], "stats": {...}}` — one fetch provides the hot window. `stats` holds all-history `totalCommits`, `totalEntries`, `logFirst`/`logLast`, `commitsByProject`, `archivedLogs`, and `archive` (whether the archive file has rows). All are written at compact time. The client keeps the commit and entry totals live by adding its in-memory logs to `archivedLogs` until the archive is merged (`logStats` in `src/data.js`); `commitsByProject` stays a compact-time snapshot (idea #4713).
 - Dates are ISO in JSON; the client formats Finnish DD.MM. Writers that default "today" use `Europe/Helsinki` (the VPS is UTC).
 - `UPDATES_FILE` / `ARCHIVE_FILE` / `LOG_HOT_DAYS` are overridable so writers can be exercised against a throwaway file (`UPDATES_FILE=/tmp/x.json mase-fi-update feature wander "…"`)
 

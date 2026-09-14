@@ -407,75 +407,7 @@ describe('fetchData date normalization', () => {
   });
 });
 
-// ---- logStats.totalCommits -----------------------------------------------
-
-describe('logStats totalCommits', () => {
-  it('returns 0 for empty entries', () => {
-    expect(logStats(dataWith([])).totalCommits).toBe(0);
-  });
-
-  it('counts only log entries in a mixed dataset', () => {
-    const data = dataWith([
-      entry('log', 'activity'),
-      entry('log', 'explorer'),
-      entry('daily', 'home'),
-      entry('feature', 'explorer'),
-      entry('project', 'explorer'),
-    ]);
-    expect(logStats(data).totalCommits).toBe(2);
-  });
-
-  it('returns 0 when there are no log entries', () => {
-    const data = dataWith([entry('daily', 'home'), entry('feature', 'explorer')]);
-    expect(logStats(data).totalCommits).toBe(0);
-  });
-
-  it('counts a log entry whose date is unparseable', () => {
-    const data = dataWith([
-      entry('log', 'activity', { date: 'not-a-date' }),
-      entry('log', 'activity', { date: dayStr(0) }),
-    ]);
-    expect(logStats(data).totalCommits).toBe(2);
-  });
-
-  it('adds stats.archivedLogs to the in-memory log count for the all-history total', () => {
-    // After a retention cut the hot file holds only recent logs; the pinned
-    // "N in feed" figure must keep the all-history total (finding #8804),
-    // including logs prepended since the last compact.
-    const data = {
-      entries: [entry('log', 'activity'), entry('log', 'activity')],
-      stats: { archivedLogs: 9666 },
-      archiveLoaded: false,
-    };
-    expect(logStats(data).totalCommits).toBe(9668);
-    expect(logStats(data).buckets.length).toBe(28); // buckets still from in-memory
-  });
-
-  it('does not add archivedLogs after the archive has been merged into memory', () => {
-    const data = {
-      entries: [entry('log', 'activity'), entry('log', 'activity')],
-      stats: { archivedLogs: 100 },
-      archiveLoaded: true,
-    };
-    expect(logStats(data).totalCommits).toBe(2);
-  });
-
-  it('falls back to a snapshot totalCommits when archivedLogs is absent', () => {
-    const data = {
-      entries: [entry('log', 'activity'), entry('log', 'activity')],
-      stats: { totalCommits: 9668 },
-    };
-    expect(logStats(data).totalCommits).toBe(9668);
-  });
-
-  it('ignores a non-numeric stats.totalCommits and falls back to counting', () => {
-    const data = {
-      entries: [entry('log', 'activity')],
-      stats: { totalCommits: 'nope' },
-    };
-    expect(logStats(data).totalCommits).toBe(1);
-  });
-});
+// logStats totals and commitsForProject live in data-stats.test.js.
 
 // ---- logStats.buckets ----------------------------------------------------
 

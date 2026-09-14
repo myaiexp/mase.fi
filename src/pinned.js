@@ -1,6 +1,6 @@
 // Pinned hero card renderers — one per channel kind
 import { LOGO, PROJECT_ART, sparkbar } from './ascii.js';
-import { logStats } from './data.js';
+import { logStats, commitsForProject } from './data.js';
 import { dayOf, timeOf } from './dates.js';
 import { mountBeam, unmountBeam } from './beam.js';
 import { escapeHtml } from './html.js';
@@ -77,11 +77,7 @@ function pinnedHome(data) {
 
 function pinnedProject(p, data) {
   const art = PROJECT_ART[p.channel] || '';
-  const commits = Number.isFinite(data.stats?.commitsByProject?.[p.slug])
-    ? data.stats.commitsByProject[p.slug]
-    : Number.isFinite(data.stats?.commitsByProject?.[p.channel])
-      ? data.stats.commitsByProject[p.channel]
-      : data.entries.filter(e => e.ch === p.channel && e.cat === 'log').length;
+  const commits = commitsForProject(p, data);
   const status = heatStatus(p.heat);
   const demoLink = demoLinkHtml(p.channel, data.demos, { arrow: true });
   const linksHtml = demoLink +
@@ -116,10 +112,7 @@ function pinnedActivity(data) {
   // days (idle days excluded so the figure reflects "when I push, ~N/day" rather
   // than a calendar average diluted to near-zero). Recomputed every render — no
   // stale hardcoded constant. '—' when there's been no recent activity.
-  const { buckets: recent, totalCommits } = logStats(data, 28);
-  const totalEntries = data.archiveLoaded
-    ? data.entries.length
-    : data.entries.filter((e) => e.cat !== 'log').length + totalCommits;
+  const { buckets: recent, totalEntries } = logStats(data, 28);
   const activeDays = recent.filter(n => n > 0).length;
   const rate = activeDays
     ? '~' + Math.round(recent.reduce((a, b) => a + b, 0) / activeDays) + '/day'
@@ -146,32 +139,27 @@ function pinnedActivity(data) {
 
 /** Replace #hero-line content with a mobile-only quick-access row. */
 export function renderHeroLine(id, data) {
-  const project = data.projects.find(p => p.channel === id);
-  let html = '';
-  if (id === 'home') {
-    html =
-      '<span class="arr">→</span> ' +
-      '<a href="#/activity">activity</a> ' +
-      '<span class="sep">\xb7</span> ' +
-      '<a href="https://github.com/myaiexp">github</a>';
-  } else if (project) {
-    const status = heatStatus(project.heat);
-    const demo = demoLinkHtml(id, data.demos);
-    const demoLink = demo ? demo + ' <span class="sep">\xb7</span> ' : '';
-    if (project.links && project.links.length > 0) {
-      html =
-        '<span class="arr">→</span> ' + demoLink +
-        '<a href="' + escapeHtml(project.links[0].href) + '">' + escapeHtml(project.links[0].label) + '</a> ' +
-        '<span class="sep">\xb7</span> ' +
-        '<span class="status">' + status.short + '</span>';
-    } else {
-      html =
-        '<span class="arr">→</span> ' + demoLink +
-        '<span class="status">' + status.short + '</span>';
-    }
-  }
   // activity and unmatched channels: empty string — CSS :empty hides the element
-  document.getElementById('hero-line').innerHTML = html;
+  document.getElementById('hero-line').innerHTML = heroLineHtml(id, data);
+}
+
+// The arrow, then the present parts joined by a · separator. '' when the channel
+// has no hero line (activity, unmatched ids).
+function heroLineHtml(id, data) {
+  let parts;
+  if (id === 'home') {
+    parts = ['<a href="#/activity">activity</a>', '<a href="https://github.com/myaiexp">github</a>'];
+  } else {
+    const project = data.projects.find(p => p.channel === id);
+    if (!project) return '';
+    const link = project.links?.[0];
+    parts = [
+      demoLinkHtml(id, data.demos),
+      link ? '<a href="' + escapeHtml(link.href) + '">' + escapeHtml(link.label) + '</a>' : '',
+      '<span class="status">' + heatStatus(project.heat).short + '</span>',
+    ].filter(Boolean);
+  }
+  return '<span class="arr">→</span> ' + parts.join(' <span class="sep">\xb7</span> ');
 }
 
 /** Replace #pinned content with the channel-appropriate card. */
