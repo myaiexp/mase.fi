@@ -1,7 +1,7 @@
 // Channel-switch CRT scanline transition over the feed area
 
 // Track the in-flight run's timers so a rapid re-switch can cancel both:
-//  - midTimer:   the midpoint content swap. If left to fire after we've already
+//  - midTimer:   the mid-sweep content swap. If left to fire after we've already
 //                navigated on, it renders the now-stale channel (and kicks off
 //                its jitter) over the freshly-navigated one. Cancel it on re-entry.
 //  - safetyTimer: the cleanup fallback. Cancel it so it can't tear down the
@@ -9,7 +9,7 @@
 let midTimer = 0;
 let safetyTimer = 0;
 
-/** Play the scanline transition; calls onMid at the midpoint where content should swap. */
+/** Play the scanline transition; calls onMid ~a third of the way in, where content should swap. */
 export function playSwitchTransition(onMid) {
   if (matchMedia('(prefers-reduced-motion: reduce)').matches) {
     onMid();
@@ -18,7 +18,7 @@ export function playSwitchTransition(onMid) {
   const $overlay = document.getElementById('feed-overlay');
 
   // A rapid re-switch can land mid-sweep; cancel the previous run's pending
-  // midpoint swap (so it can't render the now-stale channel) and its cleanup
+  // mid-sweep swap (so it can't render the now-stale channel) and its cleanup
   // timer (so it can't tear down the overlay we're about to rebuild).
   if (midTimer) { clearTimeout(midTimer); midTimer = 0; }
   if (safetyTimer) { clearTimeout(safetyTimer); safetyTimer = 0; }

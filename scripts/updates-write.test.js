@@ -1,5 +1,5 @@
-// Unit tests for write_updates_json: atomic rename vs in-place cp fallback,
-// plus malformed-candidate refusal. Sources the real updates-write.sh.
+// Unit tests for updates-write.sh: install (atomic rename vs in-place cp),
+// the O_NOFOLLOW lock open, and the two locked wrappers. Sources the real file.
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { spawnSync } from 'node:child_process';
 import {
@@ -111,6 +111,54 @@ describe('ensure_updates_lock — O_NOFOLLOW, no truncate', () => {
   });
 });
 
+// source updates-write.sh and call run_under_updates_lock <target> <label> _fn [args...]
+function runUnderLock(target, fnBody, args = [], { label = 'test-label' } = {}) {
+  const lockPath = join(dir, 'updates.json.lock');
+  const script = `
+    set -e
+    source "${join(SCRIPTS_DIR, 'updates-write.sh')}"
+    UPDATES_JSON_LOCK="$3"
+    _fn() { ${fnBody}
+    }
+    target="$1"; label="$2"; shift 3
+    run_under_updates_lock "$target" "$label" _fn "$@"
+  `;
+  return spawnSync('bash', ['-c', script, '--', target, label, lockPath, ...args], {
+    encoding: 'utf8',
+  });
+}
+
+describe('run_under_updates_lock — the one owner of the lock steps', () => {
+  it('runs the function with its args while holding the flock', () => {
+    const target = join(dir, 'updates.json');
+    writeFileSync(target, JSON.stringify({ entries: [] }));
+    // A second, non-blocking flock on the same path must fail while fn runs.
+    const r = runUnderLock(
+      target,
+      'echo "args:$*"; if flock -n "$UPDATES_JSON_LOCK" true; then echo free; else echo held; fi',
+      ['a', 'b c'],
+    );
+    expect(r.status).toBe(0);
+    expect(r.stdout).toContain('args:a b c');
+    expect(r.stdout).toContain('held');
+  });
+
+  it("returns the function's status", () => {
+    const target = join(dir, 'updates.json');
+    writeFileSync(target, JSON.stringify({ entries: [] }));
+    expect(runUnderLock(target, 'return 7').status).toBe(7);
+  });
+
+  it('refuses a malformed target without calling the function', () => {
+    const target = join(dir, 'updates.json');
+    writeFileSync(target, '{ not json');
+    const r = runUnderLock(target, 'echo CALLED');
+    expect(r.status).toBe(1);
+    expect(r.stderr).toMatch(/malformed JSON — test-label/);
+    expect(r.stdout).not.toContain('CALLED');
+  });
+});
+
 // source updates-write.sh and call with_updates_lock <target> <label> <fn>
 function withLock(target, transformBody, { label = 'test-label', lock } = {}) {
   const lockPath = lock || join(dir, 'updates.json.lock');
@@ -164,6 +212,16 @@ describe('with_updates_lock — locked read-modify-write', () => {
     const r = withLock(target, 'echo "transform blew up" >&2; return 1');
     expect(r.status).not.toBe(0);
     expect(r.stderr).toMatch(/failed to write/i);
+    expect(readFileSync(target, 'utf8')).toBe(before);
+  });
+
+  it('does not install a candidate the transform left malformed', () => {
+    const target = join(dir, 'updates.json');
+    writeFileSync(target, JSON.stringify({ entries: [], projects: [] }));
+    const before = readFileSync(target, 'utf8');
+    const r = withLock(target, 'printf "{ half" > "$2"');
+    expect(r.status).not.toBe(0);
+    expect(r.stderr).toMatch(/failed to write .* — test-label/);
     expect(readFileSync(target, 'utf8')).toBe(before);
   });
 

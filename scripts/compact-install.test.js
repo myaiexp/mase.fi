@@ -42,14 +42,14 @@ const FIXTURE = {
 const logTexts = (file) =>
   readJson(file).entries.filter((e) => e.category === 'log').map((e) => e.text).sort();
 
-// source updates-write.sh and call compact_and_install with the caller's env
-// contract; exits with its return code.
+// source updates-write.sh (write_updates_json) + updates-compact.sh and call
+// compact_and_install <hot> <archive> <cutoff>; exits with its return code.
 function compactInstall(hot, archive, cutoff = CUTOFF) {
   const script = `
     source "${join(SCRIPTS_DIR, 'updates-write.sh')}"
-    UPDATES_FILE="$1" ARCHIVE_FILE="$2" CUTOFF="$3"
+    source "${join(SCRIPTS_DIR, 'updates-compact.sh')}"
     rc=0
-    compact_and_install || rc=$?
+    compact_and_install "$1" "$2" "$3" || rc=$?
     exit "$rc"
   `;
   return spawnSync('bash', ['-c', script, '--', hot, archive, cutoff], { encoding: 'utf8' });
@@ -168,5 +168,15 @@ describe('mase-fi-compact-updates — exit status', () => {
     expect(r.status).not.toBe(3);
     expect(r.stdout).not.toMatch(/Compacted/);
     expect(r.stderr).toMatch(/Compact failed/);
+  });
+
+  it('refuses a malformed updates.json under the lock, touching nothing', () => {
+    const hot = join(dir, 'updates.json');
+    writeFileSync(hot, '{ not json');
+    const r = run({ UPDATES_FILE: hot });
+    expect(r.status).toBe(1);
+    expect(r.stderr).toMatch(/malformed JSON — not compacted/);
+    expect(readFileSync(hot, 'utf8')).toBe('{ not json');
+    expect(existsSync(join(dir, 'updates-archive.json'))).toBe(false);
   });
 });

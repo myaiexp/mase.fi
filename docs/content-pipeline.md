@@ -8,10 +8,10 @@ The homepage's datastore is one JSON file plus an optional log archive. Four scr
 - Log archive: `/var/www/html/updates-archive.json` (default `ARCHIVE_FILE`) — `log` entries older than `LOG_HOT_DAYS` (90). The `#activity` feed fetches it when the scroll-up sentinel exhausts the hot list.
 - Served by nginx from the webroot; the client fetches `/updates.json` (`SOURCE_URL` in `src/data.js`) on every load
 - Shape: `{"entries": [...], "projects": [...], "stats": {...}}` — one fetch provides the hot window. `stats` holds all-history `totalCommits`, `totalEntries`, `logFirst`/`logLast`, `commitsByProject`, `archivedLogs`, and `archive` (whether the archive file has rows). All are written at compact time. The client keeps the commit and entry totals live by adding its in-memory logs to `archivedLogs` until the archive is merged (`logStats` in `src/data.js`); `commitsByProject` stays a compact-time snapshot (idea #4713).
-- Dates are ISO in JSON; the client formats Finnish DD.MM. Writers that default "today" use `Europe/Helsinki` (the VPS is UTC).
+- Dates are ISO in JSON and the client renders them as ISO too: `YYYY-MM-DD` day separators and `HH:MM` row times (`dayOf` / `timeOf` in `src/dates.js`). Writers that default "today" use `Europe/Helsinki` (the VPS is UTC).
 - `UPDATES_FILE` / `ARCHIVE_FILE` / `LOG_HOT_DAYS` are overridable so writers can be exercised against a throwaway file (`UPDATES_FILE=/tmp/x.json mase-fi-update feature wander "…"`)
 
-`daily` entries store `{date, category, project, summary}` only — they do **not** embed a `commits` array (that field duplicated the `#activity` log and was ~39% of the payload). Compact (`scripts/mase-fi-compact-updates`, also the tail of `mase-fi-daily-summary`) strips any leftover `commits` keys, archives old logs, and rewrites `stats`.
+`daily` entries store `{date, category, project, summary}` only — they do **not** embed a `commits` array (that field duplicated the `#activity` log and was ~39% of the payload). Compact (`scripts/mase-fi-compact-updates`, which `mase-fi-daily-summary` runs at the end of every run) strips any leftover `commits` keys, archives old logs, and rewrites `stats`.
 
 Local `pnpm dev` reads `/updates.json` from Vite's `public/` dir. There is no `public/` in the checkout — drop a gitignored fixture at `public/updates.json` or the app degrades to `projects: [], entries: []`. See CLAUDE.md Deploy.
 
@@ -21,13 +21,19 @@ All four mase.fi writers (`mase-fi-update`, `mase-fi-daily-summary`, `mase-fi-pr
 
 - **Lock:** `/tmp/mase-updates-json.lock` (`UPDATES_LOCK` override for tests). Well-known `/tmp` path so `sudo -u mase` (no `XDG_RUNTIME_DIR`) and a session `deploy` still serialize against each other.
 - **`ensure_updates_lock`:** opens the path with `O_NOFOLLOW|O_APPEND|O_CREAT` (Python; bash redirects cannot set `O_NOFOLLOW`), refuses a symlink or a file owned by someone else. Finding #8125 / commit `c2a5c8d`.
-- **`with_updates_lock <target> <error-label> <transform-fn>`:** the locked read-modify-write. Owns `ensure_updates_lock`, `flock -w 30` on fd 9 with `9>>` (`O_APPEND`, never `O_TRUNC`), the in-lock `jq empty` gate, mktemp/rm of the candidate, and `write_updates_json`. The transform is a bash function `fn src dest` that writes a JSON candidate to `dest` (return 2 = skip, no write). `mase-fi-update`, `mase-fi-daily-summary`, and `mase-fi-projects` go through this so the lock discipline cannot drift. Compact takes the same flock but writes two files, so it calls `compact_and_install` under its own lock instead.
+- **`run_under_updates_lock <target> <error-label> <fn> [args...]`:** the only copy of the lock steps — `ensure_updates_lock`, `flock -w 30` on fd 9 with `9>>` (`O_APPEND`, never `O_TRUNC`), and the in-lock `jq empty` gate on `<target>` — then runs `fn args…` and returns its status. Lock unusable, busy >30s, or target malformed → returns 1 with `… — <error-label>` on stderr and `fn` is never called. Every writer's locked section goes through here, so the timeout, open flags, and gate cannot drift.
+- **`with_updates_lock <target> <error-label> <transform-fn>`:** the single-file read-modify-write on top of `run_under_updates_lock`: mktemp/rm of the candidate plus `write_updates_json`. The transform is a bash function `fn src dest` that writes a JSON candidate to `dest` (return 2 = skip, no write). `mase-fi-update`, `mase-fi-daily-summary`, and `mase-fi-projects` use it.
 - **`write_updates_json <candidate> <target>`:** `jq empty` the candidate, then install: sibling `mktemp` + `mv` when the target dir is writable (atomic rename); in-place `cp` when it isn't (`/var/www/html` is www-data-owned, so production currently takes the cp path). Invalid candidate → non-zero, target untouched.
-- **`compact_updates_json` / `compact_and_install`:** strip `commits`, move `log` entries older than `CUTOFF` into the archive, write `stats`. `mase-fi-compact-updates` is the standalone entry; daily-summary runs it on every path (including skip). Never loses a log:
-  - Install order is **archive first, then hot**. A failed hot install leaves the aged logs in both files, and the next compact and the client's `loadArchive` dedupe them. A failed archive install leaves the hot file untouched.
-  - An existing archive that is not `{entries:[...]}` (torn by an interrupted in-place `cp`, 0 bytes, hand-edited) fails the compact. Only a missing archive counts as empty.
-  - If the archive file is missing and cannot be created, compact degrades: strips `commits`, writes stats, keeps every log in the hot file, returns 3.
-  - Callers: `mase-fi-compact-updates` exits 3 (degraded) or non-zero (failed). daily-summary keeps a compact miss non-fatal but sends a `compact degraded` / `compact FAILED` ntfy.
+
+### Compaction — `scripts/updates-compact.sh` + `scripts/mase-fi-compact-updates`
+
+`updates-compact.sh` holds the transform: `compact_updates_json` (pure jq) and `compact_and_install <hot> <archive> <cutoff>` strip `commits`, move `log` entries older than the cutoff (today minus `LOG_HOT_DAYS`) into the archive, and write `stats`. Compaction writes two files, so `mase-fi-compact-updates` runs `compact_and_install` under `run_under_updates_lock` rather than `with_updates_lock`. It never loses a log:
+
+- Install order is **archive first, then hot**. A failed hot install leaves the aged logs in both files, and the next compact and the client's `loadArchive` dedupe them. A failed archive install leaves the hot file untouched.
+- An existing archive that is not `{entries:[...]}` (torn by an interrupted in-place `cp`, 0 bytes, hand-edited) fails the compact. Only a missing archive counts as empty.
+- If the archive file is missing and cannot be created, compact degrades: strips `commits`, writes stats, keeps every log in the hot file, returns 3.
+
+`mase-fi-compact-updates` exits 0 (compacted), 3 (degraded), or another non-zero status (failed — a busy lock or malformed `updates.json` included). `mase-fi-daily-summary` runs it at the end of every run, skip paths included, and never fails on it: a degraded or failed compact sends a `compact degraded` / `compact FAILED` ntfy instead.
 
 helm's `deploy` (Step 3) does **not** source this file — it flocks the same path and writes with in-place `cp` — but it must keep using `/tmp/mase-updates-json.lock`. A new writer that skips the flock will interleave bytes with a concurrent deploy and tear the file.
 

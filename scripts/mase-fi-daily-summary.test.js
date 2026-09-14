@@ -255,6 +255,16 @@ exit 7
     expect(curl.pushes()).toBe('');
     expect(readJson(join(dir, 'updates-archive.json')).entries.map((e) => e.text)).toEqual(['old commit']);
   });
+
+  it('compacts on the write path too, after the day\'s summaries land', () => {
+    seed([log('alpha', 'feat(alpha): only'), log('beta', 'ancient commit', '2026-01-01')]);
+    const curl = fakeCurl();
+    const r = run({ ...curl.env, CLAUDE_BIN: writeClaudeStub(dir, { exitCode: 1 }) });
+    expect(r.status).toBe(0);
+    expect(dailies()).toHaveLength(1);
+    expect(curl.pushes()).toBe('');
+    expect(readJson(join(dir, 'updates-archive.json')).entries.map((e) => e.text)).toEqual(['ancient commit']);
+  });
 });
 
 describe('mase-fi-daily-summary — in-lock write guards', () => {

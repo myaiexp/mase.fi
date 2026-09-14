@@ -1,5 +1,5 @@
 // Unit tests for compact_updates_json, the pure strip-commits + archive-logs
-// transform in updates-write.sh (no lock, no install).
+// transform in updates-compact.sh (no lock, no install).
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { spawnSync } from 'node:child_process';
 import { existsSync, readFileSync, writeFileSync } from 'node:fs';
@@ -17,11 +17,11 @@ beforeEach(() => {
 });
 afterEach(() => cleanup(dir));
 
-// source updates-write.sh and call compact_updates_json
+// source updates-compact.sh and call compact_updates_json
 function compactViaShell(hot, arch, hotOut, archOut, cutoff) {
   const script = `
     set -e
-    source "${join(SCRIPTS_DIR, 'updates-write.sh')}"
+    source "${join(SCRIPTS_DIR, 'updates-compact.sh')}"
     compact_updates_json "$1" "$2" "$3" "$4" "$5"
   `;
   return spawnSync('bash', ['-c', script, '--', hot, arch, hotOut, archOut, cutoff], {

@@ -3,9 +3,10 @@
 set -euo pipefail
 
 # Resolve the real script dir through the ~/.local/bin symlink so the sibling
-# helper + mase-fi-projects are found regardless of how we were invoked.
+# helper, mase-fi-projects, and mase-fi-compact-updates are found regardless of
+# how we were invoked.
 SCRIPT_DIR="$(dirname "$(readlink -f "$0")")"
-# Shared validate + atomic-or-in-place install of updates.json (write_updates_json).
+# Shared updates.json lock + install (with_updates_lock, write_updates_json).
 source "$SCRIPT_DIR/updates-write.sh"
 
 UPDATES_FILE="${UPDATES_FILE:-/var/www/html/updates.json}"
@@ -21,10 +22,6 @@ CLAUDE_TIMEOUT="${CLAUDE_TIMEOUT:-120}"
 # day from flooding #home. Not derived from commit count — a 60-commit refactor
 # sweep is still one line, a feature-packed day earns several.
 MAX_LINES="${MAX_LINES:-3}"
-# Hot-file retention for `log` entries. Older logs move to updates-archive.json
-# on compact (finding #8804). Heat (30d) and the 28d sparkbar stay in-window.
-LOG_HOT_DAYS="${LOG_HOT_DAYS:-90}"
-ARCHIVE_FILE="${ARCHIVE_FILE:-$(dirname "$UPDATES_FILE")/updates-archive.json}"
 NTFY_URL="${NTFY_URL:-https://ntfy.mase.fi/kelo}"
 HELM_ENV="${HELM_ENV:-/home/mase/Projects/helm/.env}"
 # Run claude from a throwaway empty dir. Invoked inside a project checkout it
@@ -77,35 +74,27 @@ on_exit() {
 }
 trap on_exit EXIT
 
-# Compact under the shared flock: strip unused commits[], archive logs older
-# than LOG_HOT_DAYS, write stats. Non-fatal — a compact miss must not fail a
-# successful daily write (the next run retries) — but a failed or degraded
-# compact still pushes an ntfy alert, since the exit-code alert in on_exit
-# never sees it. The alert goes out after the lock is released.
-compact_locked() {
-  CUTOFF="$(TZ="Europe/Helsinki" date -d "${TODAY} - ${LOG_HOT_DAYS} days" +%Y-%m-%d)"
-  export CUTOFF ARCHIVE_FILE UPDATES_FILE
-  ensure_updates_lock || { echo "compact skipped: lock unusable" >&2; return 0; }
-  local rc=0 err="$WORK_DIR/compact.err"
-  (
-    flock -w 30 9 || { echo "compact skipped: lock busy" >&2; exit 0; }
-    if ! jq empty "$UPDATES_FILE" 2>/dev/null; then
-      echo "compact skipped: malformed JSON" >&2
-      exit 0
-    fi
-    compact_and_install
-  ) 9>>"$UPDATES_JSON_LOCK" 2>"$err" || rc=$?
+# Compact after every run, skip paths included: strip unused commits[], archive
+# logs older than LOG_HOT_DAYS, rewrite stats (finding #8804). The compact script
+# owns the lock and the LOG_HOT_DAYS / ARCHIVE_FILE defaults (both still
+# env-overridable). Non-fatal like the projects refresh — a compact miss must
+# not fail a successful daily write; the next run retries — but a degraded
+# (exit 3) or failed compact pushes an ntfy alert, since on_exit never sees it.
+# TODAY is passed so a run that crosses midnight compacts against the day it
+# summarized.
+run_compact() {
+  local rc=0 err="$WORK_DIR/compact.err" why
+  UPDATES_FILE="$UPDATES_FILE" TODAY="$TODAY" "$SCRIPT_DIR/mase-fi-compact-updates" 2>"$err" || rc=$?
   cat "$err" >&2
-  local why
-  why="$(tail -n 1 "$err")"
+  why="$(<"$err")"
   case "$rc" in
     0) ;;
     3) ntfy_send "mase.fi compact degraded" \
-         "${TODAY}: cannot create ${ARCHIVE_FILE} — commits stripped but logs kept in updates.json, which will keep growing" ;;
-    *) ntfy_send "mase.fi compact FAILED (exit $rc)" \
+         "${TODAY}: ${why:-log archive cannot be created} — commits stripped but logs kept in updates.json, which will keep growing" ;;
+    *) echo "compact failed (non-fatal)" >&2
+       ntfy_send "mase.fi compact FAILED (exit $rc)" \
          "${TODAY}: updates.json not compacted — ${why:-no stderr}. check: journalctl --user -u mase-fi-daily-summary" ;;
   esac
-  return 0
 }
 
 if [[ ! -f "$UPDATES_FILE" ]]; then
@@ -123,7 +112,7 @@ fi
 DAILY_EXISTS=$(jq --arg date "$TODAY" '[.entries[] | select(.category == "daily" and .date == $date)] | length' "$UPDATES_FILE")
 if [[ "$DAILY_EXISTS" -gt 0 ]]; then
     echo "Daily entries already exist for $TODAY — skipping"
-    compact_locked
+    run_compact
     exit 0
 fi
 
@@ -132,7 +121,7 @@ LOG_COUNT=$(jq --arg date "$TODAY" '[.entries[] | select(.category == "log" and 
 
 if [[ "$LOG_COUNT" -eq 0 ]]; then
     echo "No log entries for $TODAY — skipping"
-    compact_locked
+    run_compact
     exit 0
 fi
 
@@ -326,7 +315,7 @@ prepend_dailies() {
   ' "$1" > "$2"
 }
 with_updates_lock "$UPDATES_FILE" "daily entries not written" prepend_dailies
-compact_locked
+run_compact
 
 DAILY_COUNT=$(jq --arg date "$TODAY" '[.entries[] | select(.category == "daily" and .date == $date)] | length' "$UPDATES_FILE")
 echo "Created $DAILY_COUNT daily summary entries for $TODAY"
