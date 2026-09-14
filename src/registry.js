@@ -9,7 +9,9 @@
 // channelById() rather than holding a live export binding. buildRegistry
 // rebuilds it by plain reassignment, so no external module can splice it.
 let _channels = [];
-let _byId = {};
+// A Map, not a {} literal: ids arrive straight from the URL hash, and a plain
+// object would resolve inherited keys (#/constructor, #/__proto__) as channels.
+let _byId = new Map();
 
 /** The ordered channel list [home, ...projects, activity]. Frozen — read-only to callers. */
 export function getChannels() {
@@ -18,11 +20,11 @@ export function getChannels() {
 
 /** Look up a channel by id, or undefined when it isn't in the registry. */
 export function channelById(id) {
-  return _byId[id];
+  return _byId.get(id);
 }
 
 export function chHeat(id) {
-  const c = _byId[id];
+  const c = _byId.get(id);
   if (c?.project) return c.project.heat;
   if (id === 'home') return 1.0;
   if (id === 'activity') return 0.85;
@@ -49,6 +51,5 @@ export function buildRegistry(data) {
     })),
     { id: 'activity', group: 'system', label: 'activity', topic: 'raw commit stream across all projects' },
   ]);
-  _byId = {};
-  for (const c of _channels) _byId[c.id] = c;
+  _byId = new Map(_channels.map(c => [c.id, c]));
 }

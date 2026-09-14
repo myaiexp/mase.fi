@@ -153,3 +153,60 @@ describe('global shortcuts (window keydown, non-input target)', () => {
     expect(document.activeElement).not.toBe(input());
   });
 });
+
+// A feed row shaped the way applySearch reads it: .feed-row[data-raw] > .msg.
+function addRow(text) {
+  const row = document.createElement('div');
+  row.className = 'feed-row';
+  row.dataset.raw = text;
+  const msg = document.createElement('span');
+  msg.className = 'msg';
+  msg.textContent = text;
+  row.appendChild(msg);
+  document.getElementById('feed').appendChild(row);
+  return row;
+}
+
+describe('Escape', () => {
+  it('clears an active search: empty value, no marks or dimming, input blurred', () => {
+    const hit = addRow('shipped the wander rename');
+    const miss = addRow('fixed a typo');
+    input().focus();
+    const el = type('wander');
+    // Precondition: the search really marked and dimmed, so the clear is observable.
+    expect(hit.querySelector('mark')?.textContent).toBe('wander');
+    expect(miss.classList.contains('search-dim')).toBe(true);
+    expect(document.activeElement).toBe(el);
+
+    press(el, 'Escape');
+    expect(el.value).toBe('');
+    expect(document.querySelector('#feed mark')).toBeNull();
+    expect(document.querySelector('#feed .search-dim')).toBeNull();
+    expect(hit.querySelector('.msg').textContent).toBe('shipped the wander rename');
+    expect(document.getElementById('cmd').classList.contains('mode-search')).toBe(false);
+    expect(document.getElementById('cmd-hint').textContent).toBe('');
+    expect(document.activeElement).not.toBe(el);
+  });
+
+  it('cancels an open "/" popup: listbox collapsed, nothing navigated, input blurred', () => {
+    input().focus();
+    const el = type('/exp');
+    expect(cc().hidden).toBe(false);
+    expect(el.getAttribute('aria-expanded')).toBe('true');
+
+    press(el, 'Escape');
+    expect(el.value).toBe('');
+    expect(cc().hidden).toBe(true);
+    expect(cc().children.length).toBe(0);
+    expect(cc().getAttribute('role')).toBeNull();
+    expect(el.getAttribute('aria-expanded')).toBe('false');
+    expect(el.hasAttribute('aria-activedescendant')).toBe(false);
+    expect(document.getElementById('cmd').classList.contains('mode-slash')).toBe(false);
+    expect(channels.navigate).not.toHaveBeenCalled();
+    expect(document.activeElement).not.toBe(el);
+
+    // The stale "/exp" matches are gone: Enter after Escape must not jump.
+    press(el, 'Enter');
+    expect(channels.navigate).not.toHaveBeenCalled();
+  });
+});

@@ -167,6 +167,27 @@ describe('navigate', () => {
     expect(location.hash).toBe('#/home');
   });
 
+  // Ids come from the URL hash; inherited Object keys must not pass as channels.
+  it.each(['constructor', '__proto__', 'toString', 'hasOwnProperty', 'valueOf'])(
+    'coerces the inherited Object key %s to home',
+    (id) => {
+      seed();
+      expect(channels.channelById(id)).toBeUndefined();
+      channels.navigate(id);
+      expect(channels.getCurrentChannelId()).toBe('home');
+      expect(location.hash).toBe('#/home');
+      expect(document.getElementById('topic-hash').textContent).toBe('#home');
+      expect(sidebar.setActiveChannel).toHaveBeenCalledWith('home');
+    },
+  );
+
+  it('a project really named "constructor" is still reachable', () => {
+    initCapturing({ projects: [{ channel: 'constructor', description: 'c topic', heat: 0.5 }], entries: [] });
+    channels.navigate('constructor');
+    expect(channels.getCurrentChannelId()).toBe('constructor');
+    expect(document.getElementById('topic-hash').textContent).toBe('#constructor');
+  });
+
   it('navigating to the already-current channel is a no-op', () => {
     seed();
     channels.navigate('explorer');
@@ -269,5 +290,13 @@ describe('applyInitialChannel', () => {
     window.history.replaceState(null, '', '#/ghost');
     channels.applyInitialChannel();
     expect(channels.getCurrentChannelId()).toBe('home');
+  });
+
+  it('hash naming an inherited Object key → falls back to home', () => {
+    seed();
+    window.history.replaceState(null, '', '#/__proto__');
+    channels.applyInitialChannel();
+    expect(channels.getCurrentChannelId()).toBe('home');
+    expect(document.getElementById('topic-hash').textContent).toBe('#home');
   });
 });

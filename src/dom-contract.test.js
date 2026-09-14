@@ -1,5 +1,7 @@
 // Guard: every getElementById / $() id in src/*.js exists in the matching HTML.
-// @vitest-environment jsdom
+// Node environment: this reads source/HTML via node:fs and builds its own JSDOM,
+// so it needs Node builtins and none of the jsdom globals.
+// @vitest-environment node
 import { describe, it, expect } from 'vitest';
 import { readdirSync, readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
