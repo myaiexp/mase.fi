@@ -78,20 +78,34 @@ on_exit() {
 trap on_exit EXIT
 
 # Compact under the shared flock: strip unused commits[], archive logs older
-# than LOG_HOT_DAYS, write stats. Best-effort — a compact miss must not fail
-# a successful daily write (the next skip-path run retries).
+# than LOG_HOT_DAYS, write stats. Non-fatal — a compact miss must not fail a
+# successful daily write (the next run retries) — but a failed or degraded
+# compact still pushes an ntfy alert, since the exit-code alert in on_exit
+# never sees it. The alert goes out after the lock is released.
 compact_locked() {
   CUTOFF="$(TZ="Europe/Helsinki" date -d "${TODAY} - ${LOG_HOT_DAYS} days" +%Y-%m-%d)"
   export CUTOFF ARCHIVE_FILE UPDATES_FILE
   ensure_updates_lock || { echo "compact skipped: lock unusable" >&2; return 0; }
+  local rc=0 err="$WORK_DIR/compact.err"
   (
     flock -w 30 9 || { echo "compact skipped: lock busy" >&2; exit 0; }
     if ! jq empty "$UPDATES_FILE" 2>/dev/null; then
       echo "compact skipped: malformed JSON" >&2
       exit 0
     fi
-    compact_and_install || echo "compact failed" >&2
-  ) 9>>"$UPDATES_JSON_LOCK"
+    compact_and_install
+  ) 9>>"$UPDATES_JSON_LOCK" 2>"$err" || rc=$?
+  cat "$err" >&2
+  local why
+  why="$(tail -n 1 "$err")"
+  case "$rc" in
+    0) ;;
+    3) ntfy_send "mase.fi compact degraded" \
+         "${TODAY}: cannot create ${ARCHIVE_FILE} — commits stripped but logs kept in updates.json, which will keep growing" ;;
+    *) ntfy_send "mase.fi compact FAILED (exit $rc)" \
+         "${TODAY}: updates.json not compacted — ${why:-no stderr}. check: journalctl --user -u mase-fi-daily-summary" ;;
+  esac
+  return 0
 }
 
 if [[ ! -f "$UPDATES_FILE" ]]; then

@@ -2,8 +2,9 @@
 // the single-vs-multi-commit branch. `claude -p` is stubbed via CLAUDE_BIN; the
 // live helm showcase API and ntfy are neutralized so the run is fully hermetic.
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+import process from 'node:process';
 import { join } from 'node:path';
-import { writeFileSync, readFileSync } from 'node:fs';
+import { chmodSync, existsSync, mkdirSync, writeFileSync, readFileSync } from 'node:fs';
 import { makeTempDir, cleanup, writeJson, readJson, runScript, todayHelsinki, writeClaudeStub, readClaudeArgv } from './test-helpers.js';
 
 let TODAY;
@@ -200,6 +201,59 @@ describe('mase-fi-daily-summary — clean_lines drop rules', () => {
     const { summary } = dailies()[0];
     expect(summary).not.toMatch(/\([^)]*$/); // no unclosed paren at end
     expect(summary.length).toBeLessThanOrEqual(111);
+  });
+});
+
+describe('mase-fi-daily-summary — compact alerts (finding #9443)', () => {
+  // Fake curl first on PATH: records ntfy pushes and fails every other call, which
+  // the showcase refresh treats as helm unreachable (.projects left alone).
+  const fakeCurl = () => {
+    const bin = join(dir, 'bin');
+    const pushes = join(dir, 'ntfy-pushes');
+    mkdirSync(bin);
+    writeFileSync(join(bin, 'curl'), `#!/usr/bin/env bash
+case "$*" in *ntfy.test*) printf '%s\\n' "$*" >> ${JSON.stringify(pushes)}; exit 0 ;; esac
+exit 7
+`);
+    chmodSync(join(bin, 'curl'), 0o755);
+    return {
+      env: { PATH: `${bin}:${process.env.PATH}`, NTFY_TOKEN: 'test-token', NTFY_URL: 'http://ntfy.test/kelo' },
+      pushes: () => (existsSync(pushes) ? readFileSync(pushes, 'utf8') : ''),
+    };
+  };
+  // No log for today → the skip path, which still compacts.
+  const seedSkip = () => seed([log('beta', 'old commit', '2026-01-01')]);
+
+  it('pushes a FAILED alert, exits 0, and leaves both files alone on a malformed archive', () => {
+    seedSkip();
+    const arch = join(dir, 'updates-archive.json');
+    writeFileSync(arch, '{ torn');
+    const before = readFileSync(file, 'utf8');
+    const curl = fakeCurl();
+    const r = run({ ...curl.env, ARCHIVE_FILE: arch });
+    expect(r.status).toBe(0);
+    expect(r.stderr).toMatch(/not a valid .*archive/);
+    expect(curl.pushes()).toMatch(/compact FAILED/);
+    expect(readFileSync(arch, 'utf8')).toBe('{ torn');
+    expect(readFileSync(file, 'utf8')).toBe(before);
+  });
+
+  it('pushes a degraded alert when the archive cannot be created', () => {
+    seedSkip();
+    const curl = fakeCurl();
+    const r = run({ ...curl.env, ARCHIVE_FILE: join(dir, 'missing-dir', 'a.json') });
+    expect(r.status).toBe(0);
+    expect(curl.pushes()).toMatch(/compact degraded/);
+    expect(readJson(file).entries.map((e) => e.text)).toEqual(['old commit']);
+  });
+
+  it('pushes nothing on a clean compact', () => {
+    seedSkip();
+    const curl = fakeCurl();
+    const r = run(curl.env);
+    expect(r.status).toBe(0);
+    expect(curl.pushes()).toBe('');
+    expect(readJson(join(dir, 'updates-archive.json')).entries.map((e) => e.text)).toEqual(['old commit']);
   });
 });
 

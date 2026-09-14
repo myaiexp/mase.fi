@@ -17,6 +17,7 @@ if [[ ! -f "$UPDATES_FILE" ]]; then
 fi
 
 ensure_updates_lock || { echo "updates.json lock unusable — not compacted" >&2; exit 1; }
+rc=0
 (
   flock -w 30 9 || { echo "updates.json lock busy >30s — not compacted" >&2; exit 1; }
   if ! jq empty "$UPDATES_FILE" 2>/dev/null; then
@@ -24,6 +25,14 @@ ensure_updates_lock || { echo "updates.json lock unusable — not compacted" >&2
     exit 1
   fi
   compact_and_install
-) 9>>"$UPDATES_JSON_LOCK"
+) 9>>"$UPDATES_JSON_LOCK" || rc=$?
 
-echo "Compacted $UPDATES_FILE (cutoff $CUTOFF, archive $ARCHIVE_FILE)"
+# compact_and_install: 0 compacted, 3 degraded (logs kept in the hot file),
+# anything else failed. Both non-zero cases exit non-zero so a caller notices.
+case "$rc" in
+  0) echo "Compacted $UPDATES_FILE (cutoff $CUTOFF, archive $ARCHIVE_FILE)" ;;
+  3) echo "Compacted $UPDATES_FILE without archiving — cannot create $ARCHIVE_FILE, logs kept in the hot file" >&2
+     exit 3 ;;
+  *) echo "Compact failed (exit $rc) — $UPDATES_FILE not compacted" >&2
+     exit "$rc" ;;
+esac

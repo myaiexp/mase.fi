@@ -141,11 +141,20 @@ write_updates_json() {
 # every entry, moves `log` entries older than <cutoff> (YYYY-MM-DD) into the
 # archive, and writes precomputed stats onto the hot object so the client can
 # keep all-history totals after the retention cut (finding #8804).
-# <archive_src> may be missing or malformed — treated as {entries:[]}.
+# An empty <cutoff> archives nothing: no string sorts below "", so every log —
+# undated ones included — stays in the hot file.
+# <archive_src> that is "" or missing is treated as {entries:[]}. One that exists
+# but is not {entries:[...]} fails the compact: production writes the archive by
+# in-place cp, so an interrupted run can leave it torn, and treating that as
+# empty would overwrite every archived log with only tonight's newly aged ones.
 compact_updates_json() {
   local hot_src="$1" arch_src="$2" hot_dst="$3" arch_dst="$4" cutoff="$5"
   local arch_for_jq empty_arch="" combined=""
-  if [[ -f "$arch_src" ]] && jq empty "$arch_src" 2>/dev/null; then
+  if [[ -n "$arch_src" && -e "$arch_src" ]]; then
+    if ! jq -e 'type == "object" and ((.entries | type) == "array")' "$arch_src" >/dev/null 2>&1; then
+      echo "compact: $arch_src is not a valid {entries:[...]} archive — refusing to compact (it may hold archived history)" >&2
+      return 1
+    fi
     arch_for_jq="$arch_src"
   else
     empty_arch="$(mktemp)" || return 1
@@ -154,7 +163,9 @@ compact_updates_json() {
   fi
   combined="$(mktemp)" || { rm -f "$empty_arch"; return 1; }
   if ! jq --arg cutoff "$cutoff" --slurpfile arch "$arch_for_jq" '
-    def entry_day: (.date // "") | split("T")[0];
+    # "" | split("T") is [], so an undated entry must default back to "" — a
+    # null day sorts below every cutoff and would age out even when cutoff is "".
+    def entry_day: ((.date // "") | split("T")[0]) // "";
     def log_key: [(.date // ""), (.project // ""), (.text // .summary // ""), (.category // "")];
 
     . as $root
@@ -201,8 +212,20 @@ compact_updates_json() {
 
 # compact_and_install — caller holds the updates.json flock.
 # Uses UPDATES_FILE, ARCHIVE_FILE (optional), CUTOFF (YYYY-MM-DD).
-# If ARCHIVE_FILE is unset/unwritable, still strips commits and writes stats
-# but leaves old logs in the hot file (degraded, never drops history).
+#
+# Returns:
+#   0  compacted: aged logs moved to the archive, hot file rewritten
+#   3  degraded: the archive file is missing and cannot be created, so commits
+#      were stripped and stats written but every log stays in the hot file
+#   *  failed: see stderr. Never loses a log (install order below).
+#
+# Install order is archive first, then hot. The archive write only adds rows
+# and is idempotent (unique_by(log_key)), so if the hot install fails after it
+# the aged logs just sit in both files until the next compact, and the client's
+# loadArchive dedupes them. Hot first would strip them from updates.json before
+# the archive held them, losing them for good if the archive install then failed.
+# An existing archive that cannot be parsed or written is a failure, not the
+# degraded path: it may hold history that a hot-only rewrite would stop counting.
 compact_and_install() {
   local cutoff="${CUTOFF:?compact_and_install: CUTOFF is required}"
   local hot="${UPDATES_FILE:?compact_and_install: UPDATES_FILE is required}"
@@ -224,32 +247,32 @@ compact_and_install() {
   fi
 
   if [[ "$split" -eq 0 ]]; then
-    # No-split path: strip commits, write stats over the full in-file history.
-    if ! compact_updates_json "$hot" /dev/null "$hot_tmp" "$arch_tmp" "1970-01-01"; then
+    # No archive source and an empty cutoff: nothing ages out, so the archive
+    # rows are empty and stats.archive comes out false — the client never
+    # fetches the file we could not create.
+    if ! compact_updates_json "$hot" "" "$hot_tmp" "$arch_tmp" ""; then
       rm -f "$hot_tmp" "$arch_tmp"
       return 1
     fi
-    # Force archive:false so the client does not fetch a file we could not write.
-    if ! jq '.stats.archive = false' "$hot_tmp" > "$hot_tmp.n" || ! mv "$hot_tmp.n" "$hot_tmp"; then
-      rm -f "$hot_tmp" "$arch_tmp" "$hot_tmp.n"
+    if ! write_updates_json "$hot_tmp" "$hot"; then
+      rm -f "$hot_tmp" "$arch_tmp"
       return 1
     fi
-    local rc=0
-    write_updates_json "$hot_tmp" "$hot" || rc=$?
     rm -f "$hot_tmp" "$arch_tmp"
-    return $rc
+    return 3
   fi
 
   if ! compact_updates_json "$hot" "$arch" "$hot_tmp" "$arch_tmp" "$cutoff"; then
     rm -f "$hot_tmp" "$arch_tmp"
     return 1
   fi
-  if ! write_updates_json "$hot_tmp" "$hot"; then
+  if ! write_updates_json "$arch_tmp" "$arch"; then
+    echo "compact: archive install failed ($arch) — $hot left untouched" >&2
     rm -f "$hot_tmp" "$arch_tmp"
     return 1
   fi
-  if ! write_updates_json "$arch_tmp" "$arch"; then
-    echo "compact: hot file updated but archive install failed ($arch)" >&2
+  if ! write_updates_json "$hot_tmp" "$hot"; then
+    echo "compact: archive updated but hot install failed ($hot) — aged logs stay in both files until the next compact" >&2
     rm -f "$hot_tmp" "$arch_tmp"
     return 1
   fi
