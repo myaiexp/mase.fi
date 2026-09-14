@@ -234,8 +234,8 @@ describe('applySearch', () => {
     command.initCommand({});
   });
 
-  it('marks matching rows and dims non-matching ones', () => {
-    type('world');
+  it('lowercases the typed query, marks matching rows and dims non-matching ones', () => {
+    type('WORLD');
     const rows = [...document.querySelectorAll('.feed-row')];
     expect(rows[0].classList.contains('search-dim')).toBe(false);
     expect(rows[0].querySelector('mark').textContent).toBe('world');

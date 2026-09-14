@@ -160,29 +160,9 @@ function ensureWindow($feed, state, sentinel) {
 // scroll so the viewport stays put as content grows above it. Only the newly
 // added rows are laid out, so a reveal costs one batch, not the full history.
 function revealOlder($feed, state, sentinel) {
-  const { entries, shown, channelId, data } = state;
+  const { entries, shown, channelId } = state;
   if (shown >= entries.length) {
-    // Ask for the archive once per render. Going through loadArchive even when
-    // data.archiveLoaded is already true refreshes state.entries for a render
-    // that started while another render's fetch was still in flight.
-    if (channelId === 'activity' && data?.hasArchive && !state.archiveSettled) {
-      if (state.loadingArchive) return;
-      state.loadingArchive = true;
-      // loadArchive never rejects: failure leaves data.archiveLoaded false. Either
-      // way this render is settled, so the re-entry below either reveals the
-      // merged rows or drops the sentinel — never a fetch per intersection.
-      // A later render of #activity may try again.
-      loadArchive(data).then(() => {
-        if (windowState.get($feed) !== state) return;
-        state.loadingArchive = false;
-        state.archiveSettled = true;
-        state.entries = entriesFor(channelId, data);
-        revealOlder($feed, state, sentinel);
-      });
-      return;
-    }
-    state.io?.disconnect();
-    sentinel.remove();
+    onWindowExhausted($feed, state, sentinel);
     return;
   }
 
@@ -209,8 +189,40 @@ function revealOlder($feed, state, sentinel) {
   $feed.dispatchEvent(new CustomEvent('feed:relayout'));
 
   state.shown = nextShown;
-  // Re-enter so an exhausted in-memory window can still kick off the archive fetch.
-  if (nextShown >= entries.length) revealOlder($feed, state, sentinel);
+  // That was the last in-memory batch: start the archive fetch (or retire the
+  // sentinel) now instead of waiting for another intersection.
+  if (nextShown >= entries.length) onWindowExhausted($feed, state, sentinel);
+}
+
+// Every in-memory entry is on screen. #activity asks for the archive once per
+// render; any other channel has nothing older, so the sentinel is retired.
+function onWindowExhausted($feed, state, sentinel) {
+  const { channelId, data } = state;
+  if (channelId !== 'activity' || !data?.hasArchive || state.archiveSettled) {
+    dropSentinel(state, sentinel);
+    return;
+  }
+  if (state.loadingArchive) return;
+  state.loadingArchive = true;
+  // Going through loadArchive even when data.archiveLoaded is already true
+  // refreshes state.entries for a render that started while another render's
+  // fetch was still in flight. loadArchive never rejects: a failure leaves
+  // data.archiveLoaded false and the entry list unchanged, so the sentinel
+  // drops here — never a fetch per intersection. A later render may retry.
+  loadArchive(data).then(() => {
+    if (windowState.get($feed) !== state) return;
+    state.loadingArchive = false;
+    state.archiveSettled = true;
+    state.entries = entriesFor(channelId, data);
+    if (state.shown < state.entries.length) revealOlder($feed, state, sentinel);
+    else dropSentinel(state, sentinel);
+  });
+}
+
+// No older rows can appear: stop observing the top sentinel and remove it.
+function dropSentinel(state, sentinel) {
+  state.io?.disconnect();
+  sentinel.remove();
 }
 
 // Click-delegate proj-pill chips that carry a data-target — those are the

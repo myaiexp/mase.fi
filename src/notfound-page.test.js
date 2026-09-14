@@ -1,78 +1,13 @@
 // @vitest-environment jsdom
 // DOM-driver tests for the smart 404 page: preview-param guard, HEAD ladder,
-// countdown/cancel, reduced-motion, fuzzy keyboard jumps, 403 restyle.
+// countdown/cancel, reduced-motion, fuzzy keyboard jumps, 403 restyle. The
+// start() ladder end to end lives in notfound-start.test.js.
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import {
   effectivePath, renderConfident, renderFuzzy, renderNone, startCountdown,
-  probePrefixes, applyRealStatus, start,
+  probePrefixes, applyRealStatus,
 } from './notfound-page.js';
-
-// jsdom has no matchMedia; bare matchMedia(...) would ReferenceError.
-function stubReducedMotion(matches) {
-  vi.stubGlobal('matchMedia', (query) => ({ matches, media: query }));
-}
-
-function stubLocation({ pathname = '/missing', search = '', origin = 'https://mase.fi' } = {}) {
-  const replace = vi.fn();
-  const hrefWrites = [];
-  const loc = {
-    pathname,
-    search,
-    origin,
-    replace,
-  };
-  Object.defineProperty(loc, 'href', {
-    configurable: true,
-    get() { return `${loc.origin}${loc.pathname}${loc.search}`; },
-    set(v) { hrefWrites.push(v); },
-  });
-  vi.stubGlobal('location', loc);
-  return { loc, replace, hrefWrites };
-}
-
-function stubFetch(impl) {
-  const fetch = vi.fn(impl ?? (async () => ({ ok: false, status: 404, json: async () => ({}) })));
-  vi.stubGlobal('fetch', fetch);
-  return fetch;
-}
-
-function el(tag, id, extra = {}) {
-  const n = document.createElement(tag);
-  n.id = id;
-  Object.assign(n, extra);
-  return n;
-}
-
-function mountDom() {
-  document.body.replaceChildren();
-  const csegs = el('span', 'csegs');
-  for (let i = 0; i < 5; i++) {
-    const s = document.createElement('span');
-    s.className = 'on';
-    csegs.append(s);
-  }
-  const box = el('section', 'countbox', { hidden: true });
-  box.append(el('span', 'cnum', { textContent: '5' }), csegs, el('button', 'gobtn'), el('button', 'staybtn'));
-  const big = document.createElement('a');
-  big.className = 'big';
-  document.body.append(
-    el('div', 'drain', { hidden: true }),
-    el('div', 'ghost', { textContent: '404' }),
-    el('span', 'dot'),
-    el('span', 'badge', { textContent: 'HTTP 404' }),
-    el('span', 'phead'),
-    el('span', 'ptail'),
-    el('span', 'pellip', { hidden: true }),
-    el('div', 'pnote', { hidden: true }),
-    el('div', 'errline', { textContent: 'error: no such page' }),
-    el('div', 'tailnote', { hidden: true }),
-    el('section', 'sugg'),
-    box,
-    el('div', 'cancelnote', { hidden: true }),
-    el('span', 'fhints'),
-    big,
-  );
-}
+import { installNotFound, removeNotFound, stubReducedMotion, mountDom } from './notfound-test-helpers.js';
 
 const PLAN = { target: '/explorer', targetLabel: '/explorer', targetName: 'map explorer' };
 const CANDIDATES = [
@@ -81,28 +16,12 @@ const CANDIDATES = [
 ];
 
 let loc, replace, hrefWrites, fetchMock;
-const tracked = [];
 
 beforeEach(() => {
-  tracked.length = 0;
-  ({ loc, replace, hrefWrites } = stubLocation());
-  stubReducedMotion(false);
-  fetchMock = stubFetch();
-  mountDom();
-  const origAdd = document.addEventListener.bind(document);
-  vi.spyOn(document, 'addEventListener').mockImplementation((type, fn, opts) => {
-    tracked.push([type, fn, opts]);
-    origAdd(type, fn, opts);
-  });
+  ({ loc, replace, hrefWrites, fetchMock } = installNotFound());
 });
 
-afterEach(() => {
-  for (const [type, fn, opts] of tracked) document.removeEventListener(type, fn, opts);
-  vi.restoreAllMocks();
-  vi.unstubAllGlobals();
-  vi.useRealTimers();
-  document.body.replaceChildren();
-});
+afterEach(removeNotFound);
 
 describe('effectivePath — preview ?p= guard', () => {
   it('accepts a same-origin absolute path and rejects //evil, non-slash, and off-origin', () => {
@@ -244,7 +163,7 @@ describe('startCountdown', () => {
   });
 });
 
-describe('renderFuzzy / renderNone / applyRealStatus / start', () => {
+describe('renderFuzzy / renderNone / applyRealStatus / renderConfident', () => {
   it('1–n jumps to a candidate and h goes home', () => {
     renderFuzzy('/exploer', CANDIDATES);
     document.dispatchEvent(new KeyboardEvent('keydown', { key: '2', bubbles: true }));
@@ -283,15 +202,5 @@ describe('renderFuzzy / renderNone / applyRealStatus / start', () => {
     expect(document.getElementById('countbox').hidden).toBe(false);
     vi.advanceTimersByTime(5000);
     expect(replace).toHaveBeenCalledWith('/explorer');
-  });
-
-  it('start() skips the matching ladder on junk paths', async () => {
-    loc.pathname = '/wp-admin/setup.php';
-    await start();
-    // applyRealStatus still HEADs the typed path (403 vs 404 restyle);
-    // parent prefixes and updates.json must not run.
-    expect(fetchMock).toHaveBeenCalledTimes(1);
-    expect(fetchMock).toHaveBeenCalledWith('/wp-admin/setup.php', expect.objectContaining({ method: 'HEAD' }));
-    expect(document.querySelector('#sugg a.big').getAttribute('href')).toBe('/');
   });
 });

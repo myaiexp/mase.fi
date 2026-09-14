@@ -237,7 +237,9 @@ export function startCountdown(plan, suggEl) {
   document.addEventListener('touchstart', onAny, { passive: true });
   const tick = () => {
     count--;
-    if (count <= 0) { go(); return; }
+    // Stop ticking first: go() only starts a navigation, so a live interval
+    // would call replace() again every second until the page unloads.
+    if (count <= 0) { clearInterval(iv); go(); return; }
     $('cnum').textContent = String(count);
     const segs = [...$('csegs').children];
     segs.forEach((s, i) => s.classList.toggle('on', i < count));
@@ -256,7 +258,8 @@ export async function start() {
   }
   const [prefix, routes] = await Promise.all([probePrefixes(path), loadRoutes()]);
   if (prefix) {
-    const known = routes.find((r) => r.kind === 'path' && r.href === prefix);
+    // Project urls may end in `/`; parent prefixes never do.
+    const known = routes.find((r) => r.kind === 'path' && r.href.replace(/\/$/, '') === prefix);
     renderConfident(path, decide({
       prefixHit: { href: prefix, label: prefix, name: known ? known.name : '' },
       candidates: [],
