@@ -81,15 +81,15 @@ function renderTyped(path, headLen) {
   $('ptail').textContent = shown.slice(headLen);
   $('pellip').hidden = !clamped;
   if (clamped) {
-    const n = $('pnote');
-    n.hidden = false;
-    n.textContent = `path truncated · ${path.length} chars · nothing here resembles it`;
+    const pathNote = $('pnote');
+    pathNote.hidden = false;
+    pathNote.textContent = `path truncated · ${path.length} chars · nothing here resembles it`;
   }
 }
 
 function setHints(desktop, mobile) {
-  const f = $('fhints');
-  f.textContent = '';
+  const hints = $('fhints');
+  hints.textContent = '';
   const mk = (cls, parts) => {
     const s = document.createElement('span');
     s.className = cls;
@@ -97,7 +97,7 @@ function setHints(desktop, mobile) {
       if (typeof p === 'string') s.append(p);
       else s.append(Object.assign(document.createElement('a'), p));
     }
-    f.append(s);
+    hints.append(s);
   };
   mk('hint-d', desktop);
   mk('hint-m', mobile);
@@ -108,8 +108,8 @@ function suggestionLink(plan) {
   a.className = 'big';
   a.href = safeHref(plan.target);
   const arr = Object.assign(document.createElement('span'), { className: 'arr', textContent: '→' });
-  const u = Object.assign(document.createElement('span'), { className: 'bu', textContent: plan.targetLabel });
-  a.append(arr, u);
+  const targetSpan = Object.assign(document.createElement('span'), { className: 'bu', textContent: plan.targetLabel });
+  a.append(arr, targetSpan);
   if (plan.targetName) {
     a.append(Object.assign(document.createElement('span'), { className: 'bname', textContent: plan.targetName }));
   }
@@ -119,11 +119,11 @@ function suggestionLink(plan) {
 export function renderConfident(path, plan) {
   if (plan.diff) {
     renderTyped(path, plan.target.length);
-    const t = $('tailnote');
-    t.hidden = false;
-    t.append('the tail ');
-    t.append(Object.assign(document.createElement('b'), { textContent: plan.tail }));
-    t.append(' matched nothing · the head resolves');
+    const tailNote = $('tailnote');
+    tailNote.hidden = false;
+    tailNote.append('the tail ');
+    tailNote.append(Object.assign(document.createElement('b'), { textContent: plan.tail }));
+    tailNote.append(' matched nothing · the head resolves');
   }
   const sugg = $('sugg');
   sugg.textContent = '';

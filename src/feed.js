@@ -44,7 +44,7 @@ export function dayLabel(date) {
   return d;
 }
 
-function populateRow(row, e, ch) {
+function populateRow(row, e, channelId) {
   const time = timeOf(e.date);
   const nickC = nickColor(e.nick);
 
@@ -62,7 +62,7 @@ function populateRow(row, e, ch) {
 
   row.replaceChildren(ts, nick, msg);
   row.dataset.raw = e.text;
-  if (ch === 'activity' && e.project) {
+  if (channelId === 'activity' && e.project) {
     row.dataset.project = e.project;
     // Mapped chips are real links into the sidebar's channel list; unmapped
     // chips (slugs without a sidebar channel) render as labels. feed-layout

@@ -20,7 +20,7 @@ vi.mock('./data.js', () => ({
   entriesFor: vi.fn(() => []),
 }));
 
-// Re-imported fresh per test so module state (the `complete` popup object, the
+// Re-imported fresh per test so module state (the autocomplete `selection`, the
 // lazy DOM refs) starts clean and command-complete binds to the same mocked
 // registry instance the test sees.
 let command, registry, channels, data;
@@ -206,7 +206,7 @@ describe('autocomplete choose', () => {
     type('/o'); // matches home + explorer (both contain "o"), in registry order
     const list = items();
     expect(list.map((el) => el.dataset.ch)).toEqual(['home', 'explorer']);
-    list[1].dispatchEvent(new MouseEvent('mouseenter', { bubbles: true })); // complete.idx → 1
+    list[1].dispatchEvent(new MouseEvent('mouseenter', { bubbles: true })); // selection.idx → 1
     list[1].dispatchEvent(new MouseEvent('click', { bubbles: true }));
     expect(channels.navigate).toHaveBeenCalledWith('explorer');
   });
@@ -298,6 +298,29 @@ describe('slash commands', () => {
     expect(list).toHaveLength(1);
     expect(list[0].classList.contains('is-cmd')).toBe(true);
     expect(list[0].querySelector('.cc-ch').textContent).toContain('whoami');
+  });
+
+  // Commands match by name prefix, not the fuzzy subsequence channels use.
+  const cmdLabels = () => items()
+    .filter((el) => el.classList.contains('is-cmd'))
+    .map((el) => el.querySelector('.cc-ch').textContent);
+
+  it('does not surface a command for a non-prefix subsequence ("/o" vs /whoami)', () => {
+    type('/o');
+    expect(items().length).toBeGreaterThan(0); // channels still fuzzy-match "o"
+    expect(cmdLabels()).toEqual([]);
+  });
+
+  it('surfaces a command for a partial name prefix', () => {
+    for (const q of ['/w', '/who']) {
+      type(q);
+      expect(cmdLabels()).toEqual(['/whoami']);
+    }
+  });
+
+  it('lists /help for "/h" without the fuzzy-only /whoami', () => {
+    type('/h');
+    expect(cmdLabels()).toEqual(['/help']);
   });
 
   it('keeps commands hidden on a bare "/" (channels only)', () => {

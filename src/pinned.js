@@ -96,8 +96,8 @@ function pinnedProject(p, data) {
 }
 
 function pinnedActivity(data) {
-  const cats = { log: 0, feature: 0, daily: 0, project: 0 };
-  data.entries.forEach(e => { cats[e.cat] = (cats[e.cat] || 0) + 1; });
+  const catCounts = { log: 0, feature: 0, daily: 0, project: 0 };
+  data.entries.forEach(e => { catCounts[e.cat] = (catCounts[e.cat] || 0) + 1; });
   const logEntries = data.entries.filter(e => e.cat === 'log');
   let range = '—';
   const statsFirst = typeof data.stats?.logFirst === 'string' ? data.stats.logFirst : '';
@@ -119,9 +119,9 @@ function pinnedActivity(data) {
     : '—';
   const artLines = [
     '  ╭─ stream ────────────────╮',
-    '  │  log      ▇▇▇▇▇▇▇▇▇  ' + String(cats.log).padStart(2) + '  │',
-    '  │  feature  ▇▇▇        ' + String(cats.feature).padStart(2) + '  │',
-    '  │  daily    ▇▇▇▇▇      ' + String(cats.daily).padStart(2) + '  │',
+    '  │  log      ▇▇▇▇▇▇▇▇▇  ' + String(catCounts.log).padStart(2) + '  │',
+    '  │  feature  ▇▇▇        ' + String(catCounts.feature).padStart(2) + '  │',
+    '  │  daily    ▇▇▇▇▇      ' + String(catCounts.daily).padStart(2) + '  │',
     '  ╰───────────────────────╯',
   ].join('\n');
   return pinCard({

@@ -9,7 +9,7 @@ import { createAutocomplete } from './command-complete.js';
 
 let searchTerm = '';
 let _commands = [];
-let ac = null; // autocomplete controller — created in initCommand
+let autocomplete = null; // created in initCommand
 
 // Run a feed search and remember the term so feed:relayout can re-apply it.
 function search(term) {
@@ -27,19 +27,19 @@ function updateMode() {
   if (v.startsWith('/')) {
     $cmd.classList.add('mode-slash');
     $cmdPrompt.textContent = '/';
-    ac.render(v.slice(1));
+    autocomplete.render(v.slice(1));
     $cmdHint.innerHTML = `<kbd>↑↓</kbd> pick <kbd>↵</kbd> jump <kbd>esc</kbd> cancel`;
   } else if (v.startsWith('?')) {
     $cmd.classList.add('mode-help');
     $cmdPrompt.textContent = '?';
     // Clear leftover slash matches before showing help on the same node —
     // otherwise isOpen() stays true and Enter/Tab still choose a channel.
-    ac.hide();
+    autocomplete.hide();
     renderHelp();
     $cmdHint.innerHTML = '';
   } else {
     $cmdPrompt.textContent = '>';
-    ac.hide();
+    autocomplete.hide();
     if (v.trim()) {
       $cmd.classList.add('mode-search');
       $cmdHint.innerHTML = `<kbd>esc</kbd> clear`;
@@ -132,12 +132,12 @@ export function initCommand(data) {
   $cmdComplete     = document.getElementById('cmd-complete');
   $feed      = document.getElementById('feed');
 
-  ac = createAutocomplete({
+  autocomplete = createAutocomplete({
     getCommands: () => _commands,
     formatRelativeActivity,
     onChoose: onChooseMatch,
   });
-  ac.bind($cmdInput, $cmdComplete);
+  autocomplete.bind($cmdInput, $cmdComplete);
 
   // Build the slash-command registry, wiring the side-effect hooks commands
   // need (search reset + notice teardown) without slash-commands.js touching the DOM.
@@ -161,21 +161,21 @@ export function initCommand(data) {
       $cmdInput.blur();
       return;
     }
-    if (ac.isOpen()) {
+    if (autocomplete.isOpen()) {
       // Arrow keys only move the highlight — moveSelection toggles classes + ARIA
       // without rebuilding the popup. Tab rewrites the input (a genuine mode change),
       // so it still re-renders via updateMode.
-      if (e.key === 'ArrowDown') { e.preventDefault(); ac.moveSelection(1); return; }
-      if (e.key === 'ArrowUp')   { e.preventDefault(); ac.moveSelection(-1); return; }
+      if (e.key === 'ArrowDown') { e.preventDefault(); autocomplete.moveSelection(1); return; }
+      if (e.key === 'ArrowUp')   { e.preventDefault(); autocomplete.moveSelection(-1); return; }
       if (e.key === 'Tab') {
         e.preventDefault();
-        const m = ac.selected();
+        const m = autocomplete.selected();
         if (!m) return;
         $cmdInput.value = '/' + m.label;
         updateMode();
         return;
       }
-      if (e.key === 'Enter')     { e.preventDefault(); ac.choose(); return; }
+      if (e.key === 'Enter')     { e.preventDefault(); autocomplete.choose(); return; }
     }
   });
 

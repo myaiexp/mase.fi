@@ -23,10 +23,8 @@ export function createAutocomplete({
   formatRelativeActivity,
   onChoose,
 }) {
-  // Selection state in one object, shared by every writer (render, setSelection,
-  // keydown) instead of scattered globals. `idx` = highlighted row; `matches` =
-  // current channel+command list.
-  const complete = { idx: 0, matches: [] };
+  // `idx` = highlighted row; `matches` = current channel+command list.
+  const selection = { idx: 0, matches: [] };
   let $input = null;
   let $popup = null;
 
@@ -40,15 +38,15 @@ export function createAutocomplete({
     // listbox. Help mode reuses #cmd-complete; Enter/Tab must not choose a
     // stale channel from the previous "/…" query (or from a hide that only
     // collapsed the popup).
-    complete.matches = [];
-    complete.idx = 0;
+    selection.matches = [];
+    selection.idx = 0;
     $popup.hidden = true;
     $popup.replaceChildren();
     collapseCombobox($input, $popup);
   }
 
   function setSelection(idx) {
-    complete.idx = idx;
+    selection.idx = idx;
     $popup.querySelectorAll('.cc-item').forEach((el, i) => el.classList.toggle('selected', i === idx));
     setActive($input, $popup, idx);
   }
@@ -56,24 +54,24 @@ export function createAutocomplete({
   // Arrow-key selection: wrap `delta` around the match list, then move the
   // highlight cheaply via setSelection instead of re-rendering.
   function moveSelection(delta) {
-    const n = complete.matches.length;
+    const n = selection.matches.length;
     if (!n) return;
-    setSelection((complete.idx + delta + n) % n);
+    setSelection((selection.idx + delta + n) % n);
   }
 
   function renderItem(m, i, q) {
-    const sel = i === complete.idx ? 'selected' : '';
+    const sel = i === selection.idx ? 'selected' : '';
     const hit = highlightFuzzy(m.label, q);
     if (m.kind === 'cmd') {
       return `
-      <div class="cc-item is-cmd ${sel}" data-i="${i}" ${optionAttrs(i, i === complete.idx)}>
+      <div class="cc-item is-cmd ${sel}" data-i="${i}" ${optionAttrs(i, i === selection.idx)}>
         <div class="cc-ch"><span class="slash">/</span>${hit}</div>
         <div class="cc-desc">${escapeHtml(m.desc)}</div>
         <div class="cc-last">cmd</div>
       </div>`;
     }
     return `
-    <div class="cc-item ${sel}" data-ch="${escapeHtml(m.id)}" data-i="${i}" ${optionAttrs(i, i === complete.idx)} style="--ch-accent:${chAccent(m.id)}">
+    <div class="cc-item ${sel}" data-ch="${escapeHtml(m.id)}" data-i="${i}" ${optionAttrs(i, i === selection.idx)} style="--ch-accent:${chAccent(m.id)}">
       <div class="cc-ch"><span class="hash">#</span>${hit}</div>
       <div class="cc-desc">${escapeHtml(m.topic)}</div>
       <div class="cc-last">${formatRelativeActivity(m.id)}</div>
@@ -97,8 +95,8 @@ export function createAutocomplete({
       .sort((a, b) => b.score - a.score)
       .slice(0, 8);
     if (!matches.length) { hide(); return; }
-    complete.matches = matches;
-    complete.idx = Math.min(complete.idx, matches.length - 1);
+    selection.matches = matches;
+    selection.idx = Math.min(selection.idx, matches.length - 1);
     $popup.innerHTML = `
     <div class="cc-head" aria-hidden="true">
       <span>jump to channel</span>
@@ -113,20 +111,20 @@ export function createAutocomplete({
       el.addEventListener('mouseenter', () => setSelection(Number(el.dataset.i)));
       el.addEventListener('click', () => choose());
     });
-    markListbox($input, $popup, complete.idx);
+    markListbox($input, $popup, selection.idx);
   }
 
   function choose() {
-    const m = complete.matches[complete.idx];
+    const m = selection.matches[selection.idx];
     if (m) onChoose(m);
   }
 
   function selected() {
-    return complete.matches[complete.idx] ?? null;
+    return selection.matches[selection.idx] ?? null;
   }
 
   function isOpen() {
-    return Boolean($popup && !$popup.hidden && complete.matches.length);
+    return Boolean($popup && !$popup.hidden && selection.matches.length);
   }
 
   return {
@@ -138,6 +136,6 @@ export function createAutocomplete({
     choose,
     selected,
     isOpen,
-    get matches() { return complete.matches; },
+    get matches() { return selection.matches; },
   };
 }
