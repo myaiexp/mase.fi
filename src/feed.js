@@ -20,8 +20,9 @@ const WINDOW_SIZE = 200;
 const chipNavWired = new WeakSet();
 const resizeObservers = new WeakMap();
 // Per-feed windowing state: the full ascending entry list for the current
-// channel, how many newest rows are materialized, the channel id, and the live
-// top-sentinel IntersectionObserver. Reset wholesale on every renderFeed.
+// channel, how many newest rows are materialized, the channel id, the live
+// top-sentinel IntersectionObserver, and whether this render's archive load is
+// in flight / settled. Reset wholesale on every renderFeed.
 const windowState = new WeakMap();
 
 const NICK_COLORS = { git: '#06b6d4', mase: '#e8a308' };
@@ -134,7 +135,7 @@ export function renderFeed(id, data, { immediate = false, navigate } = {}) {
   $feed.scrollTop = $feed.scrollHeight;
 
   const needsArchive = id === 'activity' && data.hasArchive && !data.archiveLoaded;
-  const state = { entries, shown, channelId: id, io: null, data, loadingArchive: false };
+  const state = { entries, shown, channelId: id, io: null, data, loadingArchive: false, archiveSettled: false };
   windowState.set($feed, state);
   if (shown < entries.length || needsArchive) ensureWindow($feed, state, sentinel);
   else sentinel.remove();
@@ -161,18 +162,22 @@ function ensureWindow($feed, state, sentinel) {
 function revealOlder($feed, state, sentinel) {
   const { entries, shown, channelId, data } = state;
   if (shown >= entries.length) {
-    if (channelId === 'activity' && data?.hasArchive && !data.archiveLoaded && !state.loadingArchive) {
+    // Ask for the archive once per render. Going through loadArchive even when
+    // data.archiveLoaded is already true refreshes state.entries for a render
+    // that started while another render's fetch was still in flight.
+    if (channelId === 'activity' && data?.hasArchive && !state.archiveSettled) {
+      if (state.loadingArchive) return;
       state.loadingArchive = true;
+      // loadArchive never rejects: failure leaves data.archiveLoaded false. Either
+      // way this render is settled, so the re-entry below either reveals the
+      // merged rows or drops the sentinel — never a fetch per intersection.
+      // A later render of #activity may try again.
       loadArchive(data).then(() => {
         if (windowState.get($feed) !== state) return;
+        state.loadingArchive = false;
+        state.archiveSettled = true;
         state.entries = entriesFor(channelId, data);
-        state.loadingArchive = false;
         revealOlder($feed, state, sentinel);
-      }).catch(() => {
-        if (windowState.get($feed) !== state) return;
-        state.loadingArchive = false;
-        state.io?.disconnect();
-        sentinel.remove();
       });
       return;
     }

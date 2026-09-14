@@ -2,15 +2,29 @@
 import { projectLink } from './project-link.js';
 import { parseEntryDate, normalizeDate, utcDayStart } from './dates.js';
 import { fetchDemos, raceTimeout, DEMOS_GRACE_MS } from './data-demos.js';
-export { parseEntryDate, fetchDemos };
+import { buildSlugToChannel, normalizeEntry } from './data-normalize.js';
+import { fetchJson } from './fetch-json.js';
+export { fetchDemos };
 export { loadArchive } from './data-archive.js';
 
+// updates.json is required; the demos manifest is optional chips. fetchJson
+// time-boxes both, then demos is grace-raced so a hung manifest cannot delay
+// init after updates.json is already in.
 const SOURCE_URL = '/updates.json';
-// A hung fetch with no AbortSignal stalls the app shell — main.js awaits
-// fetchData with no timeout of its own. updates.json is required; the demos
-// manifest is optional chips. Time-box both, then grace-race demos so a hung
-// manifest cannot delay init after updates.json is already in.
-const FETCH_TIMEOUT_MS = 8000;
+
+// The degraded shape, and the base the success path overrides — one literal so
+// the two fetchData branches cannot drift apart.
+function emptyData(demos) {
+  return {
+    meta: { nick: 'mase', server: 'irc.mase.fi', bootTime: Date.now() },
+    projects: [],
+    entries: [],
+    demos,
+    stats: {},
+    hasArchive: false,
+    archiveLoaded: false,
+  };
+}
 
 /**
  * Fetch + normalize the live updates.json into the canonical shape used by the UI:
@@ -38,15 +52,8 @@ export async function fetchData() {
   // the same empty fallback instead of escaping as an unhandled rejection — main.js
   // awaits this without a catch, so an escape would silently stall the app shell.
   try {
-    const raw = await fetch(SOURCE_URL, {
-      signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
-    }).then((r) => {
-      // Assert a 2xx before parsing: a 4xx/5xx with a JSON error body (e.g. from a
-      // reverse proxy) would otherwise parse as data and degrade silently to empty
-      // state. Throwing routes it to the catch below, which is the same fallback.
-      if (!r.ok) throw new Error('updates.json HTTP ' + r.status);
-      return r.json();
-    });
+    // fetchJson rejects on a non-2xx, routing it to the catch below.
+    const raw = await fetchJson(SOURCE_URL);
 
     const rawProjects = Array.isArray(raw.projects) ? raw.projects : [];
     const rawEntries = Array.isArray(raw.entries) ? raw.entries : [];
@@ -58,13 +65,11 @@ export async function fetchData() {
     const stats = normalizeStats(raw.stats);
 
     return {
-      meta: { nick: 'mase', server: 'irc.mase.fi', bootTime: Date.now() },
+      ...emptyData(await raceTimeout(demosPromise, DEMOS_GRACE_MS, [])),
       projects,
       entries,
-      demos: await raceTimeout(demosPromise, DEMOS_GRACE_MS, []),
       stats,
       hasArchive: stats.archive === true,
-      archiveLoaded: false,
     };
   } catch (err) {
     // Deliberate degrade-to-empty so the app shell still renders, but this catch
@@ -72,15 +77,7 @@ export async function fetchData() {
     // so a real bug surfaces in the console instead of masquerading as the benign
     // "server returned no data" case.
     console.warn('fetchData: failed to load/normalize updates.json, degrading to empty state', err);
-    return {
-      meta: { nick: 'mase', server: 'irc.mase.fi', bootTime: Date.now() },
-      projects: [],
-      entries: [],
-      demos: await raceTimeout(demosPromise, DEMOS_GRACE_MS, []),
-      stats: {},
-      hasArchive: false,
-      archiveLoaded: false,
-    };
+    return emptyData(await raceTimeout(demosPromise, DEMOS_GRACE_MS, []));
   }
 }
 
@@ -101,20 +98,6 @@ function normalizeStats(raw) {
     commitsByProject,
     archive: raw.archive === true,
   };
-}
-
-/**
- * Build the entry-slug → channel lookup. Entries reference a project by slug
- * (matched case-insensitively); channels are keyed by `channel`. A project's slug
- * defaults to its channel when not given explicitly.
- */
-function buildSlugToChannel(rawProjects) {
-  const slugToChannel = new Map();
-  for (const p of rawProjects) {
-    const slug = (p.slug || p.channel || '').toLowerCase();
-    if (slug) slugToChannel.set(slug, p.channel);
-  }
-  return slugToChannel;
 }
 
 /**
@@ -185,52 +168,17 @@ function normalizeProjects(rawProjects, counts, lastActivity) {
 }
 
 /**
- * Normalize raw entries into the UI shape: map category + project-slug → channel
- * (falling back to daily→home, log→activity), drop unroutable entries, normalize
- * the date, pick a nick, and sort by date ascending. Entries keep the project's
+ * Normalize raw entries into the UI shape (normalizeEntry per row), drop
+ * unroutable entries, and sort by date ascending. Entries keep the project's
  * own `ch`; the #activity firehose re-selects all `log` entries separately in
  * entriesFor(), so there's no duplication to strip here.
  * Pure over (rawEntries, slugToChannel).
  */
 function normalizeEntries(rawEntries, slugToChannel) {
   return rawEntries
-    .map((e) => {
-      const slug = (e.project || '').toLowerCase();
-      const mappedChannel = slugToChannel.get(slug);
-      const ch = mappedChannel
-        || (e.category === 'daily' ? 'home' : e.category === 'log' ? 'activity' : null);
-      if (!ch) return null;
-      const date = normalizeDate(e.date);
-      const text = e.text || e.summary || '';
-      const nick = pickNick(e);
-      return {
-        ch,
-        cat: e.category,
-        date,
-        nick,
-        text,
-        project: slug || undefined,
-        mappedChannel,
-        sticky: !!e.sticky,
-      };
-    })
+    .map((e) => normalizeEntry(e, slugToChannel))
     .filter(Boolean)
     .sort((a, b) => a.date.localeCompare(b.date));
-}
-
-/**
- * Pick a nick for an entry based on category.
- * - log → 'git' (commit firehose)
- * - daily → the project slug, so #home reads as a per-project standup: each
- *   project "speaks" its own colour-coded line (nick colours are name-hashed),
- *   which is the channel's subject identity. Project-less daily → 'mase'.
- * - feature/project → 'mase' (these live in a project channel that already
- *   names the subject, so the nick stays the author).
- */
-function pickNick(e) {
-  if (e.category === 'log') return 'git';
-  if (e.category === 'daily' && e.project) return String(e.project).toLowerCase();
-  return 'mase';
 }
 
 /**

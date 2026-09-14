@@ -1,63 +1,58 @@
 // Lazy-load archived log entries into an already-normalized data object
-import { normalizeDate } from './dates.js';
+import { buildSlugToChannel, normalizeEntry } from './data-normalize.js';
+import { fetchJson } from './fetch-json.js';
 
 const ARCHIVE_URL = '/updates-archive.json';
-const FETCH_TIMEOUT_MS = 8000;
 
-function slugToChannel(projects) {
-  const map = new Map();
-  for (const p of projects || []) {
-    const slug = (p.slug || p.channel || '').toLowerCase();
-    if (slug) map.set(slug, p.channel);
-  }
-  return map;
+// One fetch per data object at a time: a re-render of #activity while a load is
+// in flight joins it instead of starting a second fetch.
+const inflight = new WeakMap();
+
+const entryKey = (e) => `${e.date}\0${e.project || ''}\0${e.text}`;
+
+// The archive holds only logs, but a stray non-log row must not merge — it would
+// surface in #home or a project channel. Null rows are dropped so one bad row
+// cannot fail the whole merge.
+function normalizeArchivedLogs(rawEntries, slugToChannel) {
+  return rawEntries
+    .filter((e) => e && e.category === 'log')
+    .map((e) => normalizeEntry(e, slugToChannel));
 }
 
-function normalizeArchivedLogs(rawEntries, map) {
-  const out = [];
-  for (const e of rawEntries) {
-    const cat = e.category || e.cat;
-    if (cat !== 'log') continue;
-    const slug = (e.project || '').toLowerCase();
-    const mappedChannel = map.get(slug);
-    out.push({
-      ch: mappedChannel || 'activity',
-      cat: 'log',
-      date: normalizeDate(e.date),
-      nick: 'git',
-      text: e.text || e.summary || '',
-      project: slug || undefined,
-      mappedChannel,
-      sticky: !!e.sticky,
-    });
+async function fetchAndMerge(data) {
+  try {
+    const raw = await fetchJson(ARCHIVE_URL);
+    // A payload without an entries array is a failure, not an empty merge:
+    // marking it loaded would drop stats.archivedLogs from the totals.
+    if (!Array.isArray(raw?.entries)) throw new Error(ARCHIVE_URL + ' has no entries array');
+    const archived = normalizeArchivedLogs(raw.entries, buildSlugToChannel(data.projects));
+    const seen = new Set(data.entries.map(entryKey));
+    const extra = archived.filter((e) => !seen.has(entryKey(e)));
+    if (extra.length) {
+      data.entries = data.entries.concat(extra).sort((a, b) => a.date.localeCompare(b.date));
+    }
+    data.archiveLoaded = true;
+  } catch (err) {
+    console.warn('loadArchive: failed to load ' + ARCHIVE_URL + '; totals stay on stats.archivedLogs', err);
   }
-  return out;
+  return data;
 }
 
 /**
  * Fetch /updates-archive.json and merge its logs into data.entries in place.
- * No-op when there is no archive or it was already merged. On fetch failure
- * marks archiveLoaded so the sentinel does not retry forever.
+ * Never rejects. data.archiveLoaded means "the archive rows are in data.entries":
+ * it is set only after a successful merge, because logStats and pinnedActivity
+ * read it to stop adding stats.archivedLogs to the in-memory count. A failed load
+ * warns and leaves it false, so the all-history totals stay intact; whether to
+ * try again is the caller's call (the feed asks once per render).
+ * No-op when there is no archive or it was already merged.
  */
-export async function loadArchive(data) {
-  if (!data?.hasArchive || data.archiveLoaded) return data;
-  data.archiveLoaded = true;
-  try {
-    const raw = await fetch(ARCHIVE_URL, {
-      signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
-    }).then((r) => {
-      if (!r.ok) throw new Error('updates-archive.json HTTP ' + r.status);
-      return r.json();
-    });
-    const rawEntries = Array.isArray(raw.entries) ? raw.entries : [];
-    const archived = normalizeArchivedLogs(rawEntries, slugToChannel(data.projects));
-    const seen = new Set(data.entries.map((e) => `${e.date}\0${e.project || ''}\0${e.text}`));
-    const extra = archived.filter((e) => !seen.has(`${e.date}\0${e.project || ''}\0${e.text}`));
-    if (extra.length) {
-      data.entries = data.entries.concat(extra).sort((a, b) => a.date.localeCompare(b.date));
-    }
-  } catch {
-    // Hot feed stays; the caller drops the sentinel.
+export function loadArchive(data) {
+  if (!data?.hasArchive || data.archiveLoaded) return Promise.resolve(data);
+  let pending = inflight.get(data);
+  if (!pending) {
+    pending = fetchAndMerge(data).finally(() => inflight.delete(data));
+    inflight.set(data, pending);
   }
-  return data;
+  return pending;
 }

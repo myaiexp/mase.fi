@@ -1,20 +1,11 @@
 // Unit tests for the data adapter (fetch + normalize + channel routing/bucketing).
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { fetchData, fetchDemos, entriesFor, logStats, loadArchive } from './data.js';
+import { fetchData, fetchDemos, entriesFor, logStats } from './data.js';
+import { entry, stubFetch } from './data-test-helpers.js';
+
+// loadArchive tests live in data-archive.test.js.
 
 // ---- helpers -------------------------------------------------------------
-
-// A normalized entry as produced by fetchData(): { ch, cat, date, nick, text, project? }.
-function entry(cat, ch, extra = {}) {
-  return {
-    ch,
-    cat,
-    date: '2026-01-01T00:00',
-    nick: cat === 'log' ? 'git' : 'mase',
-    text: 't',
-    ...extra,
-  };
-}
 
 function dataWith(entries) {
   return { entries };
@@ -31,10 +22,6 @@ function dayStr(offsetDays, hour = 12) {
   d.setUTCDate(d.getUTCDate() + offsetDays);
   const pad = (n) => String(n).padStart(2, '0');
   return `${d.getUTCFullYear()}-${pad(d.getUTCMonth() + 1)}-${pad(d.getUTCDate())}T${pad(hour)}:00`;
-}
-
-function stubFetch(payload) {
-  vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: true, json: async () => payload }));
 }
 
 afterEach(() => {
@@ -723,66 +710,5 @@ describe('fetchData project heat + recency', () => {
     expect(data.projects[0].lastActivity).toBeGreaterThan(0);
     // Two mixed-case hits against one project — if either side skipped toLowerCase
     // the counts lookup would miss and heat would stay 0.
-  });
-});
-
-// ---- loadArchive ---------------------------------------------------------
-// The hot file keeps recent logs; older ones live at /updates-archive.json
-// and merge into data.entries when the activity sentinel exhausts.
-
-describe('loadArchive', () => {
-  it('is a no-op when hasArchive is false (does not fetch)', async () => {
-    const fetchMock = vi.fn();
-    vi.stubGlobal('fetch', fetchMock);
-    const data = { entries: [entry('log', 'activity')], projects: [], hasArchive: false, archiveLoaded: false };
-    await loadArchive(data);
-    expect(fetchMock).not.toHaveBeenCalled();
-    expect(data.archiveLoaded).toBe(false);
-  });
-
-  it('is a no-op when the archive was already merged', async () => {
-    const fetchMock = vi.fn();
-    vi.stubGlobal('fetch', fetchMock);
-    const data = { entries: [], projects: [], hasArchive: true, archiveLoaded: true };
-    await loadArchive(data);
-    expect(fetchMock).not.toHaveBeenCalled();
-  });
-
-  it('merges archived logs into data.entries, normalized and sorted, without duplicating', async () => {
-    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
-      ok: true,
-      json: async () => ({
-        entries: [
-          { category: 'log', project: 'helm', date: '2026-01-01T10:00', text: 'ancient' },
-          { category: 'log', project: 'helm', date: '2026-08-20T10:00', text: 'already-hot' },
-        ],
-      }),
-    }));
-    const data = {
-      projects: [{ name: 'Helm', channel: 'helm', slug: 'helm' }],
-      entries: [
-        entry('log', 'activity', { date: '2026-08-20T10:00', text: 'already-hot', project: 'helm' }),
-        entry('log', 'activity', { date: '2026-09-01T10:00', text: 'recent', project: 'helm' }),
-      ],
-      hasArchive: true,
-      archiveLoaded: false,
-    };
-    await loadArchive(data);
-    expect(data.archiveLoaded).toBe(true);
-    expect(data.entries.map((e) => e.text)).toEqual(['ancient', 'already-hot', 'recent']);
-    expect(data.entries[0]).toMatchObject({ cat: 'log', nick: 'git', project: 'helm' });
-  });
-
-  it('marks archiveLoaded and leaves entries untouched on a failed fetch', async () => {
-    vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new Error('timeout')));
-    const data = {
-      entries: [entry('log', 'activity')],
-      projects: [],
-      hasArchive: true,
-      archiveLoaded: false,
-    };
-    await loadArchive(data);
-    expect(data.archiveLoaded).toBe(true);
-    expect(data.entries).toHaveLength(1);
   });
 });

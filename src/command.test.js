@@ -18,7 +18,6 @@ vi.mock('./channels.js', () => ({
 }));
 vi.mock('./data.js', () => ({
   entriesFor: vi.fn(() => []),
-  parseEntryDate: (d) => new Date(d + 'Z'),
 }));
 
 // Re-imported fresh per test so module state (the `complete` popup object, the

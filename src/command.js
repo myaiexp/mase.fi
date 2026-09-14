@@ -1,6 +1,7 @@
 // Command input — slash-jump, ?-help, plain-text search; global / ? g-leader shortcuts.
 import { navigate } from './channels.js';
-import { entriesFor, parseEntryDate } from './data.js';
+import { entriesFor } from './data.js';
+import { parseEntryDate } from './dates.js';
 import { buildCommands } from './slash-commands.js';
 import { applySearch } from './command-search.js';
 import { markHelp } from './command-aria.js';

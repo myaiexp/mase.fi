@@ -1,6 +1,7 @@
 // Optional demos-manifest fetch for "try demo" chips
+import { fetchJson } from './fetch-json.js';
+
 const DEMOS_MANIFEST_URL = '/demos/manifest.json';
-const FETCH_TIMEOUT_MS = 8000;
 export const DEMOS_GRACE_MS = 400;
 
 export async function raceTimeout(promise, ms, fallback) {
@@ -25,11 +26,7 @@ export async function raceTimeout(promise, ms, fallback) {
  */
 export async function fetchDemos() {
   try {
-    const r = await fetch(DEMOS_MANIFEST_URL, {
-      signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
-    });
-    if (!r.ok) return [];
-    const list = await r.json();
+    const list = await fetchJson(DEMOS_MANIFEST_URL);
     return Array.isArray(list) ? list.filter((s) => typeof s === 'string') : [];
   } catch {
     return [];

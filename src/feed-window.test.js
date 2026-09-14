@@ -1,61 +1,24 @@
 // @vitest-environment jsdom
 // Windowing tests for renderFeed: it materializes only the newest WINDOW_SIZE
 // rows and lazy-loads older batches when the top sentinel intersects. jsdom has
-// no IntersectionObserver/ResizeObserver and no layout, so we stub the observers
-// (the IO stub is hand-fired to simulate scroll-up) and assert pure DOM structure
-// — row counts, the sentinel, and day-separator seam dedup across batches.
+// no IntersectionObserver/ResizeObserver and no layout, so the observers are
+// stubbed (feed-test-helpers.js; the IO stub is hand-fired to simulate scroll-up)
+// and we assert pure DOM structure — row counts, the sentinel, and day-separator
+// seam dedup across batches. Archive lazy-load lives in feed-archive.test.js.
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import { dayOf } from './dates.js';
+import {
+  ioInstances, installFeedDom, removeFeedStubs, makeData, distinctDays, rows, dayHeaders, sentinel,
+} from './feed-test-helpers.js';
 
-// Controllable IntersectionObserver: records instances so a test can fire the
-// callback as if the sentinel scrolled into view, and tracks disconnect().
-let ioInstances = [];
-class FakeIntersectionObserver {
-  constructor(cb) { this.cb = cb; this.targets = []; this.disconnected = false; ioInstances.push(this); }
-  observe(el) { this.targets.push(el); }
-  unobserve(el) { this.targets = this.targets.filter(t => t !== el); }
-  disconnect() { this.disconnected = true; this.targets = []; }
-  fire() { this.cb([{ isIntersecting: true }]); }
-}
-class NoopResizeObserver { observe() {} unobserve() {} disconnect() {} }
-
-// Build `n` ascending activity 'log' entries, `perDay` per calendar day, so a
-// WINDOW_SIZE (200) boundary lands mid-day and exercises the seam dedup.
-function makeData(n, perDay = 30) {
-  const entries = [];
-  for (let i = 0; i < n; i++) {
-    const day = String(1 + Math.floor(i / perDay)).padStart(2, '0');
-    const min = String(i % perDay).padStart(2, '0');
-    entries.push({ ch: 'activity', cat: 'log', date: `2026-06-${day}T10:${min}`, nick: 'git', text: 'commit ' + i });
-  }
-  return { entries };
-}
-
-// Distinct calendar days across a set of entries — the expected .feed-day count.
-const distinctDays = (entries) => new Set(entries.map(e => dayOf(e.date))).size;
-
-const rows = () => [...document.querySelectorAll('#feed .feed-row')];
-const dayHeaders = () => [...document.querySelectorAll('#feed .feed-day')];
-const sentinel = () => document.querySelector('#feed .feed-top-sentinel');
 let renderFeed;
 
 beforeEach(async () => {
   vi.resetModules();
-  ioInstances = [];
-  globalThis.IntersectionObserver = FakeIntersectionObserver;
-  globalThis.ResizeObserver = NoopResizeObserver;
-  document.body.replaceChildren();
-  const feed = document.createElement('div');
-  feed.id = 'feed';
-  document.body.appendChild(feed);
+  installFeedDom();
   ({ renderFeed } = await import('./feed.js'));
 });
 
-afterEach(() => {
-  delete globalThis.IntersectionObserver;
-  delete globalThis.ResizeObserver;
-  vi.unstubAllGlobals();
-});
+afterEach(removeFeedStubs);
 
 describe('renderFeed windowing', () => {
   it('materializes only the newest WINDOW_SIZE rows, newest last', () => {
@@ -119,38 +82,6 @@ describe('renderFeed windowing', () => {
     const first = ioInstances.at(-1);
     renderFeed('activity', makeData(450), { immediate: true, navigate: () => {} });
     expect(first.disconnected).toBe(true);
-  });
-
-  it('keeps the sentinel when in-memory logs fit but an archive remains', () => {
-    const data = makeData(80);
-    data.hasArchive = true;
-    data.archiveLoaded = false;
-    renderFeed('activity', data, { immediate: true, navigate: () => {} });
-    expect(rows().length).toBe(80);
-    expect(sentinel()).toBeTruthy();
-  });
-
-  it('fetches the archive when the sentinel exhausts in-memory logs and prepends them', async () => {
-    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
-      ok: true,
-      json: async () => ({
-        entries: [
-          { category: 'log', project: 'helm', date: '2026-01-01T10:00', text: 'archived-old' },
-        ],
-      }),
-    }));
-    const data = makeData(250);
-    data.hasArchive = true;
-    data.archiveLoaded = false;
-    data.projects = [{ name: 'Helm', channel: 'helm', slug: 'helm' }];
-    renderFeed('activity', data, { immediate: true, navigate: () => {} });
-    expect(rows().length).toBe(200);
-    ioInstances.at(-1).fire(); // 200 → 250, in-memory exhausted → archive fetch
-    await vi.waitFor(() => {
-      expect(rows().some((r) => r.dataset.raw === 'archived-old')).toBe(true);
-    });
-    expect(data.archiveLoaded).toBe(true);
-    vi.unstubAllGlobals();
   });
 });
 
@@ -238,14 +169,8 @@ describe('revealOlder lays out before scroll compensation', () => {
 
   beforeEach(async () => {
     vi.resetModules();
-    ioInstances = [];
     order = [];
-    globalThis.IntersectionObserver = FakeIntersectionObserver;
-    globalThis.ResizeObserver = NoopResizeObserver;
-    document.body.replaceChildren();
-    const feed = document.createElement('div');
-    feed.id = 'feed';
-    document.body.appendChild(feed);
+    const feed = installFeedDom();
 
     vi.doMock('./feed-layout.js', () => ({
       relayoutAll: () => { order.push('relayoutAll'); },
