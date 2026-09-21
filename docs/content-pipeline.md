@@ -65,9 +65,13 @@ Routed by `entry.category`:
 
 `entry.project` (slug) is matched case-insensitively against `project.slug`, falling back to `project.channel`.
 
-### Log entries — helm `deploy` Step 3
+### Log entries — helm `deploy` Step 3 and the VPS-copy timer
 
-`deploy` (`~/Projects/helm/scripts/deploy`) diffs `OLD_HEAD..NEW_HEAD` and prepends one `{date, project, text, category: "log"}` entry per non-merge commit subject, deduped per date+project+text, under the shared flock. The CLAUDE.md Deploy section is the command that ships the site; the same invocation logs the commits.
+Both go through helm's `scripts/log-commits-to-updates` (one jq pass under the shared flock), which prepends one `{date, project, text, category: "log"}` entry per non-merge commit subject and skips a subject the project already logged within ±1 day.
+
+- **`deploy`** (`~/Projects/helm/scripts/deploy`) logs `OLD_HEAD..NEW_HEAD`, dated by deploy day. The CLAUDE.md Deploy section is the command that ships the site; the same invocation logs the commits.
+- **Remote projects** (r-proxy, e.g. `modding` on the desktop) never run `deploy`: sessions ship with `r git push`. helm's 15-min `vps-copy-refresh` timer logs each VPS copy's `refs/helm/activity-logged..HEAD`, dated by commit day in Helsinki (helm `docs/substrates.md`, idea #5221).
+- Desktop `git deployboth` (machine-configs) still appends the last commit of a push on its own; the ±1-day dedupe keeps it from doubling the timer's row.
 
 ### Feature / project entries — `scripts/mase-fi-update`
 
