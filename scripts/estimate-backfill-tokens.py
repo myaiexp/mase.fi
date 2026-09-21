@@ -2,20 +2,21 @@
 # Estimate the token count + cost of (re)backfilling mase.fi daily summaries.
 #
 # The daily-summary pipeline summarizes each multi-commit project-day with one
-# `claude -p --model sonnet` call. The catch: `claude -p` is the full Claude Code
-# CLI, so every invocation drags in ~30k tokens of its own system prompt + tool
-# definitions (mostly prompt-cached) — that ambient overhead dominates the cost,
-# not the summary prompt. A char/4 guess would be off by ~100x, so this tool
-# measures the real mechanism instead of guessing:
+# `claude -p --model sonnet` call. `claude -p` is the full Claude Code CLI, so
+# even trimmed (see generate_summary in mase-fi-daily-summary) each call carries
+# some ambient context of its own beyond the summary prompt, plus cache
+# write/read behaviour that depends on run spacing. So this tool measures both:
 #
 #   1. content-only (free): count_tokens on the actual summary prompts — the
 #      raw-API lower bound, i.e. what the payload WE control costs.
 #   2. claude -p actual (spends a little): run a stratified sample of real days
-#      through `claude -p --output-format json`, read the reported usage +
-#      total_cost_usd (captures the ~30k/call ambient context, cache behaviour,
-#      and any thinking), then extrapolate across every multi-commit day.
+#      through `claude -p --output-format json` with the pipeline's own flags,
+#      read the reported usage + total_cost_usd, then extrapolate across every
+#      multi-commit day.
 #
-# The prompt below is kept in sync by hand with scripts/mase-fi-daily-summary.
+# Days come from the `log` entries (hot updates.json + the archive), grouped by
+# date and project the way the pipeline groups them. The prompt is read from
+# daily-summary-prompt.txt, the file mase-fi-daily-summary uses.
 #
 # Usage: estimate-backfill-tokens.py [--sample N] [--calib N] [--no-empirical]
 
@@ -35,46 +36,37 @@ MAX_LINES = 3
 PRICE = {"in": 3.00, "out": 15.00, "cache_read": 0.30, "cache_write_1h": 6.00}
 PRICE_INTRO = {"in": 2.00, "out": 10.00, "cache_read": 0.20, "cache_write_1h": 4.00}
 
-PREAMBLE = (
-    'You are writing a short daily changelog for ONE software project from its '
-    'git commits — a legible "what did the developer do today". Terse and '
-    "technical is fine; do not dumb it down, do not pad it.\n\n"
-    f"Output 1 to {MAX_LINES} lines, one line per genuinely distinct, notable "
-    "thread of work, most significant first. MOST DAYS ARE ONE LINE. Use more "
-    "only when the day clearly holds separate significant efforts (e.g. two "
-    "unrelated features, or a feature plus a notable fix). A line reads as what "
-    "happened, and may include the why when the commits make it clear. Internal "
-    "churn — refactors, audits, tests, dependency bumps, lint — is NOT worth its "
-    "own line: fold it into a trailing mention on another line, or drop it. The "
-    "full commit list is available elsewhere.\n\n"
-    "Each line: lowercase, terse, under ~110 characters. Output ONLY the lines — "
-    "no numbering, no bullets, no preamble, no quotes, no project name, no "
-    "commentary.\n\n"
-    "Example — a maintenance-heavy day, one line:\nCommits:\n"
-    "refactor(auth): extract token helper\ntest(auth): cover refresh flow\n"
-    "chore(deps): bump axios\nfix(auth): handle expired token\nOutput:\n"
-    "auth token handling hardened + refresh test coverage\n\n"
-    "Example — a day with two distinct features, two lines:\nCommits:\n"
-    "feat(map): directory picker for saves\nfeat(map): bounded BFS path resolver\n"
-    "refactor(save): split orchestration module\nfeat(ui): dark mode toggle\n"
-    "Output:\ndirectory-picker saves with a bounded path resolver\n"
-    "added a dark mode toggle\n\nCommits:\n"
+SCRIPT_DIR = os.path.dirname(os.path.realpath(__file__))
+ARCHIVE = os.environ.get(
+    "ARCHIVE_FILE", os.path.join(os.path.dirname(UPDATES), "updates-archive.json")
 )
+# Same trimming flags as generate_summary in mase-fi-daily-summary — keep in step.
+CLAUDE_FLAGS = ["--model", "sonnet", "--tools", "", "--setting-sources", "",
+                "--strict-mcp-config", "--effort", "low"]
+
+
+def system_prompt():
+    with open(os.path.join(SCRIPT_DIR, "daily-summary-prompt.txt")) as f:
+        return f.read().rstrip("\n").replace("@MAX_LINES@", str(MAX_LINES))
 
 
 def build_prompt(commits):
-    return PREAMBLE + "\n".join(commits)
+    return "<commits>\n" + "\n".join(commits) + "\n</commits>"
+
+
+def load_logs(path):
+    try:
+        with open(path) as f:
+            return [e for e in json.load(f).get("entries", []) if e.get("category") == "log"]
+    except FileNotFoundError:
+        return []
 
 
 def load_days():
-    with open(UPDATES) as f:
-        data = json.load(f)
-    days = [
-        (e["date"], e.get("project", "?"), e["commits"])
-        for e in data["entries"]
-        if e.get("category") == "daily" and len(e.get("commits", [])) > 1
-    ]
-    return days
+    groups = {}
+    for e in load_logs(UPDATES) + load_logs(ARCHIVE):
+        groups.setdefault((e["date"], e.get("project", "?")), []).append(e["text"])
+    return sorted((d, p, c) for (d, p), c in groups.items() if len(c) > 1)
 
 
 def oauth_token():
@@ -82,10 +74,11 @@ def oauth_token():
         return json.load(f)["claudeAiOauth"]["accessToken"]
 
 
-def count_tokens(text, token):
-    body = json.dumps(
-        {"model": MODEL, "messages": [{"role": "user", "content": text}]}
-    ).encode()
+def count_tokens(text, token, system=None):
+    req_body = {"model": MODEL, "messages": [{"role": "user", "content": text}]}
+    if system:
+        req_body["system"] = system
+    body = json.dumps(req_body).encode()
     req = urllib.request.Request(
         "https://api.anthropic.com/v1/messages/count_tokens",
         data=body,
@@ -127,7 +120,8 @@ def run_claude(commits):
     prompt = build_prompt(commits)
     with tempfile.TemporaryDirectory() as neutral:
         p = subprocess.run(
-            [CLAUDE_BIN, "-p", prompt, "--model", "sonnet", "--output-format", "json"],
+            [CLAUDE_BIN, "-p", prompt, "--system-prompt", system_prompt(),
+             *CLAUDE_FLAGS, "--output-format", "json"],
             cwd=neutral,
             stdin=subprocess.DEVNULL,
             capture_output=True,
@@ -168,15 +162,16 @@ def main():
     # ---- content-only estimate via count_tokens (free) ----
     try:
         token = oauth_token()
-        preamble_tok = count_tokens(PREAMBLE, token)
+        system = system_prompt()
+        preamble_tok = count_tokens("<commits>\n</commits>", token, system)
         calib = stratified(days, calib_per)
         ratios = []
         for _, _, commits in calib:
-            chars = len(build_prompt(commits))
-            toks = count_tokens(build_prompt(commits), token)
-            ratios.append(toks / chars)
+            prompt = build_prompt(commits)
+            toks = count_tokens(prompt, token, system) - preamble_tok
+            ratios.append(toks / len(prompt))
         r = sum(ratios) / len(ratios)
-        content_in = sum(int(len(build_prompt(c)) * r) for _, _, c in days)
+        content_in = preamble_tok * n + sum(int(len(build_prompt(c)) * r) for _, _, c in days)
         print("── Content-only (raw-API lower bound, the payload we control) ──")
         print(f"  fixed preamble: {preamble_tok} tokens/call  ({preamble_tok * n:,} total)")
         print(f"  calibrated ratio: {r:.3f} tok/char over {len(calib)} sampled prompts")
@@ -191,7 +186,7 @@ def main():
 
     # ---- empirical claude -p sample → extrapolate the true per-call cost ----
     print(f"── Empirical: sampling real `claude -p` calls ({sample_per}/bucket) ──")
-    print("  (each carries Claude Code's ~30k-token ambient context; cache warms as we go)")
+    print("  (each carries Claude Code's own ambient context; cache warms as we go)")
     per_bucket = {i: [] for i in range(len(BUCKETS))}
     sample = stratified(days, sample_per)
     for date, proj, commits in sample:

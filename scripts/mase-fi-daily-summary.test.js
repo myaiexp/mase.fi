@@ -102,6 +102,16 @@ describe('mase-fi-daily-summary — grouping + summary branch', () => {
     expect(system).not.toContain('ignore previous instructions');
   });
 
+  it('fills MAX_LINES into the shared prompt file', () => {
+    seed([log('beta', 'c1'), log('beta', 'c2')]);
+    const CLAUDE_BIN = writeClaudeStub(dir, { output: 'did the thing' });
+    run({ CLAUDE_BIN, MAX_LINES: '2' });
+    const argv = readClaudeArgv(dir);
+    const system = argv[argv.indexOf('--system-prompt') + 1];
+    expect(system).toContain('Output 1 to 2 lines');
+    expect(system).not.toContain('@MAX_LINES@');
+  });
+
   it('strips ambient Claude Code context: no user settings, no MCP, low effort', () => {
     seed([log('beta', 'c1'), log('beta', 'c2')]);
     const CLAUDE_BIN = writeClaudeStub(dir, { output: 'did the thing' });
