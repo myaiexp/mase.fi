@@ -1,6 +1,5 @@
-// Golden-file tests for mase-fi-update: prepend ordering + sticky-capacity
-// demotion (the jq index-arithmetic that could silently drop the site's content)
-// plus the malformed-JSON / bad-category refusal paths.
+// Golden-file tests for mase-fi-update: prepend ordering, the category-free and legacy
+// argument forms, and the malformed-JSON / bad-argument refusal paths.
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { join } from 'node:path';
 import { readFileSync, writeFileSync, symlinkSync, mkdirSync, lstatSync } from 'node:fs';
@@ -17,25 +16,22 @@ beforeEach(() => {
 afterEach(() => cleanup(dir));
 
 describe('mase-fi-update — write + prepend', () => {
-  it('creates the file when missing and adds the entry', () => {
+  it('creates the file when missing and adds a feature entry', () => {
     // file does not exist yet
-    const r = update(['feature', 'explorer', 'first', '2026-07-18']);
+    const r = update(['explorer', 'first', '2026-07-18']);
     expect(r.status).toBe(0);
     const data = readJson(file);
-    expect(data.entries).toHaveLength(1);
-    expect(data.entries[0]).toMatchObject({
-      project: 'explorer', text: 'first', category: 'feature', sticky: true,
-    });
+    expect(data.entries).toEqual([
+      { date: '2026-07-18', project: 'explorer', text: 'first', category: 'feature' },
+    ]);
     expect(data.projects).toEqual([]);
   });
 
-  it('prepends newest-first and marks new entries sticky', () => {
+  it('prepends newest-first', () => {
     seed();
-    update(['feature', 'p', 'older', '2026-07-01']);
-    update(['feature', 'p', 'newer', '2026-07-02']);
-    const texts = readJson(file).entries.map((e) => e.text);
-    expect(texts).toEqual(['newer', 'older']);
-    expect(readJson(file).entries.every((e) => e.sticky === true)).toBe(true);
+    update(['p', 'older', '2026-07-01']);
+    update(['p', 'newer', '2026-07-02']);
+    expect(readJson(file).entries.map((e) => e.text)).toEqual(['newer', 'older']);
   });
 
   it('defaults the date to Helsinki today, ignoring host TZ', () => {
@@ -43,72 +39,66 @@ describe('mase-fi-update — write + prepend', () => {
     // Hostile TZ: the script must not inherit the host calendar. Helsinki is
     // the site's date, matching mase-fi-daily-summary. runScript also pins
     // Helsinki by default; this override proves the script itself is pinned.
-    update(['feature', 'p', 'no-date-given'], { TZ: 'Pacific/Kiritimati' });
+    update(['p', 'no-date-given'], { TZ: 'Pacific/Kiritimati' });
     expect(readJson(file).entries[0].date).toBe(todayHelsinki());
   });
 
   it('preserves unrelated pre-existing entries', () => {
     seed([{ date: '2026-06-01', project: 'old', text: 'keep me', category: 'log' }]);
-    update(['feature', 'p', 'new']);
-    const texts = readJson(file).entries.map((e) => e.text);
-    expect(texts).toEqual(['new', 'keep me']);
+    update(['p', 'new']);
+    expect(readJson(file).entries.map((e) => e.text)).toEqual(['new', 'keep me']);
   });
 });
 
-describe('mase-fi-update — sticky-capacity demotion', () => {
-  it('demotes the oldest project entry past the 2-sticky limit', () => {
+describe('mase-fi-update — legacy category argument', () => {
+  it.each(['feature', 'project'])('accepts a leading "%s" and writes a feature', (word) => {
     seed();
-    update(['project', 'p', 'proj1']);
-    update(['project', 'p', 'proj2']);
-    update(['project', 'p', 'proj3']); // 3rd — oldest must demote
-    const byText = Object.fromEntries(readJson(file).entries.map((e) => [e.text, e.sticky]));
-    expect(byText).toEqual({ proj3: true, proj2: true, proj1: false });
+    const r = update([word, 'p', 'legacy', '2026-07-01']);
+    expect(r.status).toBe(0);
+    expect(readJson(file).entries).toEqual([
+      { date: '2026-07-01', project: 'p', text: 'legacy', category: 'feature' },
+    ]);
   });
 
-  it('demotes the oldest feature entry past the 3-sticky limit', () => {
+  it('accepts the legacy form without a date', () => {
     seed();
-    for (const t of ['f1', 'f2', 'f3', 'f4']) update(['feature', 'p', t]);
-    const byText = Object.fromEntries(readJson(file).entries.map((e) => [e.text, e.sticky]));
-    expect(byText).toEqual({ f4: true, f3: true, f2: true, f1: false });
+    expect(update(['feature', 'p', 'legacy']).status).toBe(0);
+    expect(readJson(file).entries[0]).toMatchObject({ project: 'p', text: 'legacy', category: 'feature' });
   });
 
-  it('keeps exactly `limit` sticky entries per category as more pile up', () => {
-    seed();
-    for (const t of ['f1', 'f2', 'f3', 'f4', 'f5']) update(['feature', 'p', t]);
-    const stickies = readJson(file).entries.filter((e) => e.category === 'feature' && e.sticky);
-    expect(stickies.map((e) => e.text)).toEqual(['f5', 'f4', 'f3']);
-  });
-
-  it('demotes per-category — adding features never touches project stickiness', () => {
-    seed();
-    update(['project', 'p', 'projA']);
-    update(['project', 'p', 'projB']); // 2 project stickies (at limit, none demoted)
-    for (const t of ['f1', 'f2', 'f3', 'f4']) update(['feature', 'p', t]); // 4 features → f1 demotes
-    const stickyProjects = readJson(file).entries.filter((e) => e.category === 'project' && e.sticky);
-    expect(stickyProjects.map((e) => e.text).sort()).toEqual(['projA', 'projB']);
+  it('names the removed category argument when another word sits in its place', () => {
+    seed([{ date: '2026-06-01', project: 'x', text: 'y', category: 'log' }]);
+    const before = readFileSync(file, 'utf8');
+    const r = update(['improvement', 'p', 'text']);
+    expect(r.status).not.toBe(0);
+    expect(r.stderr).toMatch(/category argument was removed/i);
+    expect(readFileSync(file, 'utf8')).toBe(before);
   });
 });
 
 describe('mase-fi-update — refusal paths (no silent corruption)', () => {
-  it('rejects an unknown category without writing', () => {
-    seed([{ date: '2026-06-01', project: 'x', text: 'y', category: 'log' }]);
-    const before = readFileSync(file, 'utf8');
-    const r = update(['bogus', 'p', 'text']);
-    expect(r.status).not.toBe(0);
-    expect(r.stdout + r.stderr).toMatch(/category must be/i);
-    expect(readFileSync(file, 'utf8')).toBe(before); // untouched
-  });
-
   it('exits with usage when required args are missing', () => {
-    const r = update(['feature', 'onlyproject']);
+    const r = update(['onlyproject']);
     expect(r.status).not.toBe(0);
     expect(r.stdout + r.stderr).toMatch(/Usage:/);
+  });
+
+  it('exits with usage on too many args', () => {
+    const r = update(['feature', 'p', 'text', '2026-07-01', 'extra']);
+    expect(r.status).not.toBe(0);
+    expect(r.stdout + r.stderr).toMatch(/Usage:/);
+  });
+
+  it('prints usage and exits 0 on --help', () => {
+    const r = update(['--help']);
+    expect(r.status).toBe(0);
+    expect(r.stdout).toMatch(/Usage: mase-fi-update <project> <text> \[date\]/);
   });
 
   it('refuses a malformed updates.json and leaves it byte-for-byte intact', () => {
     writeFileSync(file, '{ this is not json ');
     const before = readFileSync(file, 'utf8');
-    const r = update(['feature', 'p', 'text']);
+    const r = update(['p', 'text']);
     expect(r.status).not.toBe(0);
     expect(r.stderr).toMatch(/malformed JSON/i);
     expect(readFileSync(file, 'utf8')).toBe(before);
@@ -117,7 +107,7 @@ describe('mase-fi-update — refusal paths (no silent corruption)', () => {
   it('refuses a non-YYYY-MM-DD date and leaves the file untouched', () => {
     seed([{ date: '2026-06-01', project: 'x', text: 'y', category: 'log' }]);
     const before = readFileSync(file, 'utf8');
-    const r = update(['feature', 'p', 'text', 'junkT12:34']);
+    const r = update(['p', 'text', 'junkT12:34']);
     expect(r.status).not.toBe(0);
     expect(r.stdout + r.stderr).toMatch(/YYYY-MM-DD/i);
     expect(readFileSync(file, 'utf8')).toBe(before);
@@ -126,7 +116,7 @@ describe('mase-fi-update — refusal paths (no silent corruption)', () => {
   it('refuses an impossible calendar day and leaves the file untouched', () => {
     seed([{ date: '2026-06-01', project: 'x', text: 'y', category: 'log' }]);
     const before = readFileSync(file, 'utf8');
-    const r = update(['feature', 'p', 'text', '2026-02-30']);
+    const r = update(['p', 'text', '2026-02-30']);
     expect(r.status).not.toBe(0);
     expect(r.stdout + r.stderr).toMatch(/valid calendar day/i);
     expect(readFileSync(file, 'utf8')).toBe(before);
@@ -140,7 +130,7 @@ describe('mase-fi-update — lock file must not clobber via symlink', () => {
     const lock = join(dir, 'updates.json.lock');
     writeFileSync(victim, 'do-not-clobber');
     symlinkSync(victim, lock);
-    const r = update(['feature', 'p', 'text'], { UPDATES_LOCK: lock });
+    const r = update(['p', 'text'], { UPDATES_LOCK: lock });
     expect(r.status).not.toBe(0);
     expect(r.stderr).toMatch(/lock/i);
     expect(readFileSync(victim, 'utf8')).toBe('do-not-clobber');
@@ -152,7 +142,7 @@ describe('mase-fi-update — lock file must not clobber via symlink', () => {
     const lockDir = join(dir, 'locks');
     mkdirSync(lockDir);
     const lock = join(lockDir, 'updates.json.lock');
-    const r = update(['feature', 'p', 'text'], { UPDATES_LOCK: lock });
+    const r = update(['p', 'text'], { UPDATES_LOCK: lock });
     expect(r.status).toBe(0);
     expect(readJson(file).entries).toHaveLength(1);
     expect(lstatSync(lock).isSymbolicLink()).toBe(false);

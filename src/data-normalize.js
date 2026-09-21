@@ -51,6 +51,5 @@ export function normalizeEntry(e, slugToChannel) {
     text: e.text || e.summary || '',
     project: slug || undefined,
     mappedChannel,
-    sticky: !!e.sticky,
   };
 }

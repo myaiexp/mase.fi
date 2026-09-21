@@ -9,7 +9,7 @@ The homepage's datastore is one JSON file plus an optional log archive. Four scr
 - Served by nginx from the webroot; the client fetches `/updates.json` (`SOURCE_URL` in `src/data.js`) on every load
 - Shape: `{"entries": [...], "projects": [...], "stats": {...}}` — one fetch provides the hot window. `stats` holds all-history `totalCommits`, `totalEntries`, `logFirst`/`logLast`, `commitsByProject`, `archivedLogs`, `archivedByProject` (archived log count per raw `entry.project`), and `archive` (whether the archive file has rows). All are written at compact time. The client keeps the commit and entry totals live by adding its in-memory logs to `archivedLogs` until the archive is merged (`logStats` in `src/data.js`); per-project counts do the same with `archivedByProject` (`commitsForProject`), falling back to the `commitsByProject` snapshot for a file compacted before that field existed.
 - Dates are ISO in JSON and the client renders them as ISO too: `YYYY-MM-DD` day separators and `HH:MM` row times (`dayOf` / `timeOf` in `src/dates.js`). Writers that default "today" use `Europe/Helsinki` (the VPS is UTC).
-- `UPDATES_FILE` / `ARCHIVE_FILE` / `LOG_HOT_DAYS` are overridable so writers can be exercised against a throwaway file (`UPDATES_FILE=/tmp/x.json mase-fi-update feature wander "…"`)
+- `UPDATES_FILE` / `ARCHIVE_FILE` / `LOG_HOT_DAYS` are overridable so writers can be exercised against a throwaway file (`UPDATES_FILE=/tmp/x.json mase-fi-update wander "…"`)
 
 `daily` entries store `{date, category, project, summary}` only — they do **not** embed a `commits` array (that field duplicated the `#activity` log and was ~39% of the payload). Compact (`scripts/mase-fi-compact-updates`, which `mase-fi-daily-summary` runs at the end of every run) strips any leftover `commits` keys, archives old logs, and rewrites `stats`.
 
@@ -35,7 +35,7 @@ All four mase.fi writers (`mase-fi-update`, `mase-fi-daily-summary`, `mase-fi-pr
 
 `mase-fi-compact-updates` exits 0 (compacted), 3 (degraded), or another non-zero status (failed — a busy lock or malformed `updates.json` included). `mase-fi-daily-summary` runs it at the end of every run, skip paths included, and never fails on it: a degraded or failed compact sends a `compact degraded` / `compact FAILED` ntfy instead.
 
-helm's `deploy` (Step 3) does **not** source this file — it flocks the same path and writes with in-place `cp` — but it must keep using `/tmp/mase-updates-json.lock`. A new writer that skips the flock will interleave bytes with a concurrent deploy and tear the file.
+helm's commit logger (`scripts/log-commits-to-updates`, used by `deploy` Step 3 and the VPS-copy timer) does **not** source this file — it flocks the same path and writes with in-place `cp` — but it must keep using `/tmp/mase-updates-json.lock`. A new writer that skips the flock will interleave bytes with a concurrent deploy and tear the file.
 
 ## `.projects` — `scripts/mase-fi-projects`
 
@@ -61,7 +61,7 @@ Routed by `entry.category`:
 | --- | --- |
 | `daily` | `#home` |
 | `log` | `#activity` |
-| `feature` / `project` | per-project channel |
+| `feature` | per-project channel |
 
 `entry.project` (slug) is matched case-insensitively against `project.slug`, falling back to `project.channel`.
 
@@ -73,11 +73,11 @@ Both go through helm's `scripts/log-commits-to-updates` (one jq pass under the s
 - **Remote projects** (r-proxy, e.g. `modding` on the desktop) never run `deploy`: sessions ship with `r git push`. helm's 15-min `vps-copy-refresh` timer logs each VPS copy's `refs/helm/activity-logged..HEAD`, dated by commit day in Helsinki (helm `docs/substrates.md`, idea #5221).
 - Desktop `git deployboth` (machine-configs) still appends the last commit of a push on its own; the ±1-day dedupe keeps it from doubling the timer's row.
 
-### Feature / project entries — `scripts/mase-fi-update`
+### Feature entries — `scripts/mase-fi-update`
 
-Manual `project`/`feature` entries. Sticky capacity enforced server-side via `jq` (2 `project` entries, 3 `feature` entries). Omitted date defaults to today in `Europe/Helsinki` (`TZ="Europe/Helsinki" date +%Y-%m-%d`), matching daily-summary. A supplied `[date]` must be a real `YYYY-MM-DD` calendar day — anything else is refused before the flock.
+`mase-fi-update <project> <text> [date]` prepends one `feature` entry (helm's `deploy --update "<text>"` calls it). Features are the only manual category: `project` (a "new project" announcement) and the per-category `sticky` flag predate the IRC rework, and the current frontend reads neither, so both are gone and the old `project` rows were rewritten as `feature`. A leading `feature`/`project` word is still accepted and ignored, so older callers keep working. Omitted date defaults to today in `Europe/Helsinki` (`TZ="Europe/Helsinki" date +%Y-%m-%d`), matching daily-summary. A supplied `[date]` must be a real `YYYY-MM-DD` calendar day — anything else is refused before the flock.
 
-On the laptop/desktop, `mase-fi-update` is a **machine-configs wrapper** (`.local/bin/mase-fi-update`, synced by `config-sync`) that SSHes to the VPS and runs `scripts/mase-fi-update` via `sudo -n -u mase` — `Host vps` logs in as root there, and the writer must run as mase (root can't take the mase-owned flock under `fs.protected_regular`). The wrapper forwards `UPDATES_FILE`, so `UPDATES_FILE=/tmp/x.json mase-fi-update feature wander "…"` exercises the whole chain against a throwaway file; a "broken on the laptop" report starts with that wrapper, not this script.
+On the laptop/desktop, `mase-fi-update` is a **machine-configs wrapper** (`.local/bin/mase-fi-update`, synced by `config-sync`) that SSHes to the VPS and runs `scripts/mase-fi-update` via `sudo -n -u mase` — `Host vps` logs in as root there, and the writer must run as mase (root can't take the mase-owned flock under `fs.protected_regular`). The wrapper forwards `UPDATES_FILE`, so `UPDATES_FILE=/tmp/x.json mase-fi-update wander "…"` exercises the whole chain against a throwaway file; a "broken on the laptop" report starts with that wrapper, not this script.
 
 ### Daily summaries — `scripts/mase-fi-daily-summary`
 
