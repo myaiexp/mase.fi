@@ -131,7 +131,7 @@ describe('loadArchive', () => {
   });
 
   it('builds the same entry shape as fetchData for the same raw row', async () => {
-    const raw = { category: 'log', project: 'Helm', date: '2026-01-01T10:00', text: 'same', sticky: true };
+    const raw = { category: 'log', project: 'Helm', date: '2026-01-01T10:00', text: 'same' };
     const projects = [{ name: 'Helm', channel: 'helm' }];
     stubFetch({ entries: [raw], projects });
     const hot = await fetchData();

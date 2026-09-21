@@ -16,7 +16,7 @@
 
 Store is `/var/www/html/updates.json`, served and fetched as `/updates.json`. Shape: `{"entries": [...], "projects": [...], "stats": {...}}` — one fetch provides the hot window (all non-log entries + last 90 days of `log`s). Older logs live in `/updates-archive.json` and lazy-load on `#activity` scroll-up (`loadArchive` in `data-archive.js`; archive rows go through the same `normalizeEntry` as hot rows, in `data-normalize.js`). `stats` keeps all-history totals after the cut; `data.archiveLoaded` is set only after a successful merge, so a failed archive load keeps the totals on `stats.archivedLogs` / `stats.archivedByProject` (the feed drops its sentinel and retries on the next `#activity` render). Dates are ISO in JSON and render as ISO client-side: `YYYY-MM-DD` day separators and `HH:MM` row times (`dayOf` / `timeOf` in `dates.js`). Writers default omitted dates to today in `Europe/Helsinki`.
 
-- **Categories → channels:** `daily` → `#home`, `log` → `#activity`, `feature`/`project` → per-project channel
+- **Categories → channels:** `daily` → `#home`, `log` → `#activity`, `feature` → per-project channel (the retired `project` category is migrated to `feature`)
 - **Channel mapping:** `entry.project` (slug) is matched case-insensitively against `project.slug`, falling back to `project.channel`
 - **Visibility:** only helm-showcase projects with a public GitHub repo or live public deployment appear as channels; internal tools stay unflagged and appear only in update entries
 - Full pipeline (writers, lock, showcase generator, daily summaries): `docs/content-pipeline.md`

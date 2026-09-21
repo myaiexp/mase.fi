@@ -1,49 +1,59 @@
 #!/usr/bin/env bash
+# Add one feature entry (a project's new capability) to mase.fi's updates.json
 set -e
 
 # Shared validate + atomic-or-in-place install of updates.json (write_updates_json).
 source "$(dirname "$(readlink -f "$0")")/updates-write.sh"
 
 usage() {
-  echo "Usage: mase-fi-update <category> <project> <text> [date]"
+  echo "Usage: mase-fi-update <project> <text> [date]"
   echo ""
-  echo "  category:  project | feature"
-  echo "  project:   project name (e.g., tracker, wander)"
-  echo "  text:      update description"
+  echo "  project:   project name (e.g., tracker, wander) — routes to that project's channel"
+  echo "  text:      update description (a new capability or visible change, never a bug fix)"
   echo "  date:      optional, YYYY-MM-DD (defaults to today, Europe/Helsinki)"
-  exit 1
+  echo ""
+  echo "Writes one 'feature' entry. The old leading category argument (feature | project)"
+  echo "is still accepted and ignored: every manual entry is a feature now."
+  echo ""
+  echo "Examples:"
+  echo "  mase-fi-update helm \"Answer a blocked session's dialog from Telegram\""
+  echo "  mase-fi-update wander \"Offline map tiles\" 2026-09-20"
 }
 
-if [ $# -lt 3 ]; then
+if [ "${1:-}" = "--help" ] || [ "${1:-}" = "-h" ]; then
   usage
+  exit 0
+fi
+# Legacy form: <feature|project> <project> <text> [date]. Both words once picked a
+# category; the frontend has no use for the difference, so both now write a feature.
+if { [ "${1:-}" = "feature" ] || [ "${1:-}" = "project" ]; } && [ $# -ge 3 ]; then
+  shift
+fi
+if [ $# -lt 2 ] || [ $# -gt 3 ]; then
+  usage >&2
+  exit 1
 fi
 
-CATEGORY="$1"
-PROJECT="$2"
-TEXT="$3"
-DATE="${4:-$(TZ="Europe/Helsinki" date +%Y-%m-%d)}"
+PROJECT="$1"
+TEXT="$2"
+DATE="${3:-$(TZ="Europe/Helsinki" date +%Y-%m-%d)}"
 # Env-overridable (like mase-fi-daily-summary / mase-fi-projects) so the writer can
 # be exercised against a throwaway file in tests instead of the live prod webroot.
 UPDATES_FILE="${UPDATES_FILE:-/var/www/html/updates.json}"
 
-if [ "$CATEGORY" != "project" ] && [ "$CATEGORY" != "feature" ]; then
-  echo "Error: category must be 'project' or 'feature' (got '$CATEGORY')"
-  exit 1
-fi
-
 if [[ ! "$DATE" =~ ^[0-9]{4}-[0-9]{2}-[0-9]{2}$ ]]; then
-  echo "Error: date must be YYYY-MM-DD (got '$DATE')" >&2
+  # Three arguments with a non-date last one is almost always the removed category
+  # argument with some other word in it (`mase-fi-update improvement helm "…"`).
+  if [ $# -eq 3 ]; then
+    echo "Error: the third argument must be a YYYY-MM-DD date (got '$DATE'). The category argument was removed: mase-fi-update <project> <text> [date]" >&2
+  else
+    echo "Error: date must be YYYY-MM-DD (got '$DATE')" >&2
+  fi
   exit 1
 fi
 if [ "$(date -d "$DATE" +%Y-%m-%d 2>/dev/null)" != "$DATE" ]; then
   echo "Error: date is not a valid calendar day (got '$DATE')" >&2
   exit 1
-fi
-
-if [ "$CATEGORY" = "project" ]; then
-  STICKY_LIMIT=2
-else
-  STICKY_LIMIT=3
 fi
 
 if [ ! -f "$UPDATES_FILE" ]; then
@@ -56,24 +66,9 @@ prepend_entry() {
   jq --arg date "$DATE" \
      --arg project "$PROJECT" \
      --arg text "$TEXT" \
-     --arg category "$CATEGORY" \
-     --argjson limit "$STICKY_LIMIT" \
-     '
-     .entries = [{date: $date, project: $project, text: $text, category: $category, sticky: true}] + .entries
-     | .entries = (
-         [ .entries | to_entries[] | select(.value.category == $category and .value.sticky == true) | .key ] as $sticky_indices
-         | if ($sticky_indices | length) > $limit then
-             ($sticky_indices[$limit:]) as $demote
-             | .entries | to_entries | map(
-                 if (.key | IN($demote[])) then .value.sticky = false | .value else .value end
-               )
-           else
-             .entries
-           end
-       )
-     ' \
+     '.entries = [{date: $date, project: $project, text: $text, category: "feature"}] + .entries' \
      "$1" > "$2"
 }
 with_updates_lock "$UPDATES_FILE" "not added" prepend_entry
 
-echo "Added $CATEGORY entry: [$PROJECT] $TEXT ($DATE)"
+echo "Added feature entry: [$PROJECT] $TEXT ($DATE)"
