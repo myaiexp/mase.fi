@@ -66,7 +66,13 @@ compact_updates_json() {
                 | from_entries
               ),
               archive: (($arch_entries | length) > 0),
-              archivedLogs: ($arch_entries | length)
+              archivedLogs: ($arch_entries | length),
+              archivedByProject: (
+                $arch_entries
+                | group_by(.project // "")
+                | map({key: (.[0].project // ""), value: length})
+                | from_entries
+              )
             }
         ),
         archive: { entries: $arch_entries }

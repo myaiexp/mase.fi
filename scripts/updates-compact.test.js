@@ -60,6 +60,7 @@ describe('compact_updates_json — strip commits + archive old logs (finding #88
       logFirst: '2026-01-01',
       logLast: '2026-08-20',
       commitsByProject: { beta: 2 },
+      archivedByProject: { beta: 1 },
     });
     expect(hot.stats.totalEntries).toBe(4); // 2 non-logs in hot + 2 logs overall
   });

@@ -1,6 +1,8 @@
 // @vitest-environment jsdom
-// Command input key sequences: leftover slash→help, Tab-complete, global shortcuts.
+// Command input key sequences: leftover slash→help, Tab-complete, global
+// shortcuts, Escape, and autocomplete choose (Enter/click channel navigation).
 import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { setupDom, setChannels, ch, type, press, items, cc } from './command-test-helpers.js';
 
 vi.mock('./registry.js', () => ({
   getChannels: vi.fn(() => []),
@@ -15,36 +17,6 @@ vi.mock('./data.js', () => ({
 
 let command, registry, channels;
 
-function setupDom() {
-  document.body.replaceChildren();
-  document.getElementById('search-dim-style')?.remove();
-  for (const id of ['cmd', 'cmd-input', 'cmd-prompt', 'cmd-hint', 'cmd-complete', 'feed']) {
-    const el = document.createElement(id === 'cmd-input' ? 'input' : 'div');
-    el.id = id;
-    document.body.appendChild(el);
-  }
-}
-
-function setChannels(list) {
-  registry.getChannels.mockReturnValue(list);
-}
-
-function ch(id, label = id, topic = `${id} topic`) {
-  return { id, label, topic };
-}
-
-function type(value) {
-  const input = document.getElementById('cmd-input');
-  input.value = value;
-  input.dispatchEvent(new Event('input'));
-  return input;
-}
-
-function press(el, key) {
-  el.dispatchEvent(new KeyboardEvent('keydown', { key, bubbles: true }));
-}
-
-const cc = () => document.getElementById('cmd-complete');
 const input = () => document.getElementById('cmd-input');
 
 beforeEach(async () => {
@@ -54,8 +26,28 @@ beforeEach(async () => {
   registry = await import('./registry.js');
   channels = await import('./channels.js');
   command = await import('./command.js');
-  setChannels([ch('home'), ch('explorer', 'explorer', 'file explorer'), ch('activity')]);
+  setChannels(registry, [ch('home'), ch('explorer', 'explorer', 'file explorer'), ch('activity')]);
   command.initCommand({});
+});
+
+// ---- autocomplete choose (channel navigation) ----------------------------
+
+describe('autocomplete choose', () => {
+  it('Enter navigates to the top-ranked match and clears the input', () => {
+    const el = type('/exp');
+    el.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
+    expect(channels.navigate).toHaveBeenCalledWith('explorer');
+    expect(el.value).toBe('');
+  });
+
+  it('clicking a hovered item navigates to that channel', () => {
+    type('/o'); // matches home + explorer (both contain "o"), in registry order
+    const list = items();
+    expect(list.map((el) => el.dataset.ch)).toEqual(['home', 'explorer']);
+    list[1].dispatchEvent(new MouseEvent('mouseenter', { bubbles: true })); // selection.idx → 1
+    list[1].dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    expect(channels.navigate).toHaveBeenCalledWith('explorer');
+  });
 });
 
 describe('slash then help (leftover matches must not hijack Enter/Tab)', () => {
