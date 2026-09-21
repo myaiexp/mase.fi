@@ -24,7 +24,7 @@ set -euo pipefail
 # Shared validate + atomic-or-in-place install of updates.json (write_updates_json).
 source "$(dirname "$(readlink -f "$0")")/updates-write.sh"
 
-UPDATES="${UPDATES_FILE:-/var/www/html/updates.json}"
+UPDATES="${UPDATES_FILE:-$UPDATES_FILE_DEFAULT}"
 API="${SHOWCASE_API:-http://localhost:9754/api/projects/showcase}"
 EXTRA="${SHOWCASE_EXTRA:-/home/mase/Projects/mase.fi/scripts/showcase-extra.json}"
 

@@ -27,7 +27,7 @@ import sys
 import tempfile
 import urllib.request
 
-UPDATES = os.environ.get("UPDATES_FILE", "/var/www/html/updates.json")
+UPDATES = os.environ.get("UPDATES_FILE", "/var/lib/mase-fi/updates.json")  # UPDATES_FILE_DEFAULT in updates-write.sh
 CLAUDE_BIN = os.environ.get("CLAUDE_BIN", "/home/mase/.local/bin/claude")
 CREDS = os.path.expanduser("~/.claude/.credentials.json")
 MODEL = "claude-sonnet-5"           # what `--model sonnet` resolves to (for count_tokens)

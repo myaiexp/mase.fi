@@ -9,7 +9,7 @@ SCRIPT_DIR="$(dirname "$(readlink -f "$0")")"
 # Shared updates.json lock + install (with_updates_lock, write_updates_json).
 source "$SCRIPT_DIR/updates-write.sh"
 
-UPDATES_FILE="${UPDATES_FILE:-/var/www/html/updates.json}"
+UPDATES_FILE="${UPDATES_FILE:-$UPDATES_FILE_DEFAULT}"
 TODAY=$(TZ="Europe/Helsinki" date +%Y-%m-%d)
 # Summaries come from the Claude Code CLI in headless print mode. Absolute path
 # because the systemd *user* service runs with a minimal PATH that excludes

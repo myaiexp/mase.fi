@@ -39,7 +39,7 @@ TEXT="$2"
 DATE="${3:-$(TZ="Europe/Helsinki" date +%Y-%m-%d)}"
 # Env-overridable (like mase-fi-daily-summary / mase-fi-projects) so the writer can
 # be exercised against a throwaway file in tests instead of the live prod webroot.
-UPDATES_FILE="${UPDATES_FILE:-/var/www/html/updates.json}"
+UPDATES_FILE="${UPDATES_FILE:-$UPDATES_FILE_DEFAULT}"
 
 if [[ ! "$DATE" =~ ^[0-9]{4}-[0-9]{2}-[0-9]{2}$ ]]; then
   # Three arguments with a non-date last one is almost always the removed category

@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Shared lock + install for the site-served /var/www/html/updates.json.
+# Shared lock + install for mase.fi's updates.json store.
 #
 # Sourced by the four mase.fi writers — mase-fi-update, mase-fi-daily-summary,
 # mase-fi-projects, mase-fi-compact-updates. run_under_updates_lock owns the
@@ -17,6 +17,14 @@
 # the path for tests.
 
 UPDATES_JSON_LOCK="${UPDATES_LOCK:-/tmp/mase-updates-json.lock}"
+
+# The store lives in a mase-owned dir outside the webroot, served at /updates.json and
+# /updates-archive.json by nginx `alias` locations (sites-available/default). The
+# webroot is www-data-owned, so a file there could only be rewritten in place;
+# here write_updates_json's sibling-rename branch applies and readers never see a
+# torn file (idea #2487). helm's scripts/log-commits-to-updates and deploy carry the
+# same path.
+UPDATES_FILE_DEFAULT=/var/lib/mase-fi/updates.json
 
 # Create/open $UPDATES_JSON_LOCK with O_NOFOLLOW|O_APPEND|O_CREAT. Bash redirects
 # cannot set O_NOFOLLOW, so a tiny python helper does the open;
@@ -142,12 +150,9 @@ _updates_rmw() {
 #     - dir writable  -> sibling mktemp + mv (rename(2)): tearless for readers,
 #                        an nginx GET always sees the whole old or whole new file.
 #     - dir read-only -> in-place cp (needs only file-write). nginx can briefly
-#                        read a partial file during the copy — the residual we
-#                        can't close today: updates.json is mase-owned but sits in
-#                        a www-data-owned /var/www/html that mase cannot write, so
-#                        rename INTO it is impossible without an infra perm change.
-#                        Grant mase write on the webroot dir and the atomic branch
-#                        above takes over automatically, no code change.
+#                        read a partial file during the copy. Production's store dir
+#                        (UPDATES_FILE_DEFAULT) is mase-writable, so this branch
+#                        only runs for a target someone points elsewhere.
 #
 #   Returns non-zero WITHOUT touching the target if the candidate is invalid, so a
 #   caller's `&&` chain / set -e aborts loudly instead of shipping garbage.

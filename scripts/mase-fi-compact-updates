@@ -7,7 +7,7 @@ SCRIPT_DIR="$(dirname "$(readlink -f "$0")")"
 source "$SCRIPT_DIR/updates-write.sh"
 source "$SCRIPT_DIR/updates-compact.sh"
 
-UPDATES_FILE="${UPDATES_FILE:-/var/www/html/updates.json}"
+UPDATES_FILE="${UPDATES_FILE:-$UPDATES_FILE_DEFAULT}"
 ARCHIVE_FILE="${ARCHIVE_FILE:-$(dirname "$UPDATES_FILE")/updates-archive.json}"
 # Hot-file retention for `log` entries (finding #8804). Heat (30d) and the 28d
 # sparkbar stay in-window.
