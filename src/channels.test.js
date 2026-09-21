@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
-// Unit tests for the routing layer: registry build, navigate orchestration,
-// hash routing fallbacks, and the chHeat/chAccent channel-temperature helpers.
+// Unit tests for the routing layer: registry build, navigate orchestration, and
+// the chHeat/chAccent channel-temperature helpers. applyInitialChannel (the
+// hash → initial channel fallback chain) lives in channels-hash.test.js.
 //
 // DIVERGENCE FROM AUDIT #1442: the finding states getCurrentChannelId() "reads
 // location.hash with a fallback to localStorage" and that navigate() "updates
@@ -260,43 +261,5 @@ describe('initChannels', () => {
   });
 });
 
-// ---- applyInitialChannel -------------------------------------------------
-
-describe('applyInitialChannel', () => {
-  it('hash present → navigates to that channel', () => {
-    seed();
-    window.history.replaceState(null, '', '#/explorer');
-    channels.applyInitialChannel();
-    expect(channels.getCurrentChannelId()).toBe('explorer');
-    expect(location.hash).toBe('#/explorer'); // fromHash → hash left as-is
-  });
-
-  it('hash absent → defaults to home', () => {
-    seed();
-    window.history.replaceState(null, '', '/');
-    channels.applyInitialChannel();
-    expect(channels.getCurrentChannelId()).toBe('home');
-  });
-
-  it('bare "#" hash → defaults to home', () => {
-    seed();
-    window.history.replaceState(null, '', '#');
-    channels.applyInitialChannel();
-    expect(channels.getCurrentChannelId()).toBe('home');
-  });
-
-  it('unknown hash id → falls back to home', () => {
-    seed();
-    window.history.replaceState(null, '', '#/ghost');
-    channels.applyInitialChannel();
-    expect(channels.getCurrentChannelId()).toBe('home');
-  });
-
-  it('hash naming an inherited Object key → falls back to home', () => {
-    seed();
-    window.history.replaceState(null, '', '#/__proto__');
-    channels.applyInitialChannel();
-    expect(channels.getCurrentChannelId()).toBe('home');
-    expect(document.getElementById('topic-hash').textContent).toBe('#home');
-  });
-});
+// applyInitialChannel tests (hash → initial channel fallback chain) moved to
+// channels-hash.test.js.

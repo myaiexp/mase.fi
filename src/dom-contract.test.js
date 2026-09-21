@@ -34,7 +34,9 @@ function htmlIds(filename) {
 
 function homepageModules() {
   return readdirSync(SRC).filter(
-    (f) => f.endsWith('.js') && !f.endsWith('.test.js') && f !== 'notfound-page.js',
+    // *-test-helpers.js are jsdom harnesses that never ship, so their ids bind no page.
+    (f) => f.endsWith('.js') && !f.endsWith('.test.js') && !f.endsWith('-test-helpers.js')
+      && f !== 'notfound-page.js',
   );
 }
 
