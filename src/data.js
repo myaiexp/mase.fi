@@ -86,16 +86,15 @@ function normalizeStats(raw) {
   const totalCommits = Number(raw.totalCommits);
   const totalEntries = Number(raw.totalEntries);
   const archivedLogs = Number(raw.archivedLogs);
-  const commitsByProject = (raw.commitsByProject && typeof raw.commitsByProject === 'object')
-    ? raw.commitsByProject
-    : undefined;
+  const countMap = (m) => (m && typeof m === 'object' ? m : undefined);
   return {
     totalCommits: Number.isFinite(totalCommits) ? totalCommits : undefined,
     totalEntries: Number.isFinite(totalEntries) ? totalEntries : undefined,
     archivedLogs: Number.isFinite(archivedLogs) ? archivedLogs : undefined,
     logFirst: typeof raw.logFirst === 'string' ? raw.logFirst : undefined,
     logLast: typeof raw.logLast === 'string' ? raw.logLast : undefined,
-    commitsByProject,
+    commitsByProject: countMap(raw.commitsByProject),
+    archivedByProject: countMap(raw.archivedByProject),
     archive: raw.archive === true,
   };
 }
@@ -254,14 +253,28 @@ function allHistoryLogs(data, counted) {
 }
 
 /**
- * All-history commit count for one project channel: the compact's
- * commitsByProject (a compact-time snapshot) keyed by slug, then by channel for
- * projects without a slug; else the project's log rows in memory.
+ * All-history commit count for one project channel, by the same cut rule as
+ * allHistoryLogs: the channel's log rows in memory, plus archivedByProject's
+ * compact-time count of archived rows when the archive is not merged. Archive
+ * keys are raw entry.project strings, matched case-insensitively against the
+ * project's routing slug the way normalizeEntry routes rows. A compact from
+ * before archivedByProject existed falls back to its commitsByProject snapshot,
+ * keyed by slug, then by channel.
  */
 export function commitsForProject(project, data) {
+  const inMemory = data.entries.filter((e) => e.ch === project.channel && e.cat === 'log').length;
+  if (data.archiveLoaded) return inMemory;
+  const archived = data.stats?.archivedByProject;
+  if (archived) {
+    const slug = (project.slug || project.channel || '').toLowerCase();
+    let total = inMemory;
+    for (const [key, n] of Object.entries(archived)) {
+      if (key.toLowerCase() === slug && Number.isFinite(n)) total += n;
+    }
+    return total;
+  }
   const byProject = data.stats?.commitsByProject;
   if (Number.isFinite(byProject?.[project.slug])) return byProject[project.slug];
   if (Number.isFinite(byProject?.[project.channel])) return byProject[project.channel];
-  return data.entries.filter((e) => e.ch === project.channel && e.cat === 'log').length;
+  return inMemory;
 }
-

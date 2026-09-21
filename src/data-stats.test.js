@@ -155,3 +155,45 @@ describe('commitsForProject', () => {
     expect(commitsForProject({ slug: 'constructor', channel: 'toString' }, inherited)).toBe(0);
   });
 });
+
+// Deploys prepend logs to the hot file between nightly compacts, so a per-project
+// count must be archived (compact-time) + in-memory (live), like logStats' total.
+describe('commitsForProject — live between compacts (idea #4713)', () => {
+  const hot = () => [
+    entry('log', 'helm'),
+    entry('log', 'helm'),
+    entry('log', 'helm'), // prepended by a deploy after the last compact
+    entry('log', 'other'),
+  ];
+  const project = { slug: 'helm', channel: 'helm' };
+
+  it('adds the archived count to the project log rows in memory', () => {
+    const data = { entries: hot(), stats: { archivedByProject: { helm: 40 }, commitsByProject: { helm: 42 } } };
+    expect(commitsForProject(project, data)).toBe(43);
+  });
+
+  it('matches archive keys case-insensitively against the routing slug', () => {
+    const data = { entries: hot(), stats: { archivedByProject: { Helm: 10, helm: 5, other: 9 } } };
+    expect(commitsForProject(project, data)).toBe(18);
+  });
+
+  it('routes by slug, not channel, when the project has its own slug', () => {
+    const data = { entries: hot(), stats: { archivedByProject: { 'helm-app': 10, helm: 99 } } };
+    expect(commitsForProject({ slug: 'helm-app', channel: 'helm' }, data)).toBe(13);
+  });
+
+  it('counts only memory once the archive is merged', () => {
+    const data = { entries: hot(), archiveLoaded: true, stats: { archivedByProject: { helm: 40 } } };
+    expect(commitsForProject(project, data)).toBe(3);
+  });
+
+  it('treats a project absent from the archive as zero archived', () => {
+    const data = { entries: hot(), stats: { archivedByProject: {} } };
+    expect(commitsForProject(project, data)).toBe(3);
+  });
+
+  it('ignores non-numeric archived counts', () => {
+    const data = { entries: hot(), stats: { archivedByProject: { helm: 'x', HELM: 2 } } };
+    expect(commitsForProject(project, data)).toBe(5);
+  });
+});

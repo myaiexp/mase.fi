@@ -294,6 +294,7 @@ describe('fetchData routing', () => {
         logLast: '2026-09-02',
         archive: true,
         commitsByProject: { helm: 4 },
+        archivedByProject: { helm: 3 },
       },
     });
     const data = await fetchData();
@@ -301,6 +302,7 @@ describe('fetchData routing', () => {
     expect(data.stats.logFirst).toBe('2026-03-05');
     expect(data.stats.logLast).toBe('2026-09-02');
     expect(data.stats.commitsByProject).toEqual({ helm: 4 });
+    expect(data.stats.archivedByProject).toEqual({ helm: 3 });
     expect(data.hasArchive).toBe(true);
     expect(data.archiveLoaded).toBe(false);
   });
