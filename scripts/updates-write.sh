@@ -3,8 +3,8 @@
 #
 # Sourced by the four mase.fi writers — mase-fi-update, mase-fi-daily-summary,
 # mase-fi-projects, mase-fi-compact-updates. run_under_updates_lock owns the
-# lock steps (open, flock, in-lock validity gate) and is the only place they are
-# written; with_updates_lock adds the single-file read-modify-write on top;
+# lock steps (open, flock, in-lock is_updates_json gate) and is the only place
+# they are written; with_updates_lock adds the single-file read-modify-write on top;
 # write_updates_json is the final validate + install step. Compaction's
 # transform lives in updates-compact.sh, sourced only by mase-fi-compact-updates.
 #
@@ -47,6 +47,18 @@ finally:
 ' "$UPDATES_JSON_LOCK"
 }
 
+# is_updates_json <file>
+#
+#   True when <file> holds exactly one JSON document that is an object with an
+#   `entries` array — the store's minimum shape. `jq empty` is not enough: it
+#   exits 0 on a 0-byte file and on several concatenated documents, so a
+#   transform that silently produced nothing would pass it and blank the store.
+#   Slurping (-s) makes both cases fail the length check.
+is_updates_json() {
+  jq -se 'length == 1 and (.[0] | type == "object" and (.entries | type) == "array")' \
+    "$1" >/dev/null 2>&1
+}
+
 # run_under_updates_lock <target> <error-label> <fn> [args...]
 #
 #   Runs `<fn> [args...]` while holding the updates.json flock, after checking
@@ -75,7 +87,7 @@ run_under_updates_lock() {
       echo "updates.json lock busy >30s — $label" >&2
       exit 1
     }
-    if ! jq empty "$target" 2>/dev/null; then
+    if ! is_updates_json "$target"; then
       echo "$target is malformed JSON — $label" >&2
       exit 1
     fi
@@ -141,7 +153,7 @@ _updates_rmw() {
 #   caller's `&&` chain / set -e aborts loudly instead of shipping garbage.
 write_updates_json() {
   local candidate="$1" target="$2"
-  if ! jq empty "$candidate" 2>/dev/null; then
+  if ! is_updates_json "$candidate"; then
     echo "write_updates_json: candidate is malformed JSON — refusing to write $target" >&2
     return 1
   fi

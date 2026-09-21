@@ -1,12 +1,17 @@
 // @vitest-environment jsdom
-// Unit tests for pinned.js — the per-channel hero card / pinned panel renderers.
-// pinned.js builds its markup with string concatenation + template literals and leans
-// entirely on escapeHtml() to neutralize user-visible strings (project names,
-// descriptions, links, the last-push project). These tests pin the generated markup
-// and, critically, prove that HTML-special characters in user data are ESCAPED — never
-// parsed into live DOM (no injected <script>/<b>, no attribute breakout).
+// Unit tests for pinned.js — cardHead escaping, the home card, and the
+// unmatched-channel / beam-teardown branches of renderPinned. pinned.js builds
+// its markup with string concatenation + template literals and leans entirely
+// on escapeHtml() to neutralize user-visible strings — these tests pin the
+// generated markup and prove HTML-special characters are ESCAPED, never parsed
+// into live DOM.
+//
+// renderPinned — project: pinned-project.test.js
+// renderPinned — activity: pinned-activity.test.js
+// renderHeroLine: pinned-hero.test.js
+// Activity card totals after loadArchive: pinned-archive.test.js
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import { renderPinned, renderHeroLine, cardHead } from './pinned.js';
+import { renderPinned, cardHead } from './pinned.js';
 import * as beam from './beam.js';
 
 // renderPinned('home', …) calls mountBeam, which probes matchMedia. jsdom doesn't
@@ -27,7 +32,6 @@ afterEach(() => {
 });
 
 const pinnedEl = () => document.getElementById('pinned');
-const heroEl = () => document.getElementById('hero-line');
 
 describe('cardHead', () => {
   it('escapes chip keys, values, and the right-hand slot (no live markup)', () => {
@@ -90,195 +94,6 @@ describe('renderPinned — home', () => {
   });
 });
 
-// ---- renderPinned: project -----------------------------------------------
-
-describe('renderPinned — project', () => {
-  // demos defaults to [] to mirror fetchData's canonical shape (always present).
-  const projectData = (project, entries = [], demos = []) => ({ projects: [project], entries, demos });
-
-  it('renders a project card with commits, heat, status, description and links', () => {
-    const project = {
-      channel: 'explorer',
-      heat: 0.8,
-      description: 'a terminal file explorer',
-      links: [{ href: 'https://mase.fi/explorer', label: 'mase.fi' }],
-    };
-    const data = projectData(project, [
-      logEntry({ ch: 'explorer' }),
-      logEntry({ ch: 'explorer' }),
-      logEntry({ ch: 'porssi' }), // different channel — must not be counted
-    ]);
-    renderPinned('explorer', data);
-    const html = pinnedEl().innerHTML;
-    expect(html).toContain('a terminal file explorer');
-    expect(html).toContain('80%');                  // heat → (0.8*100|0)
-    expect(html).toContain('2 commits in feed');    // only the two 'explorer' logs
-    expect(html).toContain('● shipping');           // heat > 0.6 label
-    expect(html).toContain('actively shipping');    // heat > 0.6 status text
-    expect(html).toContain('href="https://mase.fi/explorer"');
-    expect(html).toContain('>mase.fi</a>');
-  });
-
-  it('uses stats.commitsByProject when the hot file no longer holds all logs', () => {
-    const project = {
-      channel: 'explorer',
-      slug: 'explorer',
-      heat: 0.5,
-      description: 'desc',
-      links: [],
-    };
-    const data = projectData(project, [logEntry({ ch: 'explorer' })]);
-    data.stats = { commitsByProject: { explorer: 42 } };
-    renderPinned('explorer', data);
-    expect(pinnedEl().innerHTML).toContain('42 commits in feed');
-  });
-
-  it('labels a mid-heat project as steady', () => {
-    renderPinned('explorer', projectData({ channel: 'explorer', heat: 0.5, description: 'd', links: [] }));
-    const html = pinnedEl().innerHTML;
-    expect(html).toContain('● steady');                       // heat > 0.3 label
-    expect(html).toContain('<dd class="accent">steady</dd>'); // status text
-  });
-
-  it('labels a cold project as idle / maintenance only', () => {
-    renderPinned('explorer', projectData({ channel: 'explorer', heat: 0.1, description: 'd', links: [] }));
-    const html = pinnedEl().innerHTML;
-    expect(html).toContain('○ idle');               // heat <= 0.3 label
-    expect(html).toContain('maintenance only');     // status text
-  });
-
-  it('escapes a malicious project description (no script injected)', () => {
-    const project = {
-      channel: 'explorer',
-      heat: 0.5,
-      description: '<script>alert(1)</script> & "quoted"',
-      links: [],
-    };
-    renderPinned('explorer', projectData(project));
-    expect(pinnedEl().querySelector('script')).toBeNull();
-    const html = pinnedEl().innerHTML;
-    expect(html).toContain('&lt;script&gt;');
-    expect(html).toContain('&amp;');
-    expect(html).not.toContain('<script>');
-  });
-
-  it('renders a "try demo →" chip when the channel has a published demo', () => {
-    const data = projectData({ channel: 'explorer', heat: 0.5, description: 'd', links: [] }, [], ['explorer']);
-    renderPinned('explorer', data);
-    const a = pinnedEl().querySelector('.demo-link');
-    expect(a).not.toBeNull();
-    expect(a.getAttribute('href')).toBe('/demos/explorer/');
-    expect(a.textContent).toContain('try demo');
-  });
-
-  it('omits the demo chip when the channel has no demo', () => {
-    renderPinned('explorer', projectData({ channel: 'explorer', heat: 0.5, description: 'd', links: [] }));
-    expect(pinnedEl().querySelector('.demo-link')).toBeNull();
-  });
-
-  it('escapes malicious link href and label (no attribute breakout)', () => {
-    const project = {
-      channel: 'explorer',
-      heat: 0.5,
-      description: 'd',
-      links: [{ href: '"><script>alert(1)</script>', label: '<b>x</b>' }],
-    };
-    renderPinned('explorer', projectData(project));
-    // Without escapeHtml the unescaped quote would close href= and the <script>
-    // would become a live element. Assert against the DOM (serialization-robust):
-    // no breakout, and the whole payload is trapped as the href value / link text.
-    const a = pinnedEl().querySelector('.links a');
-    expect(pinnedEl().querySelector('script')).toBeNull();
-    expect(pinnedEl().querySelector('.links b')).toBeNull();
-    expect(a.getAttribute('href')).toBe('"><script>alert(1)</script>');
-    expect(a.textContent).toBe('<b>x</b>');
-  });
-});
-
-// ---- renderPinned: activity ----------------------------------------------
-
-describe('renderPinned — activity', () => {
-  it('renders the activity card with the total entry count and a log date range', () => {
-    const data = {
-      projects: [],
-      entries: [
-        logEntry({ cat: 'log', date: '2026-01-01T08:00' }),
-        logEntry({ cat: 'log', date: '2026-03-15T08:00' }),
-        { ch: 'home', cat: 'daily', date: '2026-02-01T08:00', nick: 'mase', text: 'd' },
-      ],
-    };
-    renderPinned('activity', data);
-    const html = pinnedEl().innerHTML;
-    expect(html).toContain('3 entries');               // data.entries.length (incl. daily)
-    expect(html).toContain('2026-01-01 → 2026-03-15'); // first → last log entry
-  });
-
-  it('uses precomputed stats for total and range when the hot file is a window', () => {
-    // After compact, data.entries is the recent slice; the card must still
-    // show all-history figures from stats (finding #8804).
-    const data = {
-      projects: [],
-      entries: [
-        logEntry({ cat: 'log', date: '2026-08-01T08:00' }),
-        { ch: 'home', cat: 'daily', date: '2026-08-01T08:00', nick: 'mase', text: 'd' },
-      ],
-      stats: { archivedLogs: 11735, logFirst: '2026-03-05', logLast: '2026-09-02' },
-    };
-    renderPinned('activity', data);
-    const html = pinnedEl().innerHTML;
-    // 1 non-log in memory + (11735 archived + 1 hot log) = 11737
-    expect(html).toContain('11737 entries');
-    expect(html).toContain('2026-03-05 → 2026-09-02');
-    expect(html).not.toContain('2026-08-01 → 2026-08-01');
-  });
-
-  it('shows an em-dash range when there are no log entries', () => {
-    renderPinned('activity', { projects: [], entries: [] });
-    const html = pinnedEl().innerHTML;
-    expect(html).toContain('0 entries');
-    expect(html).toContain('<dt>range</dt><dd>—</dd>');
-  });
-
-  // A UTC-noon date string N days ago. logStats buckets by UTC calendar day, so
-  // building the string in UTC terms keeps the bucket index deterministic in any
-  // runner timezone (noon keeps it clear of the window's start/end edges).
-  const utcNoonDaysAgo = (n) => {
-    const d = new Date();
-    d.setUTCHours(12, 0, 0, 0);
-    d.setUTCDate(d.getUTCDate() - n);
-    const p = (x) => String(x).padStart(2, '0');
-    return `${d.getUTCFullYear()}-${p(d.getUTCMonth() + 1)}-${p(d.getUTCDate())}T12:00`;
-  };
-
-  it('shows a recent rate computed as average commits per active day (~N/day)', () => {
-    const data = {
-      projects: [],
-      entries: [
-        // 4 commits one recent day + 2 another recent day → 6 / 2 active days = ~3.
-        logEntry({ cat: 'log', date: utcNoonDaysAgo(3) }),
-        logEntry({ cat: 'log', date: utcNoonDaysAgo(3) }),
-        logEntry({ cat: 'log', date: utcNoonDaysAgo(3) }),
-        logEntry({ cat: 'log', date: utcNoonDaysAgo(3) }),
-        logEntry({ cat: 'log', date: utcNoonDaysAgo(7) }),
-        logEntry({ cat: 'log', date: utcNoonDaysAgo(7) }),
-      ],
-    };
-    renderPinned('activity', data);
-    expect(pinnedEl().innerHTML).toContain('~3/day');
-  });
-
-  it('shows an em-dash rate when there is no recent (last-28d) activity', () => {
-    const data = {
-      projects: [],
-      // Older than the 28-day window → no active days → '—', never a stale number.
-      entries: [logEntry({ cat: 'log', date: utcNoonDaysAgo(60) })],
-    };
-    renderPinned('activity', data);
-    const html = pinnedEl().innerHTML;
-    expect(html).toContain('<i>rate</i><b>—</b>');
-  });
-});
-
 // ---- renderPinned: unmatched ---------------------------------------------
 
 describe('renderPinned — unmatched channel', () => {
@@ -305,98 +120,5 @@ describe('renderPinned — beam teardown', () => {
 
     unmount.mockRestore();
     mount.mockRestore();
-  });
-});
-
-// ---- renderHeroLine ------------------------------------------------------
-
-describe('renderHeroLine', () => {
-  it('renders static activity/github links for home', () => {
-    renderHeroLine('home', { projects: [] });
-    const html = heroEl().innerHTML;
-    expect(html).toContain('href="#/activity"');
-    expect(html).toContain('href="https://github.com/myaiexp"');
-  });
-
-  it('renders the first project link plus status for a matched project', () => {
-    const data = {
-      projects: [{ channel: 'explorer', heat: 0.8, links: [{ href: 'https://mase.fi/explorer', label: 'mase.fi' }] }],
-      demos: [],
-    };
-    renderHeroLine('explorer', data);
-    const html = heroEl().innerHTML;
-    expect(html).toContain('href="https://mase.fi/explorer"');
-    expect(html).toContain('>mase.fi</a>');
-    expect(html).toContain('shipping'); // heat > 0.6
-  });
-
-  it('renders only the status when a matched project has no links', () => {
-    renderHeroLine('explorer', { projects: [{ channel: 'explorer', heat: 0.4, links: [] }], demos: [] });
-    const html = heroEl().innerHTML;
-    expect(html).not.toContain('<a');
-    expect(html).toContain('steady'); // heat > 0.3
-  });
-
-  it('includes a demo link when the channel has a published demo', () => {
-    const data = { projects: [{ channel: 'explorer', heat: 0.4, links: [] }], demos: ['explorer'] };
-    renderHeroLine('explorer', data);
-    const a = heroEl().querySelector('.demo-link');
-    expect(a).not.toBeNull();
-    expect(a.getAttribute('href')).toBe('/demos/explorer/');
-  });
-
-  it('escapes a malicious project link in the hero line', () => {
-    const data = {
-      projects: [{ channel: 'explorer', heat: 0.8, links: [{ href: '"><script>alert(1)</script>', label: '<b>x</b>' }] }],
-      demos: [],
-    };
-    renderHeroLine('explorer', data);
-    const a = heroEl().querySelector('a');
-    expect(heroEl().querySelector('script')).toBeNull();
-    expect(heroEl().querySelector('b')).toBeNull();
-    expect(a.getAttribute('href')).toBe('"><script>alert(1)</script>');
-    expect(a.textContent).toBe('<b>x</b>');
-  });
-
-  // Exact markup, so the separators and single spaces between parts are pinned.
-  it.each([
-    {
-      name: 'home',
-      id: 'home',
-      data: { projects: [] },
-      html: '<span class="arr">→</span> <a href="#/activity">activity</a> ' +
-        '<span class="sep">·</span> <a href="https://github.com/myaiexp">github</a>',
-    },
-    {
-      name: 'demo + first link + status',
-      id: 'explorer',
-      data: {
-        projects: [{ channel: 'explorer', heat: 0.8, links: [{ href: 'https://x.test/', label: 'site' }, { href: 'https://y.test/', label: 'two' }] }],
-        demos: ['explorer'],
-      },
-      html: '<span class="arr">→</span> <a class="demo-link" href="/demos/explorer/">try demo</a> ' +
-        '<span class="sep">·</span> <a href="https://x.test/">site</a> ' +
-        '<span class="sep">·</span> <span class="status">shipping</span>',
-    },
-    {
-      name: 'demo + status, no links',
-      id: 'explorer',
-      data: { projects: [{ channel: 'explorer', heat: 0.1, links: [] }], demos: ['explorer'] },
-      html: '<span class="arr">→</span> <a class="demo-link" href="/demos/explorer/">try demo</a> ' +
-        '<span class="sep">·</span> <span class="status">idle</span>',
-    },
-  ])('renders the exact hero line for $name', ({ id, data, html }) => {
-    renderHeroLine(id, data);
-    expect(heroEl().innerHTML).toBe(html);
-  });
-
-  it('clears the hero line for activity and unmatched channels', () => {
-    heroEl().textContent = 'stale';
-    renderHeroLine('activity', { projects: [] });
-    expect(heroEl().innerHTML).toBe('');
-
-    heroEl().textContent = 'stale';
-    renderHeroLine('nope', { projects: [] });
-    expect(heroEl().innerHTML).toBe('');
   });
 });

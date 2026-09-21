@@ -55,6 +55,24 @@ describe('write_updates_json — atomic branch (dir writable)', () => {
     expect(r.stderr).toMatch(/malformed JSON/i);
     expect(readFileSync(target, 'utf8')).toBe(before);
   });
+
+  // `jq empty` exits 0 on all three, so each used to pass the gate and be installed.
+  it.each([
+    ['a 0-byte file', ''],
+    ['a non-object document', '[]'],
+    ['an object without an entries array', '{"projects":[]}'],
+    ['two concatenated documents', '{"entries":[]}{"entries":[]}'],
+  ])('refuses %s as a candidate without touching the target', (_, content) => {
+    const target = join(dir, 'updates.json');
+    const cand = join(dir, 'cand.json');
+    writeFileSync(target, '{"entries":[],"projects":[]}');
+    writeFileSync(cand, content);
+    const before = readFileSync(target, 'utf8');
+    const r = writeViaShell(cand, target);
+    expect(r.status).not.toBe(0);
+    expect(r.stderr).toMatch(/malformed JSON/i);
+    expect(readFileSync(target, 'utf8')).toBe(before);
+  });
 });
 
 describe('write_updates_json — in-place cp fallback (dir not writable)', () => {
@@ -152,6 +170,15 @@ describe('run_under_updates_lock — the one owner of the lock steps', () => {
   it('refuses a malformed target without calling the function', () => {
     const target = join(dir, 'updates.json');
     writeFileSync(target, '{ not json');
+    const r = runUnderLock(target, 'echo CALLED');
+    expect(r.status).toBe(1);
+    expect(r.stderr).toMatch(/malformed JSON — test-label/);
+    expect(r.stdout).not.toContain('CALLED');
+  });
+
+  it('refuses a 0-byte target without calling the function', () => {
+    const target = join(dir, 'updates.json');
+    writeFileSync(target, '');
     const r = runUnderLock(target, 'echo CALLED');
     expect(r.status).toBe(1);
     expect(r.stderr).toMatch(/malformed JSON — test-label/);
