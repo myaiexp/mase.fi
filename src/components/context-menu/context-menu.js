@@ -3,9 +3,9 @@
 import { MENU_ITEM_CSS, MENU_SURFACE_CSS } from '../shared/menu-styles.js';
 import { nextEnabledIndex } from '../shared/menu-nav.js';
 import { addOverlayListeners, removeOverlayListeners } from '../shared/overlay-utils.js';
+import { shadowStyles } from '../shared/shadow-styles.js';
 
-const contextMenuTemplate = document.createElement('template');
-contextMenuTemplate.innerHTML = `<style>
+const contextMenuStyles = shadowStyles(`
   :host {
     display: contents;
   }
@@ -43,8 +43,10 @@ contextMenuTemplate.innerHTML = `<style>
     border-top: 1px solid var(--border-color, #27272a);
     margin: 4px 0;
   }
-</style>
-<div part="menu" hidden></div>`;
+`);
+
+const contextMenuTemplate = document.createElement('template');
+contextMenuTemplate.innerHTML = '<div part="menu" hidden></div>';
 
 class BaseContextMenu extends HTMLElement {
   // Member convention (library-wide — see docs/base-components.md): `#member` is
@@ -66,6 +68,7 @@ class BaseContextMenu extends HTMLElement {
   constructor() {
     super();
     this.attachShadow({ mode: 'open' });
+    contextMenuStyles.adopt(this.shadowRoot);
     this.shadowRoot.appendChild(contextMenuTemplate.content.cloneNode(true));
     this.#menu = this.shadowRoot.querySelector('[part="menu"]');
   }

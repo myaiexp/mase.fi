@@ -1,5 +1,7 @@
 // <base-badge> — status/tag chip per design system (Recipes A & B)
 
+import { shadowStyles } from '../shared/shadow-styles.js';
+
 const STATUS_VARIANTS = {
   running: { color: 'var(--green)',    tint: 8 },
   idle:    { color: 'var(--text-dim)', tint: 4 },
@@ -13,9 +15,7 @@ const TAG_VARIANTS = {
   chore:    { color: 'var(--text-dim)', tint: 4 },
 };
 
-const template = document.createElement('template');
-template.innerHTML = `
-<style>
+const styles = shadowStyles(`
   :host { display: inline-flex; vertical-align: middle; }
   span {
     display: inline-flex;
@@ -42,9 +42,10 @@ template.innerHTML = `
     display: inline-block;
     flex-shrink: 0;
   }
-</style>
-<span><slot></slot></span>
-`;
+`);
+
+const template = document.createElement('template');
+template.innerHTML = '<span><slot></slot></span>';
 
 class BaseBadge extends HTMLElement {
   static observedAttributes = ['type', 'variant', 'color', 'size'];
@@ -57,6 +58,7 @@ class BaseBadge extends HTMLElement {
   constructor() {
     super();
     this.attachShadow({ mode: 'open' });
+    styles.adopt(this.shadowRoot);
     this.shadowRoot.appendChild(template.content.cloneNode(true));
     this.#span = this.shadowRoot.querySelector('span');
   }

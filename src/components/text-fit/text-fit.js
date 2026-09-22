@@ -3,18 +3,18 @@
 // rendering; the pure layout algorithms live in text-fit-layout.js.
 
 import { DEFAULT_FONT, doPrepare, justifyLines, truncate, wrapOptimal } from './text-fit-layout.js';
+import { shadowStyles } from '../shared/shadow-styles.js';
 
-const template = document.createElement('template');
-// Template uses static literal HTML only (no user input)
-template.innerHTML = [
-  '<style>',
+const styles = shadowStyles([
   '  :host { display: block; min-width: 0; max-width: 100%; overflow: hidden; }',
   '  #text { font: inherit; white-space: pre-wrap; overflow-wrap: break-word; }',
   '  :host([mode="fit"]) #text, :host(:not([mode])) #text { white-space: nowrap; }',
   '  .jl { display: block; white-space: nowrap; }',
-  '</style>',
-  '<span id="text"></span>',
-].join('\n');
+].join('\n'));
+
+const template = document.createElement('template');
+// Template uses static literal HTML only (no user input)
+template.innerHTML = '<span id="text"></span>';
 
 let hyphenateWarned = false;
 
@@ -32,6 +32,7 @@ class BaseTextFit extends HTMLElement {
   constructor() {
     super();
     this.attachShadow({ mode: 'open' });
+    styles.adopt(this.shadowRoot);
     this.shadowRoot.appendChild(template.content.cloneNode(true));
     this.#textEl = this.shadowRoot.querySelector('#text');
   }

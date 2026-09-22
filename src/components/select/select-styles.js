@@ -1,8 +1,9 @@
 // Shadow DOM stylesheet for <base-select> — trigger, menu surface, options, groups
 
 import { MENU_SURFACE_CSS } from '../shared/menu-styles.js';
+import { shadowStyles } from '../shared/shadow-styles.js';
 
-export const selectStyles = `<style>
+export const selectStyles = shadowStyles(`
   /* Intrinsic width — the control sizes to its widest option, like a native
      <select>, instead of filling whatever box it lands in. A width:100% default
      is invisible inside a nowrap flex row (the item just gets squeezed) but
@@ -153,4 +154,4 @@ export const selectStyles = `<style>
     font-family: var(--font-mono, monospace);
     color: var(--text-muted, #71717a);
   }
-</style>`;
+`);

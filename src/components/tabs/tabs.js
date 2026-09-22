@@ -1,9 +1,9 @@
 // <base-tabs> + <base-tab> — accessible tab panel component with keyboard navigation
 import { nextEnabledIndex } from '../shared/menu-nav.js';
+import { shadowStyles } from '../shared/shadow-styles.js';
+import { upgradeProperties } from '../shared/upgrade-properties.js';
 
-const tabsTemplate = document.createElement('template');
-tabsTemplate.innerHTML = [
-  '<style>',
+const tabsStyles = shadowStyles([
   ':host { display: block; }',
   '[role="tablist"] {',
   '  display: flex;',
@@ -42,7 +42,10 @@ tabsTemplate.innerHTML = [
   '.panel-container {',
   '  padding: 0;',
   '}',
-  '</style>',
+].join('\n'));
+
+const tabsTemplate = document.createElement('template');
+tabsTemplate.innerHTML = [
   '<div role="tablist"></div>',
   '<div class="panel-container"><slot></slot></div>',
 ].join('');
@@ -65,6 +68,7 @@ class BaseTabs extends HTMLElement {
   constructor() {
     super();
     this.attachShadow({ mode: 'open' });
+    tabsStyles.adopt(this.shadowRoot);
     this.shadowRoot.appendChild(tabsTemplate.content.cloneNode(true));
     this.#tablist = this.shadowRoot.querySelector('[role="tablist"]');
 
@@ -78,6 +82,8 @@ class BaseTabs extends HTMLElement {
 
   connectedCallback() {
     this._updateTabs();
+    // After _updateTabs: the activeIndex setter selects among the built tabs.
+    upgradeProperties(this);
   }
 
   get activeIndex() {

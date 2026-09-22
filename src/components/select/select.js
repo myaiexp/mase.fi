@@ -6,11 +6,11 @@ import { wrapIndex } from '../shared/menu-nav.js';
 import { selectStyles } from './select-styles.js';
 import { buildMenu, markSelected, filterMenu, resetFilter } from './select-menu.js';
 import { createLetterJump } from './letter-jump.js';
+import { upgradeProperties } from '../shared/upgrade-properties.js';
 import './select-option.js';
 
 const selectTemplate = document.createElement('template');
-selectTemplate.innerHTML = `${selectStyles}
-<div part="trigger-wrap"></div>
+selectTemplate.innerHTML = `<div part="trigger-wrap"></div>
 <div part="menu" hidden></div>`;
 
 class BaseSelect extends HTMLElement {
@@ -32,12 +32,14 @@ class BaseSelect extends HTMLElement {
   constructor() {
     super();
     this.attachShadow({ mode: 'open', delegatesFocus: true });
+    selectStyles.adopt(this.shadowRoot);
     this.shadowRoot.appendChild(selectTemplate.content.cloneNode(true));
     this._menu = this.shadowRoot.querySelector('[part="menu"]');
     this.#triggerWrap = this.shadowRoot.querySelector('[part="trigger-wrap"]');
   }
 
   connectedCallback() {
+    upgradeProperties(this);
     this.#buildTrigger();
     buildMenu(this);
     this.#syncSizer();

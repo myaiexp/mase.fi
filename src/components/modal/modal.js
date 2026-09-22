@@ -1,8 +1,8 @@
 // <base-modal> — centered overlay dialog with slots, focus trap, and Escape/backdrop dismiss
 
-const modalTemplate = document.createElement('template');
-modalTemplate.innerHTML = `
-<style>
+import { shadowStyles } from '../shared/shadow-styles.js';
+
+const modalStyles = shadowStyles(`
   :host {
     display: contents;
   }
@@ -74,7 +74,10 @@ modalTemplate.innerHTML = `
   button[data-close]:hover {
     color: var(--text, #fafafa);
   }
-</style>
+`);
+
+const modalTemplate = document.createElement('template');
+modalTemplate.innerHTML = `
 <div data-backdrop>
   <div data-content>
     <div data-header>
@@ -126,6 +129,7 @@ class BaseModal extends HTMLElement {
   constructor() {
     super();
     this.attachShadow({ mode: 'open' });
+    modalStyles.adopt(this.shadowRoot);
     this.shadowRoot.appendChild(modalTemplate.content.cloneNode(true));
 
     // Close button inside shadow root

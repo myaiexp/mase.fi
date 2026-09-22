@@ -46,6 +46,8 @@ export default [
         customElements: 'readonly',
         HTMLHRElement: 'readonly',
         NodeFilter: 'readonly',
+        CSSStyleSheet: 'readonly',
+        ShadowRoot: 'readonly',
       },
     },
   },

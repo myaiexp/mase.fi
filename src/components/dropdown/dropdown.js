@@ -4,11 +4,11 @@ import { addOverlayListeners, removeOverlayListeners } from '../shared/overlay-u
 import { applyMenuFlip } from '../shared/menu-flip.js';
 import { wrapIndex } from '../shared/menu-nav.js';
 import { MENU_ITEM_CSS, MENU_SURFACE_CSS } from '../shared/menu-styles.js';
+import { shadowStyles } from '../shared/shadow-styles.js';
 
 // ─── base-dropdown-item ──────────────────────────────────────────────────────
 
-const itemTemplate = document.createElement('template');
-itemTemplate.innerHTML = `<style>
+const itemStyles = shadowStyles(`
   :host {
     display: block;
     outline: none;
@@ -26,8 +26,10 @@ itemTemplate.innerHTML = `<style>
   span:not(.disabled):hover {
     background: var(--bg-hover, #27272a);
   }
-</style>
-<span><slot></slot></span>`;
+`);
+
+const itemTemplate = document.createElement('template');
+itemTemplate.innerHTML = '<span><slot></slot></span>';
 
 class BaseDropdownItem extends HTMLElement {
   static observedAttributes = ['variant', 'disabled'];
@@ -37,6 +39,7 @@ class BaseDropdownItem extends HTMLElement {
   constructor() {
     super();
     this.attachShadow({ mode: 'open' });
+    itemStyles.adopt(this.shadowRoot);
     this.shadowRoot.appendChild(itemTemplate.content.cloneNode(true));
     this.#span = this.shadowRoot.querySelector('span');
   }
@@ -70,21 +73,23 @@ customElements.define('base-dropdown-item', BaseDropdownItem);
 
 // ─── base-dropdown-divider ───────────────────────────────────────────────────
 
-const dividerTemplate = document.createElement('template');
-dividerTemplate.innerHTML = `<style>
+const dividerStyles = shadowStyles(`
   :host { display: block; }
   hr {
     border: none;
     border-top: 1px solid var(--border-color, #27272a);
     margin: 4px 0;
   }
-</style>
-<hr>`;
+`);
+
+const dividerTemplate = document.createElement('template');
+dividerTemplate.innerHTML = '<hr>';
 
 class BaseDropdownDivider extends HTMLElement {
   constructor() {
     super();
     this.attachShadow({ mode: 'open' });
+    dividerStyles.adopt(this.shadowRoot);
     this.shadowRoot.appendChild(dividerTemplate.content.cloneNode(true));
   }
 }
@@ -93,8 +98,7 @@ customElements.define('base-dropdown-divider', BaseDropdownDivider);
 
 // ─── base-dropdown ───────────────────────────────────────────────────────────
 
-const dropdownTemplate = document.createElement('template');
-dropdownTemplate.innerHTML = `<style>
+const dropdownStyles = shadowStyles(`
   :host {
     display: inline-block;
     position: relative;
@@ -114,8 +118,10 @@ dropdownTemplate.innerHTML = `<style>
   [part="menu"][hidden] {
     display: none;
   }
-</style>
-<slot name="trigger"></slot>
+`);
+
+const dropdownTemplate = document.createElement('template');
+dropdownTemplate.innerHTML = `<slot name="trigger"></slot>
 <div part="menu" hidden>
   <slot name="items"></slot>
 </div>`;
@@ -138,6 +144,7 @@ class BaseDropdown extends HTMLElement {
   constructor() {
     super();
     this.attachShadow({ mode: 'open' });
+    dropdownStyles.adopt(this.shadowRoot);
     this.shadowRoot.appendChild(dropdownTemplate.content.cloneNode(true));
     this.#menu = this.shadowRoot.querySelector('[part="menu"]');
   }
