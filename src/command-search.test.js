@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 // applySearch on rows shaped like renderFeed's output: the real layoutRow builds
-// .line spans holding .proj-pill / .star elements and bare body text nodes.
+// .line spans holding .proj-pill elements and bare body text nodes.
 // pretext is mocked so each test chooses where the lines break.
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 
@@ -14,7 +14,7 @@ import { walkRichInlineLineRanges, materializeRichInlineLineRange } from '@cheng
 import { layoutRow } from './feed-layout.js';
 import { applySearch } from './command-search.js';
 
-// One pretext fragment; itemIndex points into buildItems' list [pill?, star?, body].
+// One pretext fragment; itemIndex points into buildItems' list [pill?, body].
 const frag = (itemIndex, text, gapBefore = 0) => ({ itemIndex, text, gapBefore });
 
 // A node's children as text, <mark> runs bracketed: ['x ', '[ab]', ' z'].
@@ -70,16 +70,14 @@ describe('applySearch on laid-out feed rows', () => {
       raw: 'fixed the helm tabs',
       project: 'helm',
       feature: true,
-      lines: [[frag(0, '#helm'), frag(1, '★ '), frag(2, 'fixed the helm tabs', 4)]],
+      lines: [[frag(0, '#helm'), frag(1, 'fixed the helm tabs', 4)]],
     });
     applySearch(feed, 'helm');
     const line = row.querySelector('.msg > .line');
-    const [pill, star, body] = line.children;
-    expect(line.children).toHaveLength(3);
+    const [pill, body] = line.children;
+    expect(line.children).toHaveLength(2);
     expect(pill.className).toBe('proj-pill');
     expect(shape(pill)).toEqual(['#', '[helm]']);
-    expect(star.className).toBe('star');
-    expect(shape(star)).toEqual(['★ ']);
     expect(shape(body)).toEqual(['fixed the ', '[helm]', ' tabs']);
   });
 

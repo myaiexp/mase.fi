@@ -18,15 +18,15 @@ export function buildSlugToChannel(rawProjects) {
 /**
  * Pick a nick for an entry based on category.
  * - log → 'git' (commit firehose)
- * - daily → the project slug, so #home reads as a per-project standup: each
- *   project "speaks" its own colour-coded line (nick colours are name-hashed),
- *   which is the channel's subject identity. Project-less daily → 'mase'.
- * - feature/project → 'mase' (these live in a project channel that already
- *   names the subject, so the nick stays the author).
+ * - anything else with a project → the project slug: #home reads as a
+ *   per-project standup (each project "speaks" its own colour-coded line; nick
+ *   colours are name-hashed), and a project channel's daily summaries and
+ *   feature entries all speak as that project.
+ * - project-less → 'mase'.
  */
 export function pickNick(e) {
   if (e.category === 'log') return 'git';
-  if (e.category === 'daily' && e.project) return String(e.project).toLowerCase();
+  if (e.project) return String(e.project).toLowerCase();
   return 'mase';
 }
 

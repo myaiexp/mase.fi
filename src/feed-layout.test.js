@@ -59,18 +59,17 @@ beforeEach(() => {
 });
 
 describe('layoutRow — normal (pretext) path', () => {
-  it('renders a flat list of .line spans with proj-pill, star, and bare-text fragments', () => {
+  it('renders a flat list of .line spans with proj-pill and bare-text fragments, no star on feature rows', () => {
     const row = makeRow({ raw: 'shipped a thing', project: 'explorer', target: '/explorer', feature: true });
     const msg = row.querySelector('.msg');
     msg.textContent = 'stale content'; // proves replaceChildren() wipes prior content
     msg.dataset.searchOn = '1'; // proves the searchOn flag is cleared
     document.body.appendChild(row);
 
-    // buildItems for a feature+project row -> [ '#explorer', '★ ', body ]
+    // buildItems for a feature+project row -> [ '#explorer', body ]
     setNormalPath([[
       { itemIndex: 0, text: '#explorer', gapBefore: 0 },
-      { itemIndex: 1, text: '★ ', gapBefore: 0 },
-      { itemIndex: 2, text: 'shipped a thing', gapBefore: 0 },
+      { itemIndex: 1, text: 'shipped a thing', gapBefore: 0 },
     ]]);
 
     layoutRow(row, 300, FONT);
@@ -83,9 +82,7 @@ describe('layoutRow — normal (pretext) path', () => {
     expect(pill.textContent).toBe('#explorer');
     expect(pill.dataset.target).toBe('/explorer');
 
-    const star = msg.querySelector('.line .star');
-    expect(star).not.toBeNull();
-    expect(star.textContent).toBe('★ ');
+    expect(msg.textContent).not.toContain('★');
 
     // body rendered as a bare text node inside the line (no wrapper element)
     expect(msg.textContent).toContain('shipped a thing');
@@ -95,7 +92,7 @@ describe('layoutRow — normal (pretext) path', () => {
     // pretext fed the buildItems output at the requested width
     expect(prepareRichInline).toHaveBeenCalledTimes(1);
     const items = prepareRichInline.mock.calls[0][0];
-    expect(items.map(i => i.text)).toEqual(['#explorer', '★ ', 'shipped a thing']);
+    expect(items.map(i => i.text)).toEqual(['#explorer', 'shipped a thing']);
     expect(walkRichInlineLineRanges.mock.calls[0][1]).toBe(300);
   });
 
@@ -104,14 +101,14 @@ describe('layoutRow — normal (pretext) path', () => {
     const msg = row.querySelector('.msg');
     document.body.appendChild(row);
 
-    // itemIndex 1 = body item: not a pill (no '#'), not a star, gapBefore>0 -> span
+    // itemIndex 1 = body item: not a pill (no '#'), gapBefore>0 -> span
     setNormalPath([[{ itemIndex: 1, text: 'body', gapBefore: 6 }]]);
 
     layoutRow(row, 300, FONT);
 
     const span = msg.querySelector('.line span');
     expect(span).not.toBeNull();
-    expect(span.className).toBe(''); // neither proj-pill nor star
+    expect(span.className).toBe(''); // not a proj-pill
     expect(span.textContent).toBe('body');
     expect(span.style.marginLeft).toBe('6px');
   });
@@ -161,8 +158,7 @@ describe('layoutRow — zero/negative-width fallback (pretext not invoked)', () 
       expect(pill.textContent).toBe('#explorer');
       expect(pill.dataset.target).toBe('/explorer');
 
-      expect(msg.querySelector('.star')).not.toBeNull();
-      expect(msg.textContent).toContain('fallback body');
+      expect(msg.textContent).toBe('#explorerfallback body');
       expect(msg.querySelector('.line')).toBeNull(); // not the pretext path
 
       // pretext must never be touched on the zero-width branch
@@ -171,7 +167,7 @@ describe('layoutRow — zero/negative-width fallback (pretext not invoked)', () 
     });
   }
 
-  it('omits the pill and star when the row has neither project nor feature', () => {
+  it('omits the pill when the row has no project', () => {
     const row = makeRow({ raw: 'plain line' });
     const msg = row.querySelector('.msg');
     document.body.appendChild(row);
@@ -179,7 +175,6 @@ describe('layoutRow — zero/negative-width fallback (pretext not invoked)', () 
     layoutRow(row, 0, FONT);
 
     expect(msg.querySelector('.proj-pill')).toBeNull();
-    expect(msg.querySelector('.star')).toBeNull();
     expect(msg.textContent).toBe('plain line');
   });
 });
@@ -204,7 +199,6 @@ describe('layoutRow — pretext-throws fallback (caught -> renderFallback)', () 
     const pill = msg.querySelector('.proj-pill');
     expect(pill).not.toBeNull();
     expect(pill.textContent).toBe('#explorer');
-    expect(msg.querySelector('.star')).toBeNull(); // not a feature row
     expect(msg.textContent).toContain('caught body');
     expect(msg.querySelector('.line')).toBeNull();
   });
@@ -222,7 +216,7 @@ describe('layoutRow — early returns', () => {
   });
 
   it('clears .msg and skips pretext when there is no text to lay out', () => {
-    const row = makeRow(); // no project, no raw, not a feature -> only an empty body item
+    const row = makeRow(); // no project, no raw -> only an empty body item
     const msg = row.querySelector('.msg');
     msg.textContent = 'leftover';
     document.body.appendChild(row);

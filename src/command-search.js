@@ -2,7 +2,7 @@
 
 // Walk text nodes inside an element and wrap substring matches with <mark>.
 // Operates per text node so we never touch element boundaries (pretext line
-// spans, .proj-pill, .star). Cross-line matches simply won't highlight — both
+// spans, .proj-pill). Cross-line matches simply won't highlight — both
 // pretext and word search break at word boundaries, so this is rare.
 function highlightTextNodes(root, needle) {
   const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);

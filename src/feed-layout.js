@@ -8,23 +8,14 @@ import {
 // 4px gap after the project chip; matches `.feed-row .proj-pill { margin-right: 4px }`.
 const CHIP_GAP_PX = 4;
 
-// The feature-star fragment text (trailing space intentional). Shared by the
-// producer (buildItems / renderFallback) and the renderFragment detector so the
-// equality check can't typo-drift from the string it's matching against.
-const STAR_TEXT = '★ ';
-
 // Build fragment items for one row from the dataset attrs we stash at render time.
 function buildItems(row, font) {
   const items = [];
   const text = row.dataset.raw || '';
   const project = row.dataset.project || '';
-  const isFeature = row.classList.contains('cat-feature');
 
   if (project) {
     items.push({ text: '#' + project, font, break: 'never', extraWidth: CHIP_GAP_PX });
-  }
-  if (isFeature) {
-    items.push({ text: STAR_TEXT, font, break: 'never' });
   }
   items.push({ text, font });
   return items;
@@ -32,8 +23,8 @@ function buildItems(row, font) {
 
 // Render one fragment of a laid-out line into a child span/text-node tree.
 // `frag.gapBefore` carries inter-item whitespace pretext normalized out of
-// item text (e.g. the space after "★ "), so we materialize it as margin-left.
-function renderFragment(parent, frag, items, isFeature, chipTarget) {
+// item text (e.g. the space after the project chip), so we materialize it as margin-left.
+function renderFragment(parent, frag, items, chipTarget) {
   const item = items[frag.itemIndex];
   let el;
   if (item.break === 'never' && item.text.startsWith('#')) {
@@ -41,10 +32,6 @@ function renderFragment(parent, frag, items, isFeature, chipTarget) {
     el.className = 'proj-pill';
     el.textContent = frag.text;
     if (chipTarget) el.dataset.target = chipTarget;
-  } else if (isFeature && item.text === STAR_TEXT) {
-    el = document.createElement('span');
-    el.className = 'star';
-    el.textContent = frag.text;
   } else if (frag.gapBefore > 0) {
     el = document.createElement('span');
     el.textContent = frag.text;
@@ -59,7 +46,7 @@ function renderFragment(parent, frag, items, isFeature, chipTarget) {
 }
 
 // DOM fallback when pretext can't be invoked yet (zero width, layout failure).
-function renderFallback(msg, row, isFeature) {
+function renderFallback(msg, row) {
   msg.textContent = '';
   if (row.dataset.project) {
     const pill = document.createElement('span');
@@ -67,12 +54,6 @@ function renderFallback(msg, row, isFeature) {
     pill.textContent = '#' + row.dataset.project;
     if (row.dataset.target) pill.dataset.target = row.dataset.target;
     msg.appendChild(pill);
-  }
-  if (isFeature) {
-    const star = document.createElement('span');
-    star.className = 'star';
-    star.textContent = STAR_TEXT;
-    msg.appendChild(star);
   }
   msg.appendChild(document.createTextNode(row.dataset.raw || ''));
 }
@@ -87,10 +68,8 @@ export function layoutRow(row, msgWidth, font) {
     msg.textContent = '';
     return;
   }
-  const isFeature = row.classList.contains('cat-feature');
-
   if (!(msgWidth > 0)) {
-    renderFallback(msg, row, isFeature);
+    renderFallback(msg, row);
     return;
   }
 
@@ -98,7 +77,7 @@ export function layoutRow(row, msgWidth, font) {
   try {
     prepared = prepareRichInline(items);
   } catch {
-    renderFallback(msg, row, isFeature);
+    renderFallback(msg, row);
     return;
   }
 
@@ -108,7 +87,7 @@ export function layoutRow(row, msgWidth, font) {
     const line = materializeRichInlineLineRange(prepared, range);
     const lineEl = document.createElement('span');
     lineEl.className = 'line';
-    for (const f of line.fragments) renderFragment(lineEl, f, items, isFeature, chipTarget);
+    for (const f of line.fragments) renderFragment(lineEl, f, items, chipTarget);
     frag.appendChild(lineEl);
   });
   msg.replaceChildren(frag);

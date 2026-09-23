@@ -163,16 +163,18 @@ describe('fetchData routing', () => {
     expect(data.entries.map((e) => e.nick)).toEqual(['mase', 'git']);
   });
 
-  it('nicks a daily entry with its project (per-project standup), lowercased', async () => {
+  it('nicks daily and feature entries with their project, lowercased; log stays git', async () => {
     stubFetch({
       projects: [{ name: 'Explorer', slug: 'explorer', channel: 'explorer' }],
       entries: [
         { category: 'daily', date: '2026-03-01', project: 'Explorer', summary: 'route fixes, dep bumps' },
+        { category: 'feature', date: '2026-03-02', project: 'Explorer', text: 'offline maps' },
+        { category: 'log', date: '2026-03-03', project: 'Explorer', text: 'fix: tiles' },
       ],
     });
     const data = await fetchData();
-    expect(data.entries[0].nick).toBe('explorer');
-    expect(data.entries[0].ch).toBe('explorer');
+    expect(data.entries.map((e) => e.nick)).toEqual(['explorer', 'explorer', 'git']);
+    expect(data.entries.every((e) => e.ch === 'explorer')).toBe(true);
   });
 
   it('returns empty entries/projects when fetch rejects', async () => {

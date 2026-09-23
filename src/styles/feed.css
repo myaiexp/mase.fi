@@ -85,7 +85,6 @@
   overflow: hidden;
 }
 .feed-row .msg .line { display: block; white-space: nowrap; }
-.feed-row .star { color: var(--accent); }
 .feed-row.cat-log .msg    { color: var(--dim); }
 .feed-row.cat-daily .msg  { color: var(--text); }
 .feed-row.cat-feature .msg { color: var(--text); }
