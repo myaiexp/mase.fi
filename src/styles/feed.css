@@ -87,7 +87,9 @@
 .feed-row .msg .line { display: block; white-space: nowrap; }
 .feed-row.cat-log .msg    { color: var(--dim); }
 .feed-row.cat-daily .msg  { color: var(--text); }
-.feed-row.cat-feature .msg { color: var(--text); }
+/* Features share the project nick with daily summaries, so a half-step
+   toward --dim is what tells the two apart in a project channel. */
+.feed-row.cat-feature .msg { color: color-mix(in oklab, var(--text) 50%, var(--dim)); }
 .feed-row .proj-pill {
   /* Default styling — labels for unmapped slugs (project not in the
      sidebar's channel list). Same accent color, but no link affordance. */
