@@ -46,6 +46,12 @@
   --border-color: var(--border);   /* alias used by base-components.js */
   --border-overlay: #3f3f46;       /* stronger perimeter for overlays on AMOLED black */
 
+  /* Accent outlines — the focus ring and the .flagged edge are both --accent, told
+     apart by width and side alone, so --ring-focus must stay wider than --ring-flag
+     (pinned by base-rings.test.js). Focus sits outside the edge, the flag inside. */
+  --ring-focus: 2px;
+  --ring-flag:  1px;
+
   /* Elevation — overlays sit two steps above --bg-raised on pure black */
   --bg-overlay:     #1f1f24;   /* modal body */
   --bg-overlay-rim: #26262c;   /* modal header / footer (one tick brighter) */
@@ -216,8 +222,10 @@ textarea { resize: none; }
 
 /* ===== Focus ===== */
 
+/* 2px (--ring-focus), not 1px: a 1px accent outline is what .flagged draws, and the
+   two must never read alike. 2px is also WCAG 2.2's focus-appearance floor. */
 :focus-visible {
-  outline: 1px solid var(--accent);
+  outline: var(--ring-focus) solid var(--accent);
   outline-offset: 1px;
 }
 
@@ -549,20 +557,23 @@ pre code {
 .border-l { border-left: 1px solid var(--border); }
 
 /* ===== Flagged — attention edge =====
-   A persistent "look at this" marker on a card or row: 1px --accent on all four
-   edges. Amber, not red — it asks for a look, not immediate action. Use this rather
-   than a thick left-edge accent bar.
-   An outline, not a border, so flagging never shifts layout; offset -1px so it sits
-   on the element's own edge, not in the gap to its neighbour.
-   Base :focus-visible is also a 1px accent outline, so a focused flagged element
-   steps up to 2px — otherwise focus would vanish into the flag. */
+   A persistent "look at this" marker on a card or row: a --ring-flag (1px) --accent
+   outline on all four edges. Amber, not red — it asks for a look, not immediate
+   action. Use this, never a thick left-edge accent bar. Spec + do/don't:
+   docs/design-cards/flagged/.
+   An outline, not a border, so flagging never shifts layout; inset by its own width
+   so it sits on the element's edge — inside any overflow:hidden parent, not in the
+   gap to a neighbour. Pair it with a text cue (a label, title or status badge): the
+   edge alone is colour-only and screen readers never see it. */
 
 .flagged {
-  outline: 1px solid var(--accent);
-  outline-offset: -1px;
+  outline: var(--ring-flag) solid var(--accent);
+  outline-offset: calc(-1 * var(--ring-flag));
 }
+/* Same specificity as :focus-visible and later in the file, so .flagged would
+   otherwise replace the focus ring; restate the focus ring for a focused flag. */
 .flagged:focus-visible {
-  outline-width: 2px;
+  outline-width: var(--ring-focus);
   outline-offset: 1px;
 }
 

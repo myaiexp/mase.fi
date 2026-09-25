@@ -33,6 +33,17 @@ so they don't bleed into the black.
 | `--border-overlay` | `#3f3f46` | Modal / popover perimeter against pure black |
 | `--border-color` | → `--border` | Alias consumed by `base-components.js` — don't redefine |
 
+## Accent outlines
+
+The focus ring and the `.flagged` edge are both `--accent` outlines, told apart by width
+and side only — so `--ring-focus` stays wider than `--ring-flag` (`src/base-rings.test.js`
+fails otherwise). See the **flagged** card.
+
+| Token | Value | Role |
+|---|---|---|
+| `--ring-focus` | `2px` | Global `:focus-visible` outline, drawn 1px outside the edge |
+| `--ring-flag` | `1px` | `.flagged` outline, drawn inset on the element's own edge |
+
 ## Foreground text
 
 `--fg-*` is canonical. `--text*` are back-compat aliases pointing at the same values — both

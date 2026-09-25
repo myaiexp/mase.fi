@@ -131,8 +131,8 @@ box* rule, not an instruction to ignore the row it sits in.
   or theme re-tints them. (This resolves idea #2467: `.btn-danger` was frozen amber-
   era rgba that ignored a re-themed `--red`.)
 - **`white-space: nowrap`.** Buttons never wrap. Too long? Shorten the label.
-- **No button-specific focus ring.** `base.css`'s global `:focus-visible` (1px amber
-  outline, 1px offset) already covers buttons. Don't add one.
+- **No button-specific focus ring.** `base.css`'s global `:focus-visible` (2px amber
+  outline, `--ring-focus`, 1px offset) already covers buttons. Don't add one.
 
 ## Legacy — `.btn-sm`, `.btn-ghost`
 

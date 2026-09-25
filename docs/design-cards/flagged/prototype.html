@@ -1,0 +1,98 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>flagged · prototype</title>
+<!-- .flagged, the ring tokens and the focus ring all resolve from the real sheet —
+     this specimen adds only layout scaffolding and stand-in cards. -->
+<link rel="stylesheet" href="src/base.css">
+<style>
+  body {
+    padding: 24px 16px 64px;
+    max-width: 880px;
+    margin: 0 auto;
+    color: var(--text);
+    background: var(--bg);
+  }
+  h1 { font-size: var(--text-md); color: var(--text-dim); font-weight: 500; margin-bottom: 4px; }
+  .lede { color: var(--text-muted); font-size: var(--text-sm); margin-bottom: 32px; max-width: 60ch; }
+  section { margin-bottom: 40px; }
+  h2 { font-size: var(--text-base); font-weight: 500; margin-bottom: 2px; }
+  .note { color: var(--text-muted); font-size: var(--text-sm); margin-bottom: 14px; max-width: 60ch; }
+
+  /* A kanban-ish column of stand-in cards — the shape the class first shipped on. */
+  .column { border: 1px solid var(--border); background: var(--bg); max-width: 420px; }
+  .card {
+    padding: var(--space-2) var(--space-3);
+    border-bottom: 1px solid var(--border);
+    display: flex; flex-direction: column; gap: var(--space-1);
+    cursor: pointer;
+  }
+  .card:last-child { border-bottom: none; }
+  .card:hover { background: var(--bg-hover); }
+  .card-title { font-size: var(--text-base); }
+  .card-meta { font-size: var(--text-sm); color: var(--text-muted); display: flex; gap: var(--space-3); align-items: center; }
+  .card-reason { font-size: var(--text-sm); color: var(--accent); }
+  .card.parked { background: var(--accent-glow); }
+
+  .pair { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: var(--space-5); }
+  .clip { overflow: hidden; border: 1px solid var(--border); }
+  .caption { font-size: var(--text-xs); color: var(--text-muted); margin-top: var(--space-2); }
+</style>
+</head>
+<body>
+  <h1>flagged — attention edge</h1>
+  <p class="lede">A 1px accent outline on all four edges: "look at this", not "act now".
+    Tab through the cards to compare the focus ring with the flag.</p>
+
+  <section>
+    <h2>In a list</h2>
+    <p class="note">The flagged card keeps its layout; the edge sits on it. The parked card
+      builds on the same edge with an accent-glow fill and a reason row.</p>
+    <div class="column">
+      <div class="card" tabindex="0">
+        <div class="card-title">An ordinary card</div>
+        <div class="card-meta"><span class="dot dot-green"></span><span>project</span><span>2m ago</span></div>
+      </div>
+      <div class="card flagged" tabindex="0">
+        <div class="card-title">A flagged card</div>
+        <div class="card-meta"><span class="dot dot-red" title="Needs review — tmux pane unreadable"></span><span>project</span><span>14m ago</span></div>
+      </div>
+      <div class="card flagged parked" tabindex="0">
+        <div class="card-title">A parked card (flagged + glow + reason)</div>
+        <div class="card-meta"><span>project</span><span>1h ago</span></div>
+        <div class="card-reason">which auth model should this use?</div>
+      </div>
+      <div class="card" tabindex="0">
+        <div class="card-title">Another ordinary card</div>
+        <div class="card-meta"><span>project</span><span>3h ago</span></div>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <h2>Focus vs. flag</h2>
+    <p class="note">Focus is 2px and sits outside the edge; the flag is 1px and sits
+      inside. A focused flagged card shows the focus ring.</p>
+    <div class="pair">
+      <div>
+        <div class="column"><div class="card flagged"><div class="card-title">flagged</div></div></div>
+        <div class="caption">.flagged — 1px, inset</div>
+      </div>
+      <div>
+        <div class="column"><div class="card" tabindex="0" id="focus-demo"><div class="card-title">focused</div></div></div>
+        <div class="caption">:focus-visible — 2px, 1px outside (tab to it)</div>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <h2>Inside overflow: hidden</h2>
+    <p class="note">The inset edge stays visible when the parent clips.</p>
+    <div class="clip" style="max-width: 420px">
+      <div class="card flagged"><div class="card-title">flagged, parent clips overflow</div></div>
+    </div>
+  </section>
+</body>
+</html>
