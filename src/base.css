@@ -548,6 +548,24 @@ pre code {
 .border-r { border-right: 1px solid var(--border); }
 .border-l { border-left: 1px solid var(--border); }
 
+/* ===== Flagged — attention edge =====
+   A persistent "look at this" marker on a card or row: 1px --accent on all four
+   edges. Amber, not red — it asks for a look, not immediate action. Use this rather
+   than a thick left-edge accent bar.
+   An outline, not a border, so flagging never shifts layout; offset -1px so it sits
+   on the element's own edge, not in the gap to its neighbour.
+   Base :focus-visible is also a 1px accent outline, so a focused flagged element
+   steps up to 2px — otherwise focus would vanish into the flag. */
+
+.flagged {
+  outline: 1px solid var(--accent);
+  outline-offset: -1px;
+}
+.flagged:focus-visible {
+  outline-width: 2px;
+  outline-offset: 1px;
+}
+
 /* ===== Status Dots ===== */
 
 .dot {
