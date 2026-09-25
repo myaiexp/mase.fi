@@ -25,41 +25,37 @@ already loaded.
 
 ## Loading
 
-Two `.woff2` files in `src/fonts/`, served from `https://mase.fi/fonts/` and referenced by
-`base.css` with absolute URLs (so every consumer project resolves them, not just mase.fi).
+One variable `.woff2` in `src/fonts/` (wght 400–700, Latin + Latin Extended, unhinted),
+generated from `fonts.json` by `~/Projects/helm/scripts/webfonts`, served from
+`https://mase.fi/fonts/` and referenced by `base.css` with an absolute URL (so every consumer
+project resolves it, not just mase.fi). The URL carries the file's content hash as `?v=`, so
+it is cached immutable and a regenerated font is a new URL.
 
 ```css
 @font-face {
   font-family: 'JetBrains Mono';
-  src: url('https://mase.fi/fonts/JetBrainsMono-Regular.woff2') format('woff2');
-  font-weight: 400 500;   /* Regular file serves 400-500 */
-  font-style: normal;
-  font-display: swap;
-}
-@font-face {
-  font-family: 'JetBrains Mono';
-  src: url('https://mase.fi/fonts/JetBrainsMono-Bold.woff2') format('woff2');
-  font-weight: 600 700;   /* Bold file serves 600-700 */
+  src: url('https://mase.fi/fonts/jetbrains-mono.woff2?v=c969eaf0') format('woff2');
+  font-weight: 400 700;   /* every weight in the range is a real instance */
   font-style: normal;
   font-display: swap;
 }
 ```
 
-Only these two files ship. No italic face is loaded — italics synthesize (oblique) and are
+Only this one file ships. No italic face is loaded — italics synthesize (oblique) and are
 avoided in the UI anyway.
 
 ## Weights
 
-Two files, **four weights invoked across the fleet** (400, 500, 600, 700). The declared
-ranges map the in-between weights to a real file, so 500 and 600 render deterministically
-instead of relying on the browser's weight-fallback algorithm.
+One file, **four weights invoked across the fleet** (400, 500, 600, 700), each an exact
+instance of the variable axis, so 500 and 600 render deterministically instead of relying on
+the browser's weight-fallback algorithm.
 
 | Weight | Renders from | Role |
 |---|---|---|
-| 400 | Regular | Body, prose, meta, timestamps, form/input text |
-| 500 | Regular | Labels, badges (`.status`/`.tag`/`.label`), buttons, section + form labels, subtle emphasis |
-| 600 | Bold | Nicks, subheads, active-channel, dense-row emphasis (mase.fi app) |
-| 700 | Bold | Headings (`h1`/`h2`/`h3`), `.bold`, hard emphasis |
+| 400 | wght 400 | Body, prose, meta, timestamps, form/input text |
+| 500 | wght 500 | Labels, badges (`.status`/`.tag`/`.label`), buttons, section + form labels, subtle emphasis |
+| 600 | wght 600 | Nicks, subheads, active-channel, dense-row emphasis (mase.fi app) |
+| 700 | wght 700 | Headings (`h1`/`h2`/`h3`), `.bold`, hard emphasis |
 
 400 and 500 are the same file; 600 and 700 are the same file. The step that reads on screen
 is Regular → Bold; 500 and 600 are the same pixels as 400 and 700 respectively, chosen for

@@ -50,6 +50,8 @@ Shared web components library built from `src/components/` via Vite library mode
 
 `base.css` and `base-components.js` are served from the webroot to other apps (helm, prospect, ghost, …). nginx (`$asset_cc` map) serves them **`no-cache, must-revalidate` + ETag when requested *unversioned*** — a bare `<link href="https://mase.fi/base.css">` revalidates every load (cheap 304), so a mase.fi push propagates to consumers with **no consumer redeploy** — and **`immutable, max-age=1y` when *any* `?v=` is present**. Consumer rule: **never append a `?v=` keyed to your own deploy hash** — that pins the asset immutably to a string that never changes when *mase.fi's* content does, so pushes go unseen until the consumer redeploys. Link shared assets **unversioned**, and a consumer **service worker must not `cacheFirst`** them (that defeats revalidation regardless of the HTTP header).
 
+The one exception is `/fonts/`: `base.css` references `jetbrains-mono.woff2?v=<content hash>`, so the file is immutable and a font change is a new URL. `fonts.json` + `~/Projects/helm/scripts/webfonts` regenerate `src/fonts/` (then paste the new hash into `base.css`); the build copies `src/fonts/` into `dist/fonts/`, and nginx's `location ^~ /fonts/` adds the CORS header fonts need cross-origin (base.css itself only needs it for SRI).
+
 A consumer that pins these assets with SRI (`integrity="sha384-…"`) must redeploy on every mase.fi push — a stale pin is not degraded, the browser refuses to load the file at all, silently. `forgejo-deploy mase.fi` runs `helm/scripts/check-sri-pins` after copying to the webroot and ntfys "mase.fi: stale SRI pins" with the list of apps holding stale pins (advisory — it never fails the apex publish).
 
 ## Deploy

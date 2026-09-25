@@ -6,7 +6,7 @@
   "packageManager": "pnpm@10.33.0",
   "scripts": {
     "dev": "vite",
-    "build": "build-lock vite build && cp src/base.css dist/base.css && pnpm run build:components",
+    "build": "build-lock vite build && cp src/base.css dist/base.css && mkdir -p dist/fonts && cp src/fonts/*.woff2 dist/fonts/ && pnpm run build:components",
     "preview": "vite preview",
     "test": "vitest run",
     "test:coverage": "vitest run --coverage",

@@ -1,0 +1,7 @@
+{
+  "out": "src/fonts",
+  "css": false,
+  "families": [
+    {"family": "JetBrains Mono", "source": "ofl/jetbrainsmono", "weights": [400, 700]}
+  ]
+}
