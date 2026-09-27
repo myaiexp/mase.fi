@@ -44,6 +44,8 @@ ENTRIES_TMP="$WORK_DIR/entries.tmp.json"
 # command here can't propagate into the script's `set -e`. Token from $NTFY_TOKEN
 # or helm's .env — no systemd EnvironmentFile needed, so this observability lives
 # entirely in the versioned script (mirrors helm's refuse-dirty-tree helper).
+# Headers go to curl on stdin (`-H @-`; printf is a builtin), never argv — argv is
+# world-readable in /proc/<pid>/cmdline, so it would leak the token (finding #10177).
 ntfy_send() (
   set +e
   title="$1"; body="$2"
@@ -51,12 +53,10 @@ ntfy_send() (
   if [ -z "$token" ] && [ -f "$HELM_ENV" ]; then
     token=$(grep -E '^NTFY_TOKEN=' "$HELM_ENV" 2>/dev/null | head -1 | cut -d= -f2-)
   fi
+  token="${token//[$'\r\n']/}"
   [ -n "$token" ] || exit 0
-  curl -fsS -m 10 \
-    -H "Authorization: Bearer $token" \
-    -H "Title: $title" \
-    -d "$body" \
-    "$NTFY_URL" >/dev/null 2>&1 || true
+  printf 'Authorization: Bearer %s\nTitle: %s\n' "$token" "${title//[$'\r\n']/ }" \
+    | curl -fsS -m 10 -H @- -d "$body" "$NTFY_URL" >/dev/null 2>&1 || true
 )
 
 # `set -euo pipefail` aborts before any in-script alert, so a hard failure (jq

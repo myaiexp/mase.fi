@@ -171,20 +171,25 @@ describe('mase-fi-daily-summary — fallback + skip paths', () => {
 // clean_lines() drop-regexes tests moved to mase-fi-daily-summary-clean.test.js.
 
 describe('mase-fi-daily-summary — compact alerts (finding #9443)', () => {
-  // Fake curl first on PATH: records ntfy pushes and fails every other call, which
-  // the showcase refresh treats as helm unreachable (.projects left alone).
+  // Fake curl first on PATH: records ntfy pushes (argv and stdin, where the headers
+  // travel) and fails every other call, which the showcase refresh treats as helm
+  // unreachable (.projects left alone).
   const fakeCurl = () => {
     const bin = join(dir, 'bin');
-    const pushes = join(dir, 'ntfy-pushes');
+    const argv = join(dir, 'ntfy-argv');
+    const stdin = join(dir, 'ntfy-stdin');
     mkdirSync(bin);
     writeFileSync(join(bin, 'curl'), `#!/usr/bin/env bash
-case "$*" in *ntfy.test*) printf '%s\\n' "$*" >> ${JSON.stringify(pushes)}; exit 0 ;; esac
+case "$*" in *ntfy.test*) printf '%s\\n' "$*" >> ${JSON.stringify(argv)}; cat >> ${JSON.stringify(stdin)}; exit 0 ;; esac
 exit 7
 `);
     chmodSync(join(bin, 'curl'), 0o755);
+    const read = (f) => (existsSync(f) ? readFileSync(f, 'utf8') : '');
     return {
       env: { PATH: `${bin}:${process.env.PATH}`, NTFY_TOKEN: 'test-token', NTFY_URL: 'http://ntfy.test/kelo' },
-      pushes: () => (existsSync(pushes) ? readFileSync(pushes, 'utf8') : ''),
+      pushes: () => read(argv) + read(stdin),
+      argv: () => read(argv),
+      stdin: () => read(stdin),
     };
   };
   // No log for today → the skip path, which still compacts.
@@ -202,6 +207,18 @@ exit 7
     expect(curl.pushes()).toMatch(/compact FAILED/);
     expect(readFileSync(arch, 'utf8')).toBe('{ torn');
     expect(readFileSync(file, 'utf8')).toBe(before);
+  });
+
+  // argv is world-readable in /proc/<pid>/cmdline, so the token goes on stdin (finding #10177).
+  it('hands curl the bearer token on stdin, never argv', () => {
+    seedSkip();
+    const arch = join(dir, 'updates-archive.json');
+    writeFileSync(arch, '{ torn');
+    const curl = fakeCurl();
+    run({ ...curl.env, ARCHIVE_FILE: arch });
+    expect(curl.argv()).toMatch(/ntfy\.test/);
+    expect(curl.argv()).not.toMatch(/test-token/);
+    expect(curl.stdin()).toMatch(/^Authorization: Bearer test-token$/m);
   });
 
   it('pushes a degraded alert when the archive cannot be created', () => {
