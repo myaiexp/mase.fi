@@ -262,10 +262,22 @@ echo '[]' > "$ENTRIES"
 
 FALLBACK_COUNT=0     # projects where claude produced nothing usable
 SUMMARIZED_COUNT=0   # projects that actually went through claude (multi-commit)
+UNCHECKED_COUNT=0    # projects skipped because their feed embargo could not be checked
 
 for i in $(jq -r 'range(length)' "$GROUPS_JSON"); do
     project=$(jq -r ".[$i].project" "$GROUPS_JSON")
     count=$(jq -r ".[$i].commits | length" "$GROUPS_JSON")
+
+    # Per-project feed embargo (feed_embargo_gate in updates-write.sh). The log writer
+    # already refuses an embargoed project, but log rows written before its .embargo file
+    # existed are still in today's batch, and a daily entry would republish them. Checked
+    # before the commits go anywhere, the summarizer included.
+    gate_rc=0
+    feed_embargo_gate "$project" || gate_rc=$?
+    if [[ "$gate_rc" -ne 0 ]]; then
+        [[ "$gate_rc" -ne 3 ]] && UNCHECKED_COUNT=$((UNCHECKED_COUNT + 1))
+        continue
+    fi
 
     if [[ "$count" -eq 1 ]]; then
         summaries=$(jq -r ".[$i].commits[0]" "$GROUPS_JSON")   # single commit → verbatim, one line
@@ -306,6 +318,14 @@ run_compact
 
 DAILY_COUNT=$(jq --arg date "$TODAY" '[.entries[] | select(.category == "daily" and .date == $date)] | length' "$UPDATES_FILE")
 echo "Created $DAILY_COUNT daily summary entries for $TODAY"
+
+# A project skipped for an embargo is the gate working. One skipped because the gate
+# could not ask helm is a lost daily entry, so that count is alerted.
+if [[ "$UNCHECKED_COUNT" -gt 0 ]]; then
+    ntfy_send "mase.fi daily-summary degraded" \
+        "${TODAY}: ${UNCHECKED_COUNT} project(s) got no daily entry — their feed embargo could not be checked (is helm up?)"
+    echo "${UNCHECKED_COUNT} project(s) skipped: feed embargo could not be checked — ntfy sent"
+fi
 
 # One consolidated alert if any summary silently degraded to a commit count —
 # rather than per-project spam. The run still succeeded (fallback text is valid),

@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Shared lock + install for mase.fi's updates.json store.
+# Shared lock + install for mase.fi's updates.json store, and the feed-embargo gate.
 #
 # Sourced by the four mase.fi writers — mase-fi-update, mase-fi-daily-summary,
 # mase-fi-projects, mase-fi-compact-updates. run_under_updates_lock owns the
@@ -25,6 +25,35 @@ UPDATES_JSON_LOCK="${UPDATES_LOCK:-/tmp/mase-updates-json.lock}"
 # torn file (idea #2487). helm's scripts/log-commits-to-updates and deploy carry the
 # same path.
 UPDATES_FILE_DEFAULT=/var/lib/mase-fi/updates.json
+
+# The helm CLI that answers the feed-embargo question. Absolute, like CLAUDE_BIN in
+# mase-fi-daily-summary: a systemd user unit and `sudo -u mase` both run without
+# ~/.local/bin on PATH. HELM_BIN overrides it for tests.
+HELM_BIN="${HELM_BIN:-/home/mase/.local/bin/helm}"
+
+# feed_embargo_gate <project>
+#
+#   Per-project feed embargo: a project whose repo root holds a `.embargo` file dated in
+#   the future has nothing written to the feed (docs/content-pipeline.md § Feed embargo).
+#   helm owns the decision — it knows where each project's repo is — and answers through
+#   `helm project embargo <project>`'s exit code. Every writer that takes a project name
+#   calls this before it writes.
+#
+#   Returns 0 ONLY when helm says the project is clear. 3 when it is embargoed, with
+#   helm's line (the file and its date) on stderr. 1 when the question could not be
+#   answered — helm down, missing, or too old to know the verb — because an unanswered
+#   question must not publish.
+feed_embargo_gate() {
+  local project="$1" out rc=0
+  out="$("$HELM_BIN" project embargo "$project" 2>&1)" || rc=$?
+  case "$rc" in
+    0) return 0 ;;
+    3) echo "Feed embargo — not written: $out" >&2
+       return 3 ;;
+    *) echo "cannot check the feed embargo for '$project' — not written ($out)" >&2
+       return 1 ;;
+  esac
+}
 
 # Create/open $UPDATES_JSON_LOCK with O_NOFOLLOW|O_APPEND|O_CREAT. Bash redirects
 # cannot set O_NOFOLLOW, so a tiny python helper does the open;

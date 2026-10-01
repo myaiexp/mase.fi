@@ -15,6 +15,9 @@ usage() {
   echo "Writes one 'feature' entry. The old leading category argument (feature | project)"
   echo "is still accepted and ignored: every manual entry is a feature now."
   echo ""
+  echo "Refuses a project under a feed embargo (a .embargo file at its repo root, dated in"
+  echo "the future): exit 3, naming the file and the date. Exit 1 on any other refusal."
+  echo ""
   echo "Examples:"
   echo "  mase-fi-update helm \"Answer a blocked session's dialog from Telegram\""
   echo "  mase-fi-update wander \"Offline map tiles\" 2026-09-20"
@@ -55,6 +58,9 @@ if [ "$(date -d "$DATE" +%Y-%m-%d 2>/dev/null)" != "$DATE" ]; then
   echo "Error: date is not a valid calendar day (got '$DATE')" >&2
   exit 1
 fi
+
+# Per-project feed embargo, checked before the file is touched or created.
+feed_embargo_gate "$PROJECT" || exit $?
 
 if [ ! -f "$UPDATES_FILE" ]; then
   echo '{"entries":[],"projects":[]}' > "$UPDATES_FILE"

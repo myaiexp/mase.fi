@@ -2,8 +2,8 @@
 // argument forms, and the malformed-JSON / bad-argument refusal paths.
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { join } from 'node:path';
-import { readFileSync, writeFileSync, symlinkSync, mkdirSync, lstatSync } from 'node:fs';
-import { makeTempDir, cleanup, writeJson, readJson, runScript, todayHelsinki } from './test-helpers.js';
+import { readFileSync, writeFileSync, symlinkSync, mkdirSync, lstatSync, existsSync } from 'node:fs';
+import { makeTempDir, cleanup, writeJson, readJson, runScript, todayHelsinki, writeHelmStub, readHelmCalls } from './test-helpers.js';
 
 let dir, file;
 const update = (args, env = {}) => runScript('mase-fi-update', args, { UPDATES_FILE: file, ...env });
@@ -119,6 +119,73 @@ describe('mase-fi-update — refusal paths (no silent corruption)', () => {
     const r = update(['p', 'text', '2026-02-30']);
     expect(r.status).not.toBe(0);
     expect(r.stdout + r.stderr).toMatch(/valid calendar day/i);
+    expect(readFileSync(file, 'utf8')).toBe(before);
+  });
+});
+
+describe('mase-fi-update — per-project feed embargo', () => {
+  const existing = [{ date: '2026-06-01', project: 'x', text: 'y', category: 'log' }];
+
+  it('refuses an embargoed project, naming the file and the date, and writes nothing', () => {
+    seed(existing);
+    const before = readFileSync(file, 'utf8');
+    const HELM_BIN = writeHelmStub(dir, { embargoed: ['held-back'] });
+    const r = update(['held-back', 'a new thing'], { HELM_BIN });
+    expect(r.status).toBe(3);
+    expect(r.stderr).toMatch(/feed embargo until 2099-01-01/);
+    expect(r.stderr).toContain('/srv/held-back/.embargo');
+    expect(readFileSync(file, 'utf8')).toBe(before);
+    expect(readHelmCalls(HELM_BIN)).toEqual(['project embargo held-back']);
+  });
+
+  it('does not create a missing updates.json for an embargoed project', () => {
+    const HELM_BIN = writeHelmStub(dir, { embargoed: ['held-back'] });
+    expect(update(['held-back', 'a new thing'], { HELM_BIN }).status).toBe(3);
+    expect(existsSync(file)).toBe(false);
+  });
+
+  it('refuses an embargo file with no valid date as embargoed indefinitely', () => {
+    seed(existing);
+    const before = readFileSync(file, 'utf8');
+    const HELM_BIN = writeHelmStub(dir, { indefinite: ['mistyped'] });
+    const r = update(['mistyped', 'a new thing'], { HELM_BIN });
+    expect(r.status).toBe(3);
+    expect(r.stderr).toMatch(/indefinitely/);
+    expect(r.stderr).toContain('/srv/mistyped/.embargo');
+    expect(readFileSync(file, 'utf8')).toBe(before);
+  });
+
+  it('writes when the embargo is expired or absent (helm answers clear)', () => {
+    seed(existing);
+    const HELM_BIN = writeHelmStub(dir, { embargoed: ['held-back'] });
+    const r = update(['released', 'a new thing', '2026-07-01'], { HELM_BIN });
+    expect(r.status).toBe(0);
+    expect(readJson(file).entries[0]).toEqual({ date: '2026-07-01', project: 'released', text: 'a new thing', category: 'feature' });
+    expect(readHelmCalls(HELM_BIN)).toEqual(['project embargo released']);
+  });
+
+  it('checks the project, not the legacy category word', () => {
+    seed(existing);
+    const HELM_BIN = writeHelmStub(dir, { embargoed: ['held-back'] });
+    expect(update(['feature', 'held-back', 'a new thing'], { HELM_BIN }).status).toBe(3);
+  });
+
+  it('refuses when the embargo cannot be determined', () => {
+    seed(existing);
+    const before = readFileSync(file, 'utf8');
+    const HELM_BIN = writeHelmStub(dir, { unknown: ['p'] });
+    const r = update(['p', 'a new thing'], { HELM_BIN });
+    expect(r.status).toBe(1);
+    expect(r.stderr).toMatch(/cannot check the feed embargo/);
+    expect(readFileSync(file, 'utf8')).toBe(before);
+  });
+
+  it('refuses when the helm CLI is missing', () => {
+    seed(existing);
+    const before = readFileSync(file, 'utf8');
+    const r = update(['p', 'a new thing'], { HELM_BIN: join(dir, 'no-such-helm') });
+    expect(r.status).toBe(1);
+    expect(r.stderr).toMatch(/cannot check the feed embargo/);
     expect(readFileSync(file, 'utf8')).toBe(before);
   });
 });

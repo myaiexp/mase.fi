@@ -1,11 +1,15 @@
 // Golden-file tests for mase-fi-daily-summary: the group-by-project rewrite and
 // the single-vs-multi-commit branch. `claude -p` is stubbed via CLAUDE_BIN; the
 // live helm showcase API and ntfy are neutralized so the run is fully hermetic.
-import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import process from 'node:process';
 import { join } from 'node:path';
 import { chmodSync, existsSync, mkdirSync, writeFileSync, readFileSync } from 'node:fs';
 import { makeTempDir, cleanup, writeJson, readJson, runScript, todayHelsinki, writeClaudeStub, readClaudeArgv } from './test-helpers.js';
+
+// Each run spawns the whole script (jq, curl, the compactor, the stubs): ~2s alone on
+// the VPS, and past vitest's 5s default once the other script suites run beside it.
+vi.setConfig({ testTimeout: 20_000 });
 
 let TODAY;
 let dir, file, extraFile;

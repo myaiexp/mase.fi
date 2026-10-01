@@ -1,11 +1,11 @@
 // Shared harness for the content-pipeline script tests.
 // Runs the REAL scripts against a throwaway updates.json fixture via their env
-// overrides (UPDATES_FILE / SHOWCASE_API / SHOWCASE_EXTRA / CLAUDE_BIN), so the
+// overrides (UPDATES_FILE / SHOWCASE_API / SHOWCASE_EXTRA / CLAUDE_BIN / HELM_BIN), so the
 // tests exercise the actual jq programs end-to-end (golden-file style) rather
 // than reimplementing them.
 import process from 'node:process';
 import { spawnSync } from 'node:child_process';
-import { mkdtempSync, rmSync, writeFileSync, readFileSync, chmodSync } from 'node:fs';
+import { mkdtempSync, rmSync, writeFileSync, readFileSync, chmodSync, existsSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -42,6 +42,11 @@ export function runScript(name, args = [], env = {}) {
   // deploy would wait on us, and we would wait on it.
   if (!merged.UPDATES_LOCK) {
     merged.UPDATES_LOCK = join(tmpdir(), `mase-fi-test-${process.pid}.lock`);
+  }
+  // The writers ask helm whether the project is under a feed embargo. Never put that to
+  // the live service from a test: default to a stub that answers "clear" for every name.
+  if (!merged.HELM_BIN) {
+    merged.HELM_BIN = writeHelmStub(tmpdir(), { name: `mase-fi-test-helm-${process.pid}` });
   }
   const r = spawnSync('bash', [join(SCRIPTS_DIR, name), ...args], {
     env: merged,
@@ -87,4 +92,31 @@ exit ${exitCode}
 
 export function readClaudeArgv(dir) {
   return readFileSync(join(dir, 'claude-argv'), 'utf8').split('\0');
+}
+
+// Write an executable stub standing in for the helm CLI (HELM_BIN), which the writers
+// call as `helm project embargo <project>`. Projects named in `embargoed` get exit 3 with
+// a dated refusal, in `indefinite` exit 3 with the no-valid-date refusal, in `unknown`
+// exit 1 (helm could not answer); every other project is clear (exit 0). Each call's
+// argv is appended to `<stub>.calls`, read back with readHelmCalls.
+export function writeHelmStub(dir, { embargoed = [], indefinite = [], unknown = [], name = 'helm-stub' } = {}) {
+  const path = join(dir, name);
+  const arm = (names, body) => (names.length ? `  ${names.join('|')}) ${body} ;;\n` : '');
+  const body = `#!/usr/bin/env bash
+printf '%s\\n' "$*" >> ${JSON.stringify(`${path}.calls`)}
+case "\${3:-}" in
+${arm(embargoed, 'echo "$3: feed embargo until 2099-01-01 (/srv/$3/.embargo)"; exit 3')}${arm(
+    indefinite,
+    'echo "$3: feed embargo, indefinitely — /srv/$3/.embargo has no YYYY-MM-DD date on its first non-comment line"; exit 3',
+  )}${arm(unknown, `echo "Error: cannot determine $3's feed embargo — helm is unreachable" >&2; exit 1`)}esac
+echo "$3: no feed embargo"
+`;
+  writeFileSync(path, body);
+  chmodSync(path, 0o755);
+  return path;
+}
+
+export function readHelmCalls(stubPath) {
+  const calls = `${stubPath}.calls`;
+  return existsSync(calls) ? readFileSync(calls, 'utf8').split('\n').filter(Boolean) : [];
 }
