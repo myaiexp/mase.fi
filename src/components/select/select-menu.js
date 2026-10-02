@@ -85,7 +85,7 @@ export function filterMenu(select, query) {
   let anyVisible = false;
 
   for (const opt of opts) {
-    const match = !query || opt.textContent.toLowerCase().includes(query);
+    const match = !query || opt.dataset.label.toLowerCase().includes(query);
     opt.style.display = match ? '' : 'none';
     if (match) anyVisible = true;
   }

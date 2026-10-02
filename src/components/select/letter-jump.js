@@ -16,13 +16,14 @@ export function createLetterJump(timeoutMs = TYPEAHEAD_TIMEOUT_MS) {
     lastAt = 0;
   }
 
-  // Returns the highlight index into `opts`, or -1 when nothing matches.
-  // `now` is injectable so tests can drive the idle window without fake timers.
-  function jump(letter, opts, now = Date.now()) {
+  // Returns the highlight index into `labels` (the option labels, in menu
+  // order), or -1 when nothing matches. `now` is injectable so tests can drive
+  // the idle window without fake timers.
+  function jump(letter, labels, now = Date.now()) {
     const lower = letter.toLowerCase();
     const matches = [];
-    for (let i = 0; i < opts.length; i++) {
-      if (opts[i].textContent.toLowerCase().startsWith(lower)) matches.push(i);
+    for (let i = 0; i < labels.length; i++) {
+      if (labels[i].toLowerCase().startsWith(lower)) matches.push(i);
     }
     if (!matches.length) return -1;
 

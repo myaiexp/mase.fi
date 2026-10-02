@@ -1,5 +1,5 @@
 // Lazy-load archived log entries into an already-normalized data object
-import { buildSlugToChannel, normalizeEntry } from './data-normalize.js';
+import { buildSlugToChannel, isRawEntry, normalizeEntry } from './data-normalize.js';
 import { fetchJson } from './fetch-json.js';
 
 const ARCHIVE_URL = '/updates-archive.json';
@@ -11,11 +11,11 @@ const inflight = new WeakMap();
 const entryKey = (e) => `${e.date}\0${e.projectSlug || ''}\0${e.text}`;
 
 // The archive holds only logs, but a stray non-log row must not merge — it would
-// surface in #home or a project channel. Null rows are dropped so one bad row
-// cannot fail the whole merge.
+// surface in #home or a project channel. Malformed rows (isRawEntry) are dropped
+// so one bad row cannot fail the whole merge.
 function normalizeArchivedLogs(rawEntries, slugToChannel) {
   return rawEntries
-    .filter((e) => e && e.category === 'log')
+    .filter((e) => isRawEntry(e) && e.category === 'log')
     .map((e) => normalizeEntry(e, slugToChannel));
 }
 

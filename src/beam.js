@@ -18,9 +18,9 @@ const FIRST_DELAY_MS = 1600;
 // re-mount never leaves a second animation loop running. Not a multi-beam registry by design.
 let activeCleanup = null;
 
-// Per-span bucket cache: { b: lastBucket, sb: lastDecaySubBucket }. Keyed off the
+// Per-span last painted state: { bucket, decayStep }. Keyed off the
 // span so the cache is GC'd with the element instead of polluting the DOM node.
-const buckets = new WeakMap();
+const lastPaint = new WeakMap();
 
 function sampleScramble() {
   return SCRAMBLE[(Math.random() * SCRAMBLE.length) | 0];
@@ -38,7 +38,7 @@ export function destructionAt(charX, beamX) {
   return 1;
 }
 
-// Exported for unit testing — the bucket cache is the cheap invariant worth
+// Exported for unit testing — the lastPaint cache is the cheap invariant worth
 // pinning (same-bucket dest must not rewrite textContent).
 export function paintChar(span, original, dest) {
   // Bucket the destruction value so we only mutate textContent when state changes.
@@ -49,10 +49,10 @@ export function paintChar(span, original, dest) {
   else if (dest < 1.0)   bucket = 3; // decay (ramp ▓▒░·)
   else                   bucket = 4; // ash
 
-  let rec = buckets.get(span);
-  if (!rec) { rec = { b: undefined, sb: undefined }; buckets.set(span, rec); }
-  const prevBucket = rec.b;
-  const prevSubBucket = rec.sb;
+  let rec = lastPaint.get(span);
+  if (!rec) { rec = { bucket: undefined, decayStep: undefined }; lastPaint.set(span, rec); }
+  const prevBucket = rec.bucket;
+  const prevDecayStep = rec.decayStep;
 
   if (bucket === 0) {
     if (prevBucket !== 0) {
@@ -69,13 +69,13 @@ export function paintChar(span, original, dest) {
       span.className = 'bch pk';
     }
   } else if (bucket === 3) {
-    // Sub-bucket within decay: pick ramp glyph by progress.
+    // Decay step: pick the ramp glyph by progress.
     const t = (dest - 0.70) / 0.30;
     const idx = Math.min(DECAY_RAMP.length - 1, (t * DECAY_RAMP.length) | 0);
-    if (prevBucket !== 3 || prevSubBucket !== idx) {
+    if (prevBucket !== 3 || prevDecayStep !== idx) {
       span.textContent = DECAY_RAMP[idx];
       span.className = 'bch dc dc' + idx;
-      rec.sb = idx;
+      rec.decayStep = idx;
     }
   } else {
     if (prevBucket !== 4) {
@@ -83,7 +83,7 @@ export function paintChar(span, original, dest) {
       span.className = 'bch ash';
     }
   }
-  rec.b = bucket;
+  rec.bucket = bucket;
 }
 
 /** Mount the beam effect over an `.ascii` element. Returns a cleanup fn. */
@@ -147,7 +147,7 @@ export function mountBeam(asciiEl, logoText) {
   const X1 = totalWidth + BEAM_R + DECAY_R;
 
   let raf = 0;
-  let schedule = 0;
+  let nextPhaseTimer = 0;
 
   function placeBeam(x, intensity) {
     beam.style.transform = `translateX(${x}px)`;
@@ -165,7 +165,7 @@ export function mountBeam(asciiEl, logoText) {
     for (const c of chars) {
       c.el.textContent = c.original;
       c.el.className = 'bch';
-      buckets.set(c.el, { b: 0, sb: undefined });
+      lastPaint.set(c.el, { bucket: 0, decayStep: undefined });
     }
     beam.style.opacity = '0';
   }
@@ -196,10 +196,10 @@ export function mountBeam(asciiEl, logoText) {
       if (t < 1) {
         raf = requestAnimationFrame(step);
       } else if (phase === 'sweep') {
-        schedule = setTimeout(() => play('reform'), HOLD_MS);
+        nextPhaseTimer = setTimeout(() => play('reform'), HOLD_MS);
       } else {
         restorePristine();
-        schedule = setTimeout(() => play('sweep'), REST_MS);
+        nextPhaseTimer = setTimeout(() => play('sweep'), REST_MS);
       }
     }
     raf = requestAnimationFrame(step);
@@ -207,17 +207,17 @@ export function mountBeam(asciiEl, logoText) {
 
   function trigger() {
     if (raf) cancelAnimationFrame(raf);
-    if (schedule) clearTimeout(schedule);
+    if (nextPhaseTimer) clearTimeout(nextPhaseTimer);
     restorePristine();
     play('sweep');
   }
   asciiEl.addEventListener('click', trigger);
 
-  schedule = setTimeout(() => play('sweep'), FIRST_DELAY_MS);
+  nextPhaseTimer = setTimeout(() => play('sweep'), FIRST_DELAY_MS);
 
   function cleanup() {
     if (raf) cancelAnimationFrame(raf);
-    if (schedule) clearTimeout(schedule);
+    if (nextPhaseTimer) clearTimeout(nextPhaseTimer);
     asciiEl.removeEventListener('click', trigger);
     asciiEl.classList.remove('beam-host');
     asciiEl.style.width = '';

@@ -1,15 +1,32 @@
 // Raw updates.json entry → UI entry shape, shared by the hot and archive loaders
 import { normalizeDate } from './dates.js';
 
+// Row guards for raw updates.json data: a row that fails one is skipped, so one
+// bad row written by a script cannot throw inside normalization and empty the
+// whole feed. An entry's project is optional but must be a string when present.
+export function isRawEntry(e) {
+  return !!e && typeof e === 'object' && (e.project == null || typeof e.project === 'string');
+}
+
+// A project without a string channel has nowhere to render, so it is skipped too.
+export function isRawProject(p) {
+  return !!p && typeof p === 'object' && typeof p.channel === 'string';
+}
+
 /**
- * Build the entry-slug → channel lookup. Entries reference a project by slug
- * (matched case-insensitively); channels are keyed by `channel`. A project's slug
- * defaults to its channel when not given explicitly.
+ * A project's routing slug: `slug`, falling back to `channel`, lowercased.
+ * Entries reference a project by this value, matched case-insensitively.
  */
-export function buildSlugToChannel(rawProjects) {
+export function projectSlug(p) {
+  const slug = p.slug || p.channel;
+  return typeof slug === 'string' ? slug.toLowerCase() : '';
+}
+
+/** Build the entry-slug → channel lookup over (raw or normalized) projects. */
+export function buildSlugToChannel(projects) {
   const slugToChannel = new Map();
-  for (const p of rawProjects || []) {
-    const slug = (p.slug || p.channel || '').toLowerCase();
+  for (const p of projects || []) {
+    const slug = projectSlug(p);
     if (slug) slugToChannel.set(slug, p.channel);
   }
   return slugToChannel;

@@ -2,12 +2,8 @@
 import { describe, it, expect } from 'vitest';
 import { createLetterJump, TYPEAHEAD_TIMEOUT_MS } from './letter-jump.js';
 
-function opts(...labels) {
-  return labels.map((textContent) => ({ textContent }));
-}
-
 describe('createLetterJump', () => {
-  const fruit = opts('Apple', 'Banana', 'Avocado');
+  const fruit = ['Apple', 'Banana', 'Avocado'];
 
   it('jumps to the first option starting with the letter', () => {
     const jump = createLetterJump();

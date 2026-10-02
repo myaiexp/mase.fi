@@ -256,20 +256,6 @@ describe('fetchData routing', () => {
     expect(data.hasArchive).toBe(false);
     expect(data.stats.totalCommits).toBeUndefined();
   });
-
-  it('degrades to empty data when normalization throws, and logs the error', async () => {
-    // A null entry makes the heat-count loop's `e.project` access throw. The error
-    // boundary keeps normalization inside it, so this degrades gracefully instead
-    // of escaping as an unhandled rejection that stalls the app shell — and the
-    // catch warns, so a real bug isn't silently swallowed as "no data".
-    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
-    stubFetch({ projects: [], entries: [null] });
-    const data = await fetchData();
-    expect(data.entries).toEqual([]);
-    expect(data.projects).toEqual([]);
-    expect(data.meta.nick).toBe('mase');
-    expect(warnSpy).toHaveBeenCalled();
-  });
 });
 
 // ---- fetchData date routing ----------------------------------------------

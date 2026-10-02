@@ -2,14 +2,11 @@
 import { projectLink } from './project-link.js';
 import { parseEntryDate, normalizeDate, utcDayStart } from './dates.js';
 import { fetchDemos, raceTimeout, DEMOS_GRACE_MS } from './data-demos.js';
-import { buildSlugToChannel, normalizeEntry } from './data-normalize.js';
+import { buildSlugToChannel, isRawEntry, isRawProject, normalizeEntry, projectSlug } from './data-normalize.js';
 import { fetchJson } from './fetch-json.js';
 export { fetchDemos };
 export { loadArchive } from './data-archive.js';
 
-// updates.json is required; the demos manifest is optional chips. fetchJson
-// time-boxes both, then demos is grace-raced so a hung manifest cannot delay
-// init after updates.json is already in.
 const SOURCE_URL = '/updates.json';
 
 // The degraded shape, and the base the success path overrides — one literal so
@@ -37,26 +34,26 @@ function emptyData(demos) {
  *  - project.heat is computed from last-30d entry count, normalized 0..1
  *  - project.tag, project.links don't exist live — we synthesize: tag = "" (dropped chip), links = [project.url]
  *  - demos: channel slugs with a published demo (from /demos/manifest.json via fetchDemos),
- *    fetched in parallel and folded in here so the shape is complete in one place — no
- *    consumer has to staple it on or guard against its absence.
+ *    always present (possibly []), so no consumer guards against its absence.
+ *  - malformed rows (isRawEntry / isRawProject) are skipped and counted in one warning.
  */
 export async function fetchData() {
-  // Kick the demos-manifest fetch off up front so it overlaps the updates fetch.
-  // fetchDemos never rejects (it degrades to [] on any failure). After updates
-  // is in, grace-race demos so a hung/slow manifest cannot stall init — chips
-  // degrade to [] if it isn't ready within DEMOS_GRACE_MS.
+  // fetchDemos never rejects (it degrades to []). Started now so it overlaps the
+  // updates fetch, then grace-raced below so a hung manifest cannot stall init
+  // once updates.json is in.
   const demosPromise = fetchDemos();
-  // Single error boundary around fetch + the full normalization pipeline. A
-  // network/parse failure OR a structural error while normalizing (e.g. a null
-  // element in entries making e.project throw, a non-array field) both degrade to
-  // the same empty fallback instead of escaping as an unhandled rejection — main.js
-  // awaits this without a catch, so an escape would silently stall the app shell.
+  // One boundary for a failed fetch/parse (fetchJson rejects on a non-2xx) and
+  // any bug thrown while normalizing: main.js awaits this without a catch, so an
+  // escape would stall the app shell. Bad rows never reach it — they are skipped.
   try {
-    // fetchJson rejects on a non-2xx, routing it to the catch below.
     const raw = await fetchJson(SOURCE_URL);
 
-    const rawProjects = Array.isArray(raw.projects) ? raw.projects : [];
-    const rawEntries = Array.isArray(raw.entries) ? raw.entries : [];
+    const projectRows = Array.isArray(raw.projects) ? raw.projects : [];
+    const entryRows = Array.isArray(raw.entries) ? raw.entries : [];
+    const rawProjects = projectRows.filter(isRawProject);
+    const rawEntries = entryRows.filter(isRawEntry);
+    const skipped = projectRows.length - rawProjects.length + entryRows.length - rawEntries.length;
+    if (skipped) console.warn(`fetchData: skipped ${skipped} malformed row(s) in ${SOURCE_URL}`);
 
     const slugToChannel = buildSlugToChannel(rawProjects);
     const { counts, lastActivity } = aggregateActivity(rawEntries);
@@ -72,10 +69,6 @@ export async function fetchData() {
       hasArchive: stats.archive === true,
     };
   } catch (err) {
-    // Deliberate degrade-to-empty so the app shell still renders, but this catch
-    // also traps any programming bug thrown in the normalization pipeline — warn
-    // so a real bug surfaces in the console instead of masquerading as the benign
-    // "server returned no data" case.
     console.warn('fetchData: failed to load/normalize updates.json, degrading to empty state', err);
     return emptyData(await raceTimeout(demosPromise, DEMOS_GRACE_MS, []));
   }
@@ -112,14 +105,7 @@ function aggregateActivity(rawEntries) {
   for (const e of rawEntries) {
     if (!e.project) continue;
     if (e.category !== 'log' && e.category !== 'feature') continue;
-    // Parse the entry's date as UTC via parseEntryDate — the same day definition
-    // the feed's separators use — so heat/recency agree with the feed. Bare
-    // Date.parse reads a zone-less "YYYY-MM-DDTHH:MM" as viewer-LOCAL, so anyone
-    // off UTC would count near-midnight entries into a different day than they see.
-    // normalizeDate first: these are RAW entries, so shapes vary (bare date, full
-    // ISO+Z); it reduces them to the zone-less form parseEntryDate expects.
-    // cutoff is an absolute instant, so the 30-day window is already viewer-
-    // independent — only the parse needed fixing here.
+    // Parse as UTC so heat/recency agree with the feed's day separators.
     const t = parseEntryDate(normalizeDate(e.date)).getTime();
     if (!Number.isFinite(t)) continue;
     const slug = e.project.toLowerCase();
@@ -142,7 +128,7 @@ function normalizeProjects(rawProjects, counts, lastActivity) {
   for (const c of counts.values()) if (c > maxCount) maxCount = c;
 
   const projects = rawProjects.map((p) => {
-    const slug = (p.slug || p.channel || '').toLowerCase();
+    const slug = projectSlug(p);
     const heat = Math.min(1, (counts.get(slug) || 0) / maxCount);
     const links = [];
     const link = projectLink(p.url);
@@ -257,19 +243,18 @@ function allHistoryLogs(data, counted) {
  * allHistoryLogs: the channel's log rows in memory, plus archivedByProject's
  * compact-time count of archived rows when the archive is not merged. Archive
  * keys are raw entry.project strings, matched case-insensitively against the
- * project's routing slug the way normalizeEntry routes rows. A compact from
- * before archivedByProject existed falls back to its commitsByProject snapshot,
- * keyed by slug, then by channel.
+ * normalized project's routing slug (project.slug) the way normalizeEntry
+ * routes rows. A compact from before archivedByProject existed falls back to
+ * its commitsByProject snapshot, keyed by slug, then by channel.
  */
 export function commitsForProject(project, data) {
   const inMemory = data.entries.filter((e) => e.channel === project.channel && e.category === 'log').length;
   if (data.archiveLoaded) return inMemory;
   const archived = data.stats?.archivedByProject;
   if (archived) {
-    const slug = (project.slug || project.channel || '').toLowerCase();
     let total = inMemory;
     for (const [key, n] of Object.entries(archived)) {
-      if (key.toLowerCase() === slug && Number.isFinite(n)) total += n;
+      if (key.toLowerCase() === project.slug && Number.isFinite(n)) total += n;
     }
     return total;
   }

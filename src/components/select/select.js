@@ -252,7 +252,7 @@ class BaseSelect extends HTMLElement {
         this._selectOption(opts[this.#highlightIdx]);
       }
     } else if (!this.#searchable && e.key.length === 1 && /[a-z]/i.test(e.key)) {
-      const idx = this.#typeahead.jump(e.key, opts);
+      const idx = this.#typeahead.jump(e.key, opts.map((o) => o.dataset.label));
       if (idx >= 0) {
         this.#highlightIdx = idx;
         this.#applyHighlight();

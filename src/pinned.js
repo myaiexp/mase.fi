@@ -7,11 +7,10 @@ import { escapeHtml } from './html.js';
 
 // heat → status business rule. Single source for the >0.6 / >0.3 breakpoints so
 // the desktop hero card and the mobile hero line can't silently diverge.
-//   label: cardHead status dot   text: desktop status line   short: mobile status
 function heatStatus(heat) {
-  if (heat > 0.6) return { label: '● shipping', text: 'actively shipping', short: 'shipping' };
-  if (heat > 0.3) return { label: '● steady', text: 'steady', short: 'steady' };
-  return { label: '○ idle', text: 'maintenance only', short: 'idle' };
+  if (heat > 0.6) return { cardBadge: '● shipping', cardLine: 'actively shipping', mobileLabel: 'shipping' };
+  if (heat > 0.3) return { cardBadge: '● steady', cardLine: 'steady', mobileLabel: 'steady' };
+  return { cardBadge: '○ idle', cardLine: 'maintenance only', mobileLabel: 'idle' };
 }
 
 // "try demo" anchor when this channel has a published demo (demos/<channel>/).
@@ -84,12 +83,12 @@ function pinnedProject(p, data) {
     p.links.map(l => '<a href="' + escapeHtml(l.href) + '">' + escapeHtml(l.label) + '</a>').join('');
   return pinCard({
     meta: [['heat', (p.heat * 100 | 0) + '%'], ['commits', String(commits)]],
-    right: status.label,
+    right: status.cardBadge,
     art,
     tagline: escapeHtml(p.description),
     rows: [
       ['activity', commits + ' commits in feed \xb7 heat ' + (p.heat * 100 | 0) + '%'],
-      ['status', status.text, 'accent'],
+      ['status', status.cardLine, 'accent'],
       ['links', linksHtml, 'links'],
     ],
   });
@@ -156,7 +155,7 @@ function heroLineHtml(id, data) {
     parts = [
       demoLinkHtml(id, data.demos),
       link ? '<a href="' + escapeHtml(link.href) + '">' + escapeHtml(link.label) + '</a>' : '',
-      '<span class="status">' + heatStatus(project.heat).short + '</span>',
+      '<span class="status">' + heatStatus(project.heat).mobileLabel + '</span>',
     ].filter(Boolean);
   }
   return '<span class="arr">→</span> ' + parts.join(' <span class="sep">\xb7</span> ');

@@ -119,28 +119,28 @@ class BaseTextFit extends HTMLElement {
       return;
     }
 
-    const maxLines = parseInt(this.getAttribute('lines'), 10);
-    const lines = Number.isFinite(maxLines) ? maxLines : 1;
+    const parsedLines = parseInt(this.getAttribute('lines'), 10);
+    const lineLimit = Number.isFinite(parsedLines) ? parsedLines : 1;
     const mode = this.getAttribute('mode') || 'fit';
 
-    if (lines === 0 && mode !== 'justify') {
+    if (lineLimit === 0 && mode !== 'justify') {
       this.#textEl.textContent = this.#fullText;
       return;
     }
 
     if (mode === 'justify') {
-      this.#renderJustified(maxWidth, lines);
+      this.#renderJustified(maxWidth, lineLimit);
     } else if (mode === 'wrap') {
-      this.#textEl.textContent = wrapOptimal(this.#prepared, maxWidth, lines);
+      this.#textEl.textContent = wrapOptimal(this.#prepared, maxWidth, lineLimit);
     } else {
-      this.#textEl.textContent = truncate(this.#prepared, maxWidth, lines);
+      this.#textEl.textContent = truncate(this.#prepared, maxWidth, lineLimit);
     }
   }
 
-  #renderJustified(maxWidth, maxLines) {
-    const lines = justifyLines(this.#prepared, maxWidth, maxLines);
+  #renderJustified(maxWidth, lineLimit) {
+    const laidOut = justifyLines(this.#prepared, maxWidth, lineLimit);
     this.#textEl.textContent = '';
-    for (const line of lines) {
+    for (const line of laidOut) {
       const span = document.createElement('span');
       span.className = 'jl';
       span.textContent = line.text;
