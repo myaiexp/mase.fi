@@ -38,8 +38,9 @@ export function pickNick(e) {
  *   - channel:        where the row routes — projectChannel, else the category
  *                     fallback (daily→home, log→activity)
  * plus the normalized date and a nick. Returns null for an unroutable entry (no
- * mapped project and no category fallback). This is the only place the entry shape is built — the hot
- * path and the archive merge both call it, so archived rows can't drift.
+ * mapped project and no category fallback). This is the only place the entry
+ * shape is built — the hot path and the archive merge both call it, so archived
+ * rows can't drift.
  */
 export function normalizeEntry(e, slugToChannel) {
   const slug = (e.project || '').toLowerCase();
