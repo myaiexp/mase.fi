@@ -1,8 +1,16 @@
 // Unit tests for logStats.buckets and logStats.last (time-windowed rollups).
 // Totals and commitsForProject live in data-stats.test.js.
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { logStats } from './data.js';
 import { entry } from './data-test-helpers.js';
+
+// Pin the clock: dayStr builds fixtures from "now" and logStats reads "now" again,
+// so a run straddling 00:00 UTC between the two would shift every bucket by one.
+beforeEach(() => {
+  vi.useFakeTimers({ toFake: ['Date'] });
+  vi.setSystemTime(new Date('2026-06-27T10:00:00Z'));
+});
+afterEach(() => vi.useRealTimers());
 
 // stats is always present on fetchData's output, possibly empty.
 function dataWith(entries) {

@@ -6,6 +6,10 @@ import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { renderPinned } from './pinned.js';
 
 beforeEach(() => {
+  // Pin the clock: utcNoonDaysAgo builds fixtures from "now" and the recent-rate
+  // window reads "now" again, so a run straddling 00:00 UTC would shift buckets.
+  vi.useFakeTimers({ toFake: ['Date'] });
+  vi.setSystemTime(new Date('2026-06-27T10:00:00Z'));
   vi.stubGlobal('matchMedia', vi.fn().mockReturnValue({ matches: true }));
   for (const id of ['pinned', 'hero-line']) {
     const el = document.createElement('div');
@@ -15,6 +19,7 @@ beforeEach(() => {
 });
 
 afterEach(() => {
+  vi.useRealTimers();
   vi.unstubAllGlobals();
   document.body.replaceChildren();
 });

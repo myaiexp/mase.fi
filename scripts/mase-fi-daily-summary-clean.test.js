@@ -1,8 +1,8 @@
 // Golden-file tests for mase-fi-daily-summary's clean_lines() drop-regexes.
 // These only ran through a canned-clean claude stub before this split — this
 // file drives the narration/refusal/preamble paths the bug history cares about.
-// Grouping + summary-branch and fallback/skip/compact/lock-guard suites live in
-// mase-fi-daily-summary.test.js.
+// Grouping + summary-branch and fallback/skip/lock-guard suites live in
+// mase-fi-daily-summary.test.js, the ntfy alerts in mase-fi-daily-summary-alerts.test.js.
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { join } from 'node:path';
 import { writeFileSync } from 'node:fs';

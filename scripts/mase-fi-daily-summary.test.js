@@ -1,10 +1,11 @@
-// Golden-file tests for mase-fi-daily-summary: the group-by-project rewrite and
-// the single-vs-multi-commit branch. `claude -p` is stubbed via CLAUDE_BIN; the
-// live helm showcase API and ntfy are neutralized so the run is fully hermetic.
+// Golden-file tests for mase-fi-daily-summary: per-project grouping and the
+// single-vs-multi-commit branch, the fallback/skip paths, and the in-lock write
+// guards. `claude -p` is stubbed via CLAUDE_BIN; the showcase API is unreachable and
+// ntfy has no token, so every run is hermetic. clean_lines() lives in the -clean
+// suite, the ntfy alerts (compact, on_exit, token handling) in the -alerts suite.
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import process from 'node:process';
 import { join } from 'node:path';
-import { chmodSync, existsSync, mkdirSync, writeFileSync, readFileSync } from 'node:fs';
+import { writeFileSync, readFileSync } from 'node:fs';
 import { makeTempDir, cleanup, writeJson, readJson, runScript, todayHelsinki, writeClaudeStub, readClaudeArgv } from './test-helpers.js';
 
 // Each run spawns the whole script (jq, curl, the compactor, the stubs): ~2s alone on
@@ -169,88 +170,6 @@ describe('mase-fi-daily-summary — fallback + skip paths', () => {
     const r = run({ CLAUDE_BIN });
     expect(r.stdout).toMatch(/No log entries/i);
     expect(dailies()).toHaveLength(0);
-  });
-});
-
-// clean_lines() drop-regexes tests moved to mase-fi-daily-summary-clean.test.js.
-
-describe('mase-fi-daily-summary — compact alerts (finding #9443)', () => {
-  // Fake curl first on PATH: records ntfy pushes (argv and stdin, where the headers
-  // travel) and fails every other call, which the showcase refresh treats as helm
-  // unreachable (.projects left alone).
-  const fakeCurl = () => {
-    const bin = join(dir, 'bin');
-    const argv = join(dir, 'ntfy-argv');
-    const stdin = join(dir, 'ntfy-stdin');
-    mkdirSync(bin);
-    writeFileSync(join(bin, 'curl'), `#!/usr/bin/env bash
-case "$*" in *ntfy.test*) printf '%s\\n' "$*" >> ${JSON.stringify(argv)}; cat >> ${JSON.stringify(stdin)}; exit 0 ;; esac
-exit 7
-`);
-    chmodSync(join(bin, 'curl'), 0o755);
-    const read = (f) => (existsSync(f) ? readFileSync(f, 'utf8') : '');
-    return {
-      env: { PATH: `${bin}:${process.env.PATH}`, NTFY_TOKEN: 'test-token', NTFY_URL: 'http://ntfy.test/kelo' },
-      pushes: () => read(argv) + read(stdin),
-      argv: () => read(argv),
-      stdin: () => read(stdin),
-    };
-  };
-  // No log for today → the skip path, which still compacts.
-  const seedSkip = () => seed([log('beta', 'old commit', '2026-01-01')]);
-
-  it('pushes a FAILED alert, exits 0, and leaves both files alone on a malformed archive', () => {
-    seedSkip();
-    const arch = join(dir, 'updates-archive.json');
-    writeFileSync(arch, '{ torn');
-    const before = readFileSync(file, 'utf8');
-    const curl = fakeCurl();
-    const r = run({ ...curl.env, ARCHIVE_FILE: arch });
-    expect(r.status).toBe(0);
-    expect(r.stderr).toMatch(/not a valid .*archive/);
-    expect(curl.pushes()).toMatch(/compact FAILED/);
-    expect(readFileSync(arch, 'utf8')).toBe('{ torn');
-    expect(readFileSync(file, 'utf8')).toBe(before);
-  });
-
-  // argv is world-readable in /proc/<pid>/cmdline, so the token goes on stdin (finding #10177).
-  it('hands curl the bearer token on stdin, never argv', () => {
-    seedSkip();
-    const arch = join(dir, 'updates-archive.json');
-    writeFileSync(arch, '{ torn');
-    const curl = fakeCurl();
-    run({ ...curl.env, ARCHIVE_FILE: arch });
-    expect(curl.argv()).toMatch(/ntfy\.test/);
-    expect(curl.argv()).not.toMatch(/test-token/);
-    expect(curl.stdin()).toMatch(/^Authorization: Bearer test-token$/m);
-  });
-
-  it('pushes a degraded alert when the archive cannot be created', () => {
-    seedSkip();
-    const curl = fakeCurl();
-    const r = run({ ...curl.env, ARCHIVE_FILE: join(dir, 'missing-dir', 'a.json') });
-    expect(r.status).toBe(0);
-    expect(curl.pushes()).toMatch(/compact degraded/);
-    expect(readJson(file).entries.map((e) => e.text)).toEqual(['old commit']);
-  });
-
-  it('pushes nothing on a clean compact', () => {
-    seedSkip();
-    const curl = fakeCurl();
-    const r = run(curl.env);
-    expect(r.status).toBe(0);
-    expect(curl.pushes()).toBe('');
-    expect(readJson(join(dir, 'updates-archive.json')).entries.map((e) => e.text)).toEqual(['old commit']);
-  });
-
-  it('compacts on the write path too, after the day\'s summaries land', () => {
-    seed([log('alpha', 'feat(alpha): only'), log('beta', 'ancient commit', '2026-01-01')]);
-    const curl = fakeCurl();
-    const r = run({ ...curl.env, CLAUDE_BIN: writeClaudeStub(dir, { exitCode: 1 }) });
-    expect(r.status).toBe(0);
-    expect(dailies()).toHaveLength(1);
-    expect(curl.pushes()).toBe('');
-    expect(readJson(join(dir, 'updates-archive.json')).entries.map((e) => e.text)).toEqual(['ancient commit']);
   });
 });
 

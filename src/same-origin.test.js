@@ -29,4 +29,8 @@ describe('sameOriginPath', () => {
   it('collapses an absolute same-origin URL to its path', () => {
     expect(sameOriginPath('https://mase.fi/explorer', ORIGIN)).toBe('/explorer');
   });
+  it('returns null instead of throwing on an unparseable URL or origin', () => {
+    expect(sameOriginPath('http://[', ORIGIN)).toBeNull();
+    expect(sameOriginPath('/explorer', 'not a url')).toBeNull();
+  });
 });
