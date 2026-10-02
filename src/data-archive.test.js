@@ -39,8 +39,8 @@ describe('loadArchive', () => {
     const data = {
       projects: [{ name: 'Helm', channel: 'helm', slug: 'helm' }],
       entries: [
-        entry('log', 'activity', { date: '2026-08-20T10:00', text: 'already-hot', project: 'helm' }),
-        entry('log', 'activity', { date: '2026-09-01T10:00', text: 'recent', project: 'helm' }),
+        entry('log', 'activity', { date: '2026-08-20T10:00', text: 'already-hot', projectSlug: 'helm' }),
+        entry('log', 'activity', { date: '2026-09-01T10:00', text: 'recent', projectSlug: 'helm' }),
       ],
       hasArchive: true,
       archiveLoaded: false,
@@ -48,7 +48,7 @@ describe('loadArchive', () => {
     await loadArchive(data);
     expect(data.archiveLoaded).toBe(true);
     expect(data.entries.map((e) => e.text)).toEqual(['ancient', 'already-hot', 'recent']);
-    expect(data.entries[0]).toMatchObject({ cat: 'log', nick: 'git', project: 'helm' });
+    expect(data.entries[0]).toMatchObject({ category: 'log', nick: 'git', projectSlug: 'helm' });
   });
 
   // A failed load must not set archiveLoaded: logStats (behind both pinned cards)
@@ -123,10 +123,10 @@ describe('loadArchive', () => {
     };
     await loadArchive(data);
     const [mapped, unmapped, bare] = data.entries;
-    expect(mapped).toMatchObject({ ch: 'exp', mappedChannel: 'exp', project: 'explorer', nick: 'git', cat: 'log' });
-    expect(unmapped).toMatchObject({ ch: 'activity', project: 'secret-tool' });
-    expect(unmapped.mappedChannel).toBeUndefined();
-    expect(bare).toMatchObject({ ch: 'activity', project: undefined, text: 'no-project' });
+    expect(mapped).toMatchObject({ channel: 'exp', projectChannel: 'exp', projectSlug: 'explorer', nick: 'git', category: 'log' });
+    expect(unmapped).toMatchObject({ channel: 'activity', projectSlug: 'secret-tool' });
+    expect(unmapped.projectChannel).toBeUndefined();
+    expect(bare).toMatchObject({ channel: 'activity', projectSlug: undefined, text: 'no-project' });
     expect(entriesFor('activity', data)).toHaveLength(3);
   });
 

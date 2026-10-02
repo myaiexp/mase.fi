@@ -1,13 +1,13 @@
 // Shared fixtures for the data adapter tests: normalized entries, fetch stubs
 import { vi } from 'vitest';
 
-// A normalized entry as produced by fetchData(): { ch, cat, date, nick, text, project? }.
-export function entry(cat, ch, extra = {}) {
+// A normalized entry as produced by fetchData(): { channel, category, date, nick, text, projectSlug? }.
+export function entry(category, channel, extra = {}) {
   return {
-    ch,
-    cat,
+    channel,
+    category,
     date: '2026-01-01T00:00',
-    nick: cat === 'log' ? 'git' : 'mase',
+    nick: category === 'log' ? 'git' : 'mase',
     text: 't',
     ...extra,
   };

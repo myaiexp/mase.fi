@@ -30,8 +30,8 @@ function makeRow({ raw = '', project = '', target = '', feature = false } = {}) 
   row.className = 'feed-row';
   if (feature) row.classList.add('cat-feature');
   if (raw) row.dataset.raw = raw;
-  if (project) row.dataset.project = project;
-  if (target) row.dataset.target = target;
+  if (project) row.dataset.projectSlug = project;
+  if (target) row.dataset.targetChannel = target;
   const msg = document.createElement('span');
   msg.className = 'msg';
   row.appendChild(msg);
@@ -80,7 +80,7 @@ describe('layoutRow — normal (pretext) path', () => {
     const pill = msg.querySelector('.line .proj-pill');
     expect(pill).not.toBeNull();
     expect(pill.textContent).toBe('#explorer');
-    expect(pill.dataset.target).toBe('/explorer');
+    expect(pill.dataset.targetChannel).toBe('/explorer');
 
     expect(msg.textContent).not.toContain('★');
 
@@ -113,7 +113,7 @@ describe('layoutRow — normal (pretext) path', () => {
     expect(span.style.marginLeft).toBe('6px');
   });
 
-  it('omits data-target on the pill when the row has no target', () => {
+  it('omits data-target-channel on the pill when the row has no target', () => {
     const row = makeRow({ raw: 'no target', project: 'explorer' });
     const msg = row.querySelector('.msg');
     document.body.appendChild(row);
@@ -124,7 +124,7 @@ describe('layoutRow — normal (pretext) path', () => {
 
     const pill = msg.querySelector('.proj-pill');
     expect(pill).not.toBeNull();
-    expect(pill.dataset.target).toBeUndefined();
+    expect(pill.dataset.targetChannel).toBeUndefined();
   });
 
   it('emits one .line span per range the walker yields', () => {
@@ -156,7 +156,7 @@ describe('layoutRow — zero/negative-width fallback (pretext not invoked)', () 
       const pill = msg.querySelector('.proj-pill');
       expect(pill).not.toBeNull();
       expect(pill.textContent).toBe('#explorer');
-      expect(pill.dataset.target).toBe('/explorer');
+      expect(pill.dataset.targetChannel).toBe('/explorer');
 
       expect(msg.textContent).toBe('#explorerfallback body');
       expect(msg.querySelector('.line')).toBeNull(); // not the pretext path

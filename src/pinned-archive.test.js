@@ -22,8 +22,8 @@ function hotWindow(archivedLogs) {
   return {
     projects: [],
     entries: [
-      { ch: 'activity', cat: 'log', date: '2026-08-01T08:00', nick: 'git', text: 'hot log' },
-      { ch: 'home', cat: 'daily', date: '2026-08-01T08:00', nick: 'mase', text: 'd' },
+      { channel: 'activity', category: 'log', date: '2026-08-01T08:00', nick: 'git', text: 'hot log' },
+      { channel: 'home', category: 'daily', date: '2026-08-01T08:00', nick: 'mase', text: 'd' },
     ],
     stats: { archivedLogs, logFirst: '2026-01-01', logLast: '2026-08-01' },
     hasArchive: true,

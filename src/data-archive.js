@@ -8,7 +8,7 @@ const ARCHIVE_URL = '/updates-archive.json';
 // in flight joins it instead of starting a second fetch.
 const inflight = new WeakMap();
 
-const entryKey = (e) => `${e.date}\0${e.project || ''}\0${e.text}`;
+const entryKey = (e) => `${e.date}\0${e.projectSlug || ''}\0${e.text}`;
 
 // The archive holds only logs, but a stray non-log row must not merge — it would
 // surface in #home or a project channel. Null rows are dropped so one bad row

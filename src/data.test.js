@@ -30,7 +30,7 @@ describe('entriesFor', () => {
     ]);
     const got = entriesFor('home', data);
     expect(got).toHaveLength(2);
-    expect(got.every((e) => e.cat === 'daily')).toBe(true);
+    expect(got.every((e) => e.category === 'daily')).toBe(true);
   });
 
   it('activity returns ALL log entries (cross-project firehose)', () => {
@@ -42,7 +42,7 @@ describe('entriesFor', () => {
     ]);
     const got = entriesFor('activity', data);
     expect(got).toHaveLength(2);
-    expect(got.every((e) => e.cat === 'log')).toBe(true);
+    expect(got.every((e) => e.category === 'log')).toBe(true);
   });
 
   it('project channel returns matching non-log entries (feature/project/daily)', () => {
@@ -54,17 +54,17 @@ describe('entriesFor', () => {
     ]);
     const got = entriesFor('explorer', data);
     expect(got).toHaveLength(3);
-    expect(got.every((e) => e.ch === 'explorer')).toBe(true);
+    expect(got.every((e) => e.channel === 'explorer')).toBe(true);
   });
 
-  it('project channel EXCLUDES log entries even when their ch matches', () => {
+  it('project channel EXCLUDES log entries even when their channel matches', () => {
     const data = dataWith([
       entry('feature', 'explorer'),
-      entry('log', 'explorer'), // log with matching ch must NOT appear in the project channel
+      entry('log', 'explorer'), // log with matching channel must NOT appear in the project channel
     ]);
     const got = entriesFor('explorer', data);
     expect(got).toHaveLength(1);
-    expect(got[0].cat).toBe('feature');
+    expect(got[0].category).toBe('feature');
   });
 
   it('unknown channel id returns empty', () => {
@@ -87,7 +87,7 @@ describe('fetchData routing', () => {
       ],
     });
     const data = await fetchData();
-    const byCat = Object.fromEntries(data.entries.map((e) => [e.cat, e.ch]));
+    const byCat = Object.fromEntries(data.entries.map((e) => [e.category, e.channel]));
     expect(byCat.daily).toBe('home');
     expect(byCat.log).toBe('activity');
   });
@@ -101,7 +101,7 @@ describe('fetchData routing', () => {
       ],
     });
     const data = await fetchData();
-    expect(data.entries.map((e) => e.ch)).toEqual(['explorer', 'explorer']);
+    expect(data.entries.map((e) => e.channel)).toEqual(['explorer', 'explorer']);
   });
 
   it('matches project slug case-insensitively (entry.project EXPLORER → channel)', async () => {
@@ -111,7 +111,7 @@ describe('fetchData routing', () => {
     });
     const data = await fetchData();
     expect(data.entries).toHaveLength(1);
-    expect(data.entries[0].ch).toBe('explorer');
+    expect(data.entries[0].channel).toBe('explorer');
   });
 
   it('uses an explicit project.slug distinct from channel for matching', async () => {
@@ -120,7 +120,7 @@ describe('fetchData routing', () => {
       entries: [{ category: 'feature', project: 'explorer', date: '2026-01-01', text: 'f' }],
     });
     const data = await fetchData();
-    expect(data.entries[0].ch).toBe('exp');
+    expect(data.entries[0].channel).toBe('exp');
   });
 
   it('DROPS feature/project entries whose project matches nothing', async () => {
@@ -145,8 +145,8 @@ describe('fetchData routing', () => {
     });
     const data = await fetchData();
     expect(data.entries).toHaveLength(1);
-    expect(data.entries[0].ch).toBe('explorer');
-    expect(data.entries[0].cat).toBe('weird');
+    expect(data.entries[0].channel).toBe('explorer');
+    expect(data.entries[0].category).toBe('weird');
   });
 
   it('falls back to text||summary and assigns nick by category, sorted by date asc', async () => {
@@ -174,7 +174,7 @@ describe('fetchData routing', () => {
     });
     const data = await fetchData();
     expect(data.entries.map((e) => e.nick)).toEqual(['explorer', 'explorer', 'git']);
-    expect(data.entries.every((e) => e.ch === 'explorer')).toBe(true);
+    expect(data.entries.every((e) => e.channel === 'explorer')).toBe(true);
   });
 
   it('returns empty entries/projects when fetch rejects', async () => {

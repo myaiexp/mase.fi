@@ -112,14 +112,14 @@ describe('logStats last', () => {
 
   it('returns the newest log entry regardless of input order', () => {
     const data = dataWith([
-      entry('log', 'activity', { date: '2026-01-10T08:00', project: 'a' }),
-      entry('log', 'activity', { date: '2026-03-20T08:00', project: 'newest' }),
-      entry('log', 'activity', { date: '2026-02-01T08:00', project: 'b' }),
-      entry('daily', 'home', { date: '2026-12-31T08:00', project: 'ignored' }), // non-log, ignored
+      entry('log', 'activity', { date: '2026-01-10T08:00', projectSlug: 'a' }),
+      entry('log', 'activity', { date: '2026-03-20T08:00', projectSlug: 'newest' }),
+      entry('log', 'activity', { date: '2026-02-01T08:00', projectSlug: 'b' }),
+      entry('daily', 'home', { date: '2026-12-31T08:00', projectSlug: 'ignored' }), // non-log, ignored
     ]);
     const got = logStats(data).last;
     expect(got.date).toBe('2026-03-20T08:00');
-    expect(got.project).toBe('newest');
+    expect(got.projectSlug).toBe('newest');
   });
 
   it('still considers a log entry whose date is unparseable', () => {

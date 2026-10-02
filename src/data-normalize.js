@@ -31,25 +31,29 @@ export function pickNick(e) {
 }
 
 /**
- * Normalize one raw entry into the UI shape: map category + project-slug →
- * channel (falling back to daily→home, log→activity), normalize the date, and
- * pick a nick. Returns null for an unroutable entry (no mapped project and no
- * category fallback). This is the only place the entry shape is built — the hot
+ * Normalize one raw entry into the UI shape:
+ *   - projectSlug:    the raw `project` lowercased (a string, not a project object)
+ *   - projectChannel: the sidebar channel that slug maps to, or undefined — the
+ *                     target of the feed's clickable #project chip
+ *   - channel:        where the row routes — projectChannel, else the category
+ *                     fallback (daily→home, log→activity)
+ * plus the normalized date and a nick. Returns null for an unroutable entry (no
+ * mapped project and no category fallback). This is the only place the entry shape is built — the hot
  * path and the archive merge both call it, so archived rows can't drift.
  */
 export function normalizeEntry(e, slugToChannel) {
   const slug = (e.project || '').toLowerCase();
-  const mappedChannel = slugToChannel.get(slug);
-  const ch = mappedChannel
+  const projectChannel = slugToChannel.get(slug);
+  const channel = projectChannel
     || (e.category === 'daily' ? 'home' : e.category === 'log' ? 'activity' : null);
-  if (!ch) return null;
+  if (!channel) return null;
   return {
-    ch,
-    cat: e.category,
+    channel,
+    category: e.category,
     date: normalizeDate(e.date),
     nick: pickNick(e),
     text: e.text || e.summary || '',
-    project: slug || undefined,
-    mappedChannel,
+    projectSlug: slug || undefined,
+    projectChannel,
   };
 }

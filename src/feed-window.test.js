@@ -90,20 +90,20 @@ describe('renderFeed windowing', () => {
 describe('renderFeed chip navigation', () => {
   let layoutRow;
 
-  function chipEntry({ project, mappedChannel, text = 'commit' }) {
+  function chipEntry({ projectSlug, projectChannel, text = 'commit' }) {
     return {
-      ch: 'activity',
-      cat: 'log',
+      channel: 'activity',
+      category: 'log',
       date: '2026-06-01T10:00',
       nick: 'git',
       text,
-      project,
-      mappedChannel,
+      projectSlug,
+      projectChannel,
     };
   }
 
   // jsdom reports 0 width, so relayoutAll no-ops and pills never materialize.
-  // layoutRow(0) takes the fallback path and copies row.dataset.target onto
+  // layoutRow(0) takes the fallback path and copies row.dataset.targetChannel onto
   // the .proj-pill — the same DOM the click delegate consumes.
   function materializePills() {
     for (const row of document.querySelectorAll('#feed .feed-row')) {
@@ -115,31 +115,31 @@ describe('renderFeed chip navigation', () => {
     ({ layoutRow } = await import('./feed-layout.js'));
   });
 
-  it('navigates to the mapped channel when a data-target chip is clicked', () => {
+  it('navigates to the mapped channel when a data-target-channel chip is clicked', () => {
     const navigate = vi.fn();
     renderFeed('activity', {
-      entries: [chipEntry({ project: 'explorer', mappedChannel: 'explorer' })],
+      entries: [chipEntry({ projectSlug: 'explorer', projectChannel: 'explorer' })],
     }, { immediate: true, navigate });
     materializePills();
 
-    const pill = document.querySelector('.proj-pill[data-target]');
+    const pill = document.querySelector('.proj-pill[data-target-channel]');
     expect(pill).toBeTruthy();
-    expect(pill.dataset.target).toBe('explorer');
+    expect(pill.dataset.targetChannel).toBe('explorer');
     pill.click();
     expect(navigate).toHaveBeenCalledOnce();
     expect(navigate).toHaveBeenCalledWith('explorer');
   });
 
-  it('does not navigate when an unmapped pill (no data-target) is clicked', () => {
+  it('does not navigate when an unmapped pill (no data-target-channel) is clicked', () => {
     const navigate = vi.fn();
     renderFeed('activity', {
-      entries: [chipEntry({ project: 'secret-tool' })],
+      entries: [chipEntry({ projectSlug: 'secret-tool' })],
     }, { immediate: true, navigate });
     materializePills();
 
     const pill = document.querySelector('.proj-pill');
     expect(pill).toBeTruthy();
-    expect(pill.dataset.target).toBeUndefined();
+    expect(pill.dataset.targetChannel).toBeUndefined();
     pill.click();
     expect(navigate).not.toHaveBeenCalled();
   });
@@ -147,14 +147,14 @@ describe('renderFeed chip navigation', () => {
   it('does not stack click listeners across re-renders of the same feed', () => {
     const navigate = vi.fn();
     const data = {
-      entries: [chipEntry({ project: 'explorer', mappedChannel: 'explorer' })],
+      entries: [chipEntry({ projectSlug: 'explorer', projectChannel: 'explorer' })],
     };
     renderFeed('activity', data, { immediate: true, navigate });
     materializePills();
     renderFeed('activity', data, { immediate: true, navigate });
     materializePills();
 
-    document.querySelector('.proj-pill[data-target]').click();
+    document.querySelector('.proj-pill[data-target-channel]').click();
     expect(navigate).toHaveBeenCalledOnce();
     expect(navigate).toHaveBeenCalledWith('explorer');
   });

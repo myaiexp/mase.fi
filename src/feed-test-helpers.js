@@ -22,7 +22,7 @@ export function makeData(n, perDay = 30) {
   for (let i = 0; i < n; i++) {
     const day = String(1 + Math.floor(i / perDay)).padStart(2, '0');
     const min = String(i % perDay).padStart(2, '0');
-    entries.push({ ch: 'activity', cat: 'log', date: `2026-06-${day}T10:${min}`, nick: 'git', text: 'commit ' + i });
+    entries.push({ channel: 'activity', category: 'log', date: `2026-06-${day}T10:${min}`, nick: 'git', text: 'commit ' + i });
   }
   return { entries };
 }

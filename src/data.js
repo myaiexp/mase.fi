@@ -31,8 +31,8 @@ function emptyData(demos) {
  *   { meta, projects, entries, demos, stats, hasArchive, archiveLoaded }
  *
  * The real /updates.json carries a different shape — see docs/content-pipeline.md — so we map here.
- *  - entry.category → cat
- *  - entry.project (slug) → ch (via project.slug or project.channel match)
+ *  - entry.category → category
+ *  - entry.project (slug) → channel / projectSlug / projectChannel (via project.slug or project.channel match)
  *  - entry.text || entry.summary → text
  *  - project.heat is computed from last-30d entry count, normalized 0..1
  *  - project.tag, project.links don't exist live — we synthesize: tag = "" (dropped chip), links = [project.url]
@@ -169,7 +169,7 @@ function normalizeProjects(rawProjects, counts, lastActivity) {
 /**
  * Normalize raw entries into the UI shape (normalizeEntry per row), drop
  * unroutable entries, and sort by date ascending. Entries keep the project's
- * own `ch`; the #activity firehose re-selects all `log` entries separately in
+ * own `channel`; the #activity firehose re-selects all `log` entries separately in
  * entriesFor(), so there's no duplication to strip here.
  * Pure over (rawEntries, slugToChannel).
  */
@@ -188,12 +188,12 @@ function normalizeEntries(rawEntries, slugToChannel) {
  */
 export function entriesFor(channelId, data) {
   if (channelId === 'home') {
-    return data.entries.filter((e) => e.cat === 'daily');
+    return data.entries.filter((e) => e.category === 'daily');
   }
   if (channelId === 'activity') {
-    return data.entries.filter((e) => e.cat === 'log');
+    return data.entries.filter((e) => e.category === 'log');
   }
-  return data.entries.filter((e) => e.ch === channelId && e.cat !== 'log');
+  return data.entries.filter((e) => e.channel === channelId && e.category !== 'log');
 }
 
 /**
@@ -218,7 +218,7 @@ export function logStats(data, days = 28) {
   let nonLog = 0;
   let last = null;
   for (const e of data.entries) {
-    if (e.cat !== 'log') {
+    if (e.category !== 'log') {
       nonLog++;
       continue;
     }
@@ -262,7 +262,7 @@ function allHistoryLogs(data, counted) {
  * keyed by slug, then by channel.
  */
 export function commitsForProject(project, data) {
-  const inMemory = data.entries.filter((e) => e.ch === project.channel && e.cat === 'log').length;
+  const inMemory = data.entries.filter((e) => e.channel === project.channel && e.category === 'log').length;
   if (data.archiveLoaded) return inMemory;
   const archived = data.stats?.archivedByProject;
   if (archived) {

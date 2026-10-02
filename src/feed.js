@@ -62,12 +62,12 @@ function populateRow(row, e, channelId) {
 
   row.replaceChildren(ts, nick, msg);
   row.dataset.raw = e.text;
-  if (channelId === 'activity' && e.project) {
-    row.dataset.project = e.project;
+  if (channelId === 'activity' && e.projectSlug) {
+    row.dataset.projectSlug = e.projectSlug;
     // Mapped chips are real links into the sidebar's channel list; unmapped
     // chips (slugs without a sidebar channel) render as labels. feed-layout
     // reads this to pick the right styling and click affordance.
-    if (e.mappedChannel) row.dataset.target = e.mappedChannel;
+    if (e.projectChannel) row.dataset.targetChannel = e.projectChannel;
   }
 }
 
@@ -96,7 +96,7 @@ function buildRows(entries, channelId) {
       lastDay = d;
     }
     const row = document.createElement('div');
-    row.className = 'feed-row cat-' + e.cat;
+    row.className = 'feed-row cat-' + e.category;
     populateRow(row, e, channelId);
     frag.appendChild(row);
     rowEls.push({ row, entry: e });
@@ -225,19 +225,19 @@ function dropSentinel(state, sentinel) {
   sentinel.remove();
 }
 
-// Click-delegate proj-pill chips that carry a data-target — those are the
+// Click-delegate proj-pill chips that carry a data-target-channel — those are the
 // chips whose slug resolves to a sidebar channel. Unmapped chips have no
-// data-target and fall through to no-op. One listener per feed element.
+// data-target-channel and fall through to no-op. One listener per feed element.
 // navigate is injected by the caller (channels.js) rather than imported, so the
 // feed doesn't take an import edge back into the routing orchestrator.
 function ensureChipNav($feed, navigate) {
   if (chipNavWired.has($feed)) return;
   chipNavWired.add($feed);
   $feed.addEventListener('click', (e) => {
-    const chip = e.target.closest('.proj-pill[data-target]');
+    const chip = e.target.closest('.proj-pill[data-target-channel]');
     if (!chip || !$feed.contains(chip)) return;
     e.preventDefault();
-    navigate?.(chip.dataset.target);
+    navigate?.(chip.dataset.targetChannel);
   });
 }
 

@@ -50,9 +50,9 @@ describe('cardHead', () => {
   });
 });
 
-// A normalized entry matching data.js fetchData() output: { ch, cat, date, nick, text }.
+// A normalized entry matching data.js fetchData() output: { channel, category, date, nick, text }.
 function logEntry(extra = {}) {
-  return { ch: 'activity', cat: 'log', date: '2026-01-01T08:00', nick: 'git', text: 't', ...extra };
+  return { channel: 'activity', category: 'log', date: '2026-01-01T08:00', nick: 'git', text: 't', ...extra };
 }
 
 // ---- renderPinned: home --------------------------------------------------
@@ -62,8 +62,8 @@ describe('renderPinned — home', () => {
     const data = {
       projects: [{ channel: 'explorer' }, { channel: 'porssi' }],
       entries: [
-        logEntry({ date: '2026-01-01T08:00', project: 'explorer' }),
-        logEntry({ date: '2026-03-20T09:00', project: 'porssi' }), // newest → last push
+        logEntry({ date: '2026-01-01T08:00', projectSlug: 'explorer' }),
+        logEntry({ date: '2026-03-20T09:00', projectSlug: 'porssi' }), // newest → last push
       ],
     };
     renderPinned('home', data);
@@ -85,7 +85,7 @@ describe('renderPinned — home', () => {
   it('escapes the last-push project name instead of injecting it', () => {
     const data = {
       projects: [{ channel: 'x' }],
-      entries: [logEntry({ date: '2026-05-01T08:00', project: '<script>alert(1)</script>' })],
+      entries: [logEntry({ date: '2026-05-01T08:00', projectSlug: '<script>alert(1)</script>' })],
     };
     renderPinned('home', data);
     expect(pinnedEl().querySelector('script')).toBeNull();
