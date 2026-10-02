@@ -21,7 +21,7 @@ package-lock.json
 bun.lock
 bun.lockb
 
-# Dev-only fixture; production updates.json lives in nginx webroot
+# Dev-only fixture; production updates.json is /var/lib/mase-fi/updates.json (nginx alias)
 public/updates.json
 
 # Editor directories and files

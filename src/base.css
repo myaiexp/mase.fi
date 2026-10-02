@@ -16,7 +16,7 @@
    (400/500/600/700) are all real instances of the one file: no synthesis, no second
    request. The ?v= is the file's content hash — the only versioned URL on this host,
    because a font never changes without its bytes changing, and without it every page
-   view revalidated both old files (see CLAUDE.md, cross-origin caching contract). */
+   view revalidated both old files (see docs/shared-assets.md). */
 @font-face {
   font-family: 'JetBrains Mono';
   src: url('https://mase.fi/fonts/jetbrains-mono.woff2?v=c969eaf0') format('woff2');
