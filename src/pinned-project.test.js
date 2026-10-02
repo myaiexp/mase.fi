@@ -27,8 +27,8 @@ function logEntry(extra = {}) {
 }
 
 describe('renderPinned — project', () => {
-  // demos defaults to [] to mirror fetchData's canonical shape (always present).
-  const projectData = (project, entries = [], demos = []) => ({ projects: [project], entries, demos });
+  // demos and stats mirror fetchData's canonical shape (always present).
+  const projectData = (project, entries = [], demos = []) => ({ projects: [project], entries, demos, stats: {} });
 
   it('renders a project card with commits, heat, status, description and links', () => {
     const project = {

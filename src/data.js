@@ -233,8 +233,8 @@ export function logStats(data, days = 28) {
 //     snapshot; else counted (an uncompacted file holds every row)
 function allHistoryLogs(data, counted) {
   if (data.archiveLoaded) return counted;
-  if (Number.isFinite(data.stats?.archivedLogs)) return data.stats.archivedLogs + counted;
-  if (Number.isFinite(data.stats?.totalCommits)) return data.stats.totalCommits;
+  if (Number.isFinite(data.stats.archivedLogs)) return data.stats.archivedLogs + counted;
+  if (Number.isFinite(data.stats.totalCommits)) return data.stats.totalCommits;
   return counted;
 }
 
@@ -250,7 +250,7 @@ function allHistoryLogs(data, counted) {
 export function commitsForProject(project, data) {
   const inMemory = data.entries.filter((e) => e.channel === project.channel && e.category === 'log').length;
   if (data.archiveLoaded) return inMemory;
-  const archived = data.stats?.archivedByProject;
+  const archived = data.stats.archivedByProject;
   if (archived) {
     let total = inMemory;
     for (const [key, n] of Object.entries(archived)) {
@@ -258,7 +258,7 @@ export function commitsForProject(project, data) {
     }
     return total;
   }
-  const byProject = data.stats?.commitsByProject;
+  const byProject = data.stats.commitsByProject;
   if (Number.isFinite(byProject?.[project.slug])) return byProject[project.slug];
   if (Number.isFinite(byProject?.[project.channel])) return byProject[project.channel];
   return inMemory;

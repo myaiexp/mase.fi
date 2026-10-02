@@ -169,8 +169,9 @@ function revealOlder($feed, state, sentinel) {
   const nextShown = Math.min(shown + WINDOW_SIZE, entries.length);
   const older = entries.slice(entries.length - nextShown, entries.length - shown);
   // The day the current window opens on, and its (now-leading) day header — used
-  // to dedup the seam when the older batch ends on that same calendar day.
-  const seamDay = dayOf(entries[entries.length - shown].date);
+  // to dedup the seam when the older batch ends on that same calendar day. An
+  // empty window (#activity with every log archived) has no seam.
+  const seamDay = shown > 0 ? dayOf(entries[entries.length - shown].date) : null;
   const seamHeader = $feed.querySelector('.feed-day');
 
   const { frag, rowEls } = buildRows(older, channelId);
@@ -179,7 +180,7 @@ function revealOlder($feed, state, sentinel) {
   $feed.insertBefore(frag, sentinel.nextSibling);
   // Seam dedup: if the older batch's newest entry shares the window's opening day,
   // that day's header now appears twice — drop the window's (now mid-day) one.
-  if (dayOf(older[older.length - 1].date) === seamDay) seamHeader?.remove();
+  if (seamDay !== null && dayOf(older[older.length - 1].date) === seamDay) seamHeader?.remove();
 
   // populateRow leaves .msg empty; wrapping grows the rows. Lay them out
   // before reading the new scrollHeight, otherwise the compensation under-shoots.
@@ -198,7 +199,7 @@ function revealOlder($feed, state, sentinel) {
 // render; any other channel has nothing older, so the sentinel is retired.
 function onWindowExhausted($feed, state, sentinel) {
   const { channelId, data } = state;
-  if (channelId !== 'activity' || !data?.hasArchive || state.archiveSettled) {
+  if (channelId !== 'activity' || !data.hasArchive || state.archiveSettled) {
     dropSentinel(state, sentinel);
     return;
   }
@@ -216,6 +217,11 @@ function onWindowExhausted($feed, state, sentinel) {
     state.entries = entriesFor(channelId, data);
     if (state.shown < state.entries.length) revealOlder($feed, state, sentinel);
     else dropSentinel(state, sentinel);
+  }).catch((err) => {
+    // A render bug past the merge: retire the sentinel so every later
+    // intersection does not rethrow, and leave a trace.
+    console.warn('renderFeed: failed to reveal archived rows', err);
+    dropSentinel(state, sentinel);
   });
 }
 

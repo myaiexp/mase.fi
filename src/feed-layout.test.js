@@ -63,7 +63,6 @@ describe('layoutRow — normal (pretext) path', () => {
     const row = makeRow({ raw: 'shipped a thing', project: 'explorer', target: '/explorer', feature: true });
     const msg = row.querySelector('.msg');
     msg.textContent = 'stale content'; // proves replaceChildren() wipes prior content
-    msg.dataset.searchOn = '1'; // proves the searchOn flag is cleared
     document.body.appendChild(row);
 
     // buildItems for a feature+project row -> [ '#explorer', body ]
@@ -87,7 +86,6 @@ describe('layoutRow — normal (pretext) path', () => {
     // body rendered as a bare text node inside the line (no wrapper element)
     expect(msg.textContent).toContain('shipped a thing');
     expect(msg.textContent).not.toContain('stale content');
-    expect(msg.dataset.searchOn).toBeUndefined();
 
     // pretext fed the buildItems output at the requested width
     expect(prepareRichInline).toHaveBeenCalledTimes(1);

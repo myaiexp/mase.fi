@@ -99,10 +99,9 @@ function pinnedActivity(data) {
   data.entries.forEach(e => { catCounts[e.category] = (catCounts[e.category] || 0) + 1; });
   const logEntries = data.entries.filter(e => e.category === 'log');
   let range = '—';
-  const statsFirst = typeof data.stats?.logFirst === 'string' ? data.stats.logFirst : '';
-  const statsLast = typeof data.stats?.logLast === 'string' ? data.stats.logLast : '';
-  if (statsFirst && statsLast) {
-    range = escapeHtml(statsFirst) + ' → ' + escapeHtml(statsLast);
+  const { logFirst, logLast } = data.stats;
+  if (logFirst && logLast) {
+    range = escapeHtml(logFirst) + ' → ' + escapeHtml(logLast);
   } else if (logEntries.length) {
     range = escapeHtml(dayOf(logEntries[0].date)) + ' → ' +
       escapeHtml(dayOf(logEntries[logEntries.length - 1].date));
@@ -151,7 +150,7 @@ function heroLineHtml(id, data) {
   } else {
     const project = data.projects.find(p => p.channel === id);
     if (!project) return '';
-    const link = project.links?.[0];
+    const link = project.links[0];
     parts = [
       demoLinkHtml(id, data.demos),
       link ? '<a href="' + escapeHtml(link.href) + '">' + escapeHtml(link.label) + '</a>' : '',

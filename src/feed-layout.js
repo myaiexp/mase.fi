@@ -9,13 +9,14 @@ import {
 const CHIP_GAP_PX = 4;
 
 // Build fragment items for one row from the dataset attrs we stash at render time.
+// `kind` is ours, not pretext's: it tells renderFragment which item is the chip.
 function buildItems(row, font) {
   const items = [];
   const text = row.dataset.raw || '';
   const project = row.dataset.projectSlug || '';
 
   if (project) {
-    items.push({ text: '#' + project, font, break: 'never', extraWidth: CHIP_GAP_PX });
+    items.push({ kind: 'chip', text: '#' + project, font, break: 'never', extraWidth: CHIP_GAP_PX });
   }
   items.push({ text, font });
   return items;
@@ -27,7 +28,7 @@ function buildItems(row, font) {
 function renderFragment(parent, frag, items, chipTarget) {
   const item = items[frag.itemIndex];
   let el;
-  if (item.break === 'never' && item.text.startsWith('#')) {
+  if (item.kind === 'chip') {
     el = document.createElement('span');
     el.className = 'proj-pill';
     el.textContent = frag.text;
@@ -64,7 +65,7 @@ export function layoutRow(row, msgWidth, font) {
   const msg = row.querySelector('.msg');
   if (!msg) return;
   const items = buildItems(row, font);
-  if (!items.length || !items.some(i => i.text)) {
+  if (!items.some(i => i.text)) {
     msg.textContent = '';
     return;
   }
@@ -91,7 +92,6 @@ export function layoutRow(row, msgWidth, font) {
     frag.appendChild(lineEl);
   });
   msg.replaceChildren(frag);
-  delete msg.dataset.searchOn;
 }
 
 /** Compute the font CSS shorthand to feed pretext, plus the .msg column width.

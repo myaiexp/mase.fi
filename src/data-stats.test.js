@@ -3,8 +3,9 @@ import { describe, it, expect } from 'vitest';
 import { logStats, commitsForProject } from './data.js';
 import { entry } from './data-test-helpers.js';
 
+// stats is always present on fetchData's output, possibly empty.
 function dataWith(entries) {
-  return { entries };
+  return { entries, stats: {} };
 }
 
 // ---- logStats.totalCommits -----------------------------------------------

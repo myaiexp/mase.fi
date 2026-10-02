@@ -48,7 +48,7 @@ async function fetchAndMerge(data) {
  * No-op when there is no archive or it was already merged.
  */
 export function loadArchive(data) {
-  if (!data?.hasArchive || data.archiveLoaded) return Promise.resolve(data);
+  if (!data.hasArchive || data.archiveLoaded) return Promise.resolve(data);
   let pending = inflight.get(data);
   if (!pending) {
     pending = fetchAndMerge(data).finally(() => inflight.delete(data));

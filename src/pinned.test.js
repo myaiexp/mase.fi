@@ -60,6 +60,7 @@ function logEntry(extra = {}) {
 describe('renderPinned — home', () => {
   it('renders the home card with project count, commit total and last-push project', () => {
     const data = {
+      stats: {},
       projects: [{ channel: 'explorer' }, { channel: 'porssi' }],
       entries: [
         logEntry({ date: '2026-01-01T08:00', projectSlug: 'explorer' }),
@@ -75,7 +76,7 @@ describe('renderPinned — home', () => {
   });
 
   it('falls back to an em-dash when there is no last push', () => {
-    renderPinned('home', { projects: [], entries: [] });
+    renderPinned('home', { projects: [], entries: [], stats: {} });
     const html = pinnedEl().innerHTML;
     expect(html).toContain('0 active');
     expect(html).toContain('0 in feed');
@@ -84,6 +85,7 @@ describe('renderPinned — home', () => {
 
   it('escapes the last-push project name instead of injecting it', () => {
     const data = {
+      stats: {},
       projects: [{ channel: 'x' }],
       entries: [logEntry({ date: '2026-05-01T08:00', projectSlug: '<script>alert(1)</script>' })],
     };
@@ -98,7 +100,7 @@ describe('renderPinned — home', () => {
 
 describe('renderPinned — unmatched channel', () => {
   it('renders nothing for a channel that is neither home/activity nor a project', () => {
-    renderPinned('does-not-exist', { projects: [], entries: [] });
+    renderPinned('does-not-exist', { projects: [], entries: [], stats: {} });
     expect(pinnedEl().innerHTML).toBe('');
   });
 });
@@ -108,13 +110,13 @@ describe('renderPinned — beam teardown', () => {
     const unmount = vi.spyOn(beam, 'unmountBeam');
     const mount = vi.spyOn(beam, 'mountBeam');
 
-    renderPinned('home', { projects: [], entries: [] });
+    renderPinned('home', { projects: [], entries: [], stats: {} });
     expect(unmount).toHaveBeenCalled();
     expect(mount).toHaveBeenCalled();
 
     unmount.mockClear();
     mount.mockClear();
-    renderPinned('activity', { projects: [], entries: [] });
+    renderPinned('activity', { projects: [], entries: [], stats: {} });
     expect(unmount).toHaveBeenCalled();
     expect(mount).not.toHaveBeenCalled();
 

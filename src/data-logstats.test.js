@@ -4,8 +4,9 @@ import { describe, it, expect } from 'vitest';
 import { logStats } from './data.js';
 import { entry } from './data-test-helpers.js';
 
+// stats is always present on fetchData's output, possibly empty.
 function dataWith(entries) {
-  return { entries };
+  return { entries, stats: {} };
 }
 
 // Normalized date string "YYYY-MM-DDTHH:MM" for `offsetDays` from today's UTC

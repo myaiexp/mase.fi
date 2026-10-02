@@ -59,6 +59,24 @@ describe('renderFeed archive lazy-load', () => {
     expect(data.archiveLoaded).toBe(true);
   });
 
+  it('shows archived rows when the hot window holds no logs at all', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({ entries: [{ category: 'log', project: 'helm', date: '2026-01-01T10:00', text: 'archived-only' }] }),
+    }));
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const data = archiveData(0);
+    render(data);
+    expect(rows().length).toBe(0);
+    expect(sentinel()).toBeTruthy();
+    ioInstances.at(-1).fire(); // nothing in memory → straight to the archive fetch
+    await vi.waitFor(() => {
+      expect(rows().map((r) => r.dataset.raw)).toEqual(['archived-only']);
+    });
+    expect(sentinel()).toBeNull();
+    expect(warn).not.toHaveBeenCalled();
+  });
+
   it('shows archive rows in a render that began while another render was fetching', async () => {
     let release;
     const fetchMock = vi.fn(() => new Promise((resolve) => { release = resolve; }));

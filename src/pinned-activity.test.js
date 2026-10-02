@@ -29,6 +29,7 @@ function logEntry(extra = {}) {
 describe('renderPinned — activity', () => {
   it('renders the activity card with the total entry count and a log date range', () => {
     const data = {
+      stats: {},
       projects: [],
       entries: [
         logEntry({ category: 'log', date: '2026-01-01T08:00' }),
@@ -62,7 +63,7 @@ describe('renderPinned — activity', () => {
   });
 
   it('shows an em-dash range when there are no log entries', () => {
-    renderPinned('activity', { projects: [], entries: [] });
+    renderPinned('activity', { projects: [], entries: [], stats: {} });
     const html = pinnedEl().innerHTML;
     expect(html).toContain('0 entries');
     expect(html).toContain('<dt>range</dt><dd>—</dd>');
@@ -81,6 +82,7 @@ describe('renderPinned — activity', () => {
 
   it('shows a recent rate computed as average commits per active day (~N/day)', () => {
     const data = {
+      stats: {},
       projects: [],
       entries: [
         // 4 commits one recent day + 2 another recent day → 6 / 2 active days = ~3.
@@ -98,6 +100,7 @@ describe('renderPinned — activity', () => {
 
   it('shows an em-dash rate when there is no recent (last-28d) activity', () => {
     const data = {
+      stats: {},
       projects: [],
       // Older than the 28-day window → no active days → '—', never a stale number.
       entries: [logEntry({ category: 'log', date: utcNoonDaysAgo(60) })],
