@@ -1,4 +1,5 @@
 // Turn a project.url into a single {label, href} or null (scheme-safe)
+import { sameOriginPath } from './same-origin.js';
 
 // Origin used to resolve schemeless project URLs. Browser: the page origin.
 // Node tests (no `location`): mase.fi, the only origin this module ships for.
@@ -20,13 +21,7 @@ export function projectLink(url) {
     }
     return null;
   } catch {
-    try {
-      const origin = pageOrigin();
-      const u = new URL(url, origin);
-      if (u.origin !== new URL(origin).origin) return null;
-      return { label: 'open', href: u.pathname + u.search };
-    } catch {
-      return null;
-    }
+    const href = sameOriginPath(url, pageOrigin());
+    return href ? { label: 'open', href } : null;
   }
 }

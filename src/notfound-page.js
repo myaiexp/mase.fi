@@ -2,7 +2,9 @@
 // Pure matching logic lives in notfound.js. Served as /404.html via nginx error_page,
 // so location.pathname is the path the visitor actually typed — except when the page
 // is opened as /404.html itself, where ?p=/some/path previews a typed path.
-import { parentPrefixes, isJunkPath, buildRoutes, fuzzyCandidates, decide, reasonFor, sameOriginPath, isSafeRedirect } from './notfound.js';
+import { parentPrefixes, isJunkPath, buildRoutes, fuzzyCandidates, decide, reasonFor, isSafeRedirect } from './notfound.js';
+import { sameOriginPath } from './same-origin.js';
+import { fetchJson, fetchWithTimeout } from './fetch-json.js';
 
 const $ = (id) => document.getElementById(id);
 const prefersReducedMotion = () => matchMedia('(prefers-reduced-motion: reduce)').matches;
@@ -28,14 +30,10 @@ function safeHref(target) {
 }
 
 async function probeHead(url, ms = 1500) {
-  const ctl = new AbortController();
-  const t = setTimeout(() => ctl.abort(), ms);
   try {
-    return await fetch(url, { method: 'HEAD', redirect: 'follow', signal: ctl.signal });
+    return await fetchWithTimeout(url, { method: 'HEAD', redirect: 'follow' }, ms);
   } catch {
     return null;
-  } finally {
-    clearTimeout(t);
   }
 }
 
@@ -51,9 +49,7 @@ export async function probePrefixes(path) {
 
 async function loadRoutes() {
   try {
-    const res = await fetch('/updates.json', { signal: AbortSignal.timeout(1500) });
-    if (!res.ok) throw new Error(String(res.status));
-    return buildRoutes(await res.json());
+    return buildRoutes(await fetchJson('/updates.json', 1500));
   } catch {
     return buildRoutes(null);
   }
