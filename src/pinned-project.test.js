@@ -21,9 +21,9 @@ afterEach(() => {
 
 const pinnedEl = () => document.getElementById('pinned');
 
-// A normalized entry matching data.js fetchData() output: { ch, cat, date, nick, text }.
+// A normalized entry matching data.js fetchData() output: { channel, category, date, nick, text }.
 function logEntry(extra = {}) {
-  return { ch: 'activity', cat: 'log', date: '2026-01-01T08:00', nick: 'git', text: 't', ...extra };
+  return { channel: 'activity', category: 'log', date: '2026-01-01T08:00', nick: 'git', text: 't', ...extra };
 }
 
 describe('renderPinned — project', () => {
@@ -38,9 +38,9 @@ describe('renderPinned — project', () => {
       links: [{ href: 'https://mase.fi/explorer', label: 'mase.fi' }],
     };
     const data = projectData(project, [
-      logEntry({ ch: 'explorer' }),
-      logEntry({ ch: 'explorer' }),
-      logEntry({ ch: 'porssi' }), // different channel — must not be counted
+      logEntry({ channel: 'explorer' }),
+      logEntry({ channel: 'explorer' }),
+      logEntry({ channel: 'porssi' }), // different channel — must not be counted
     ]);
     renderPinned('explorer', data);
     const html = pinnedEl().innerHTML;
@@ -61,7 +61,7 @@ describe('renderPinned — project', () => {
       description: 'desc',
       links: [],
     };
-    const data = projectData(project, [logEntry({ ch: 'explorer' })]);
+    const data = projectData(project, [logEntry({ channel: 'explorer' })]);
     data.stats = { commitsByProject: { explorer: 42 } };
     renderPinned('explorer', data);
     expect(pinnedEl().innerHTML).toContain('42 commits in feed');

@@ -12,7 +12,7 @@ const CHIP_GAP_PX = 4;
 function buildItems(row, font) {
   const items = [];
   const text = row.dataset.raw || '';
-  const project = row.dataset.project || '';
+  const project = row.dataset.projectSlug || '';
 
   if (project) {
     items.push({ text: '#' + project, font, break: 'never', extraWidth: CHIP_GAP_PX });
@@ -31,7 +31,7 @@ function renderFragment(parent, frag, items, chipTarget) {
     el = document.createElement('span');
     el.className = 'proj-pill';
     el.textContent = frag.text;
-    if (chipTarget) el.dataset.target = chipTarget;
+    if (chipTarget) el.dataset.targetChannel = chipTarget;
   } else if (frag.gapBefore > 0) {
     el = document.createElement('span');
     el.textContent = frag.text;
@@ -48,11 +48,11 @@ function renderFragment(parent, frag, items, chipTarget) {
 // DOM fallback when pretext can't be invoked yet (zero width, layout failure).
 function renderFallback(msg, row) {
   msg.textContent = '';
-  if (row.dataset.project) {
+  if (row.dataset.projectSlug) {
     const pill = document.createElement('span');
     pill.className = 'proj-pill';
-    pill.textContent = '#' + row.dataset.project;
-    if (row.dataset.target) pill.dataset.target = row.dataset.target;
+    pill.textContent = '#' + row.dataset.projectSlug;
+    if (row.dataset.targetChannel) pill.dataset.targetChannel = row.dataset.targetChannel;
     msg.appendChild(pill);
   }
   msg.appendChild(document.createTextNode(row.dataset.raw || ''));
@@ -81,7 +81,7 @@ export function layoutRow(row, msgWidth, font) {
     return;
   }
 
-  const chipTarget = row.dataset.target || null;
+  const chipTarget = row.dataset.targetChannel || null;
   const frag = document.createDocumentFragment();
   walkRichInlineLineRanges(prepared, msgWidth, (range) => {
     const line = materializeRichInlineLineRange(prepared, range);

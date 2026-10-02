@@ -98,11 +98,11 @@
   font-weight: 500;
 }
 /* Mapped chips resolve to a sidebar channel — they navigate on click. */
-.feed-row .proj-pill[data-target] {
+.feed-row .proj-pill[data-target-channel] {
   border-bottom: 1px dashed color-mix(in oklab, var(--ch-accent) 40%, transparent);
   cursor: pointer;
 }
-.feed-row .proj-pill[data-target]:hover {
+.feed-row .proj-pill[data-target-channel]:hover {
   border-bottom-color: var(--ch-accent);
 }
 

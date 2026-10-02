@@ -21,9 +21,9 @@ afterEach(() => {
 
 const pinnedEl = () => document.getElementById('pinned');
 
-// A normalized entry matching data.js fetchData() output: { ch, cat, date, nick, text }.
+// A normalized entry matching data.js fetchData() output: { channel, category, date, nick, text }.
 function logEntry(extra = {}) {
-  return { ch: 'activity', cat: 'log', date: '2026-01-01T08:00', nick: 'git', text: 't', ...extra };
+  return { channel: 'activity', category: 'log', date: '2026-01-01T08:00', nick: 'git', text: 't', ...extra };
 }
 
 describe('renderPinned — activity', () => {
@@ -31,9 +31,9 @@ describe('renderPinned — activity', () => {
     const data = {
       projects: [],
       entries: [
-        logEntry({ cat: 'log', date: '2026-01-01T08:00' }),
-        logEntry({ cat: 'log', date: '2026-03-15T08:00' }),
-        { ch: 'home', cat: 'daily', date: '2026-02-01T08:00', nick: 'mase', text: 'd' },
+        logEntry({ category: 'log', date: '2026-01-01T08:00' }),
+        logEntry({ category: 'log', date: '2026-03-15T08:00' }),
+        { channel: 'home', category: 'daily', date: '2026-02-01T08:00', nick: 'mase', text: 'd' },
       ],
     };
     renderPinned('activity', data);
@@ -48,8 +48,8 @@ describe('renderPinned — activity', () => {
     const data = {
       projects: [],
       entries: [
-        logEntry({ cat: 'log', date: '2026-08-01T08:00' }),
-        { ch: 'home', cat: 'daily', date: '2026-08-01T08:00', nick: 'mase', text: 'd' },
+        logEntry({ category: 'log', date: '2026-08-01T08:00' }),
+        { channel: 'home', category: 'daily', date: '2026-08-01T08:00', nick: 'mase', text: 'd' },
       ],
       stats: { archivedLogs: 11735, logFirst: '2026-03-05', logLast: '2026-09-02' },
     };
@@ -84,12 +84,12 @@ describe('renderPinned — activity', () => {
       projects: [],
       entries: [
         // 4 commits one recent day + 2 another recent day → 6 / 2 active days = ~3.
-        logEntry({ cat: 'log', date: utcNoonDaysAgo(3) }),
-        logEntry({ cat: 'log', date: utcNoonDaysAgo(3) }),
-        logEntry({ cat: 'log', date: utcNoonDaysAgo(3) }),
-        logEntry({ cat: 'log', date: utcNoonDaysAgo(3) }),
-        logEntry({ cat: 'log', date: utcNoonDaysAgo(7) }),
-        logEntry({ cat: 'log', date: utcNoonDaysAgo(7) }),
+        logEntry({ category: 'log', date: utcNoonDaysAgo(3) }),
+        logEntry({ category: 'log', date: utcNoonDaysAgo(3) }),
+        logEntry({ category: 'log', date: utcNoonDaysAgo(3) }),
+        logEntry({ category: 'log', date: utcNoonDaysAgo(3) }),
+        logEntry({ category: 'log', date: utcNoonDaysAgo(7) }),
+        logEntry({ category: 'log', date: utcNoonDaysAgo(7) }),
       ],
     };
     renderPinned('activity', data);
@@ -100,7 +100,7 @@ describe('renderPinned — activity', () => {
     const data = {
       projects: [],
       // Older than the 28-day window → no active days → '—', never a stale number.
-      entries: [logEntry({ cat: 'log', date: utcNoonDaysAgo(60) })],
+      entries: [logEntry({ category: 'log', date: utcNoonDaysAgo(60) })],
     };
     renderPinned('activity', data);
     const html = pinnedEl().innerHTML;

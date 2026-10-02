@@ -59,7 +59,7 @@ function pinnedHome(data) {
   // Every dynamic value (date slices + project) is escapeHtml'd; the accent span
   // is a static wrapper.
   const lastStr = last
-    ? `${escapeHtml(dayOf(last.date))} \xb7 ${escapeHtml(timeOf(last.date))} \xb7 <span class="accent">${escapeHtml(last.project || '—')}</span>`
+    ? `${escapeHtml(dayOf(last.date))} \xb7 ${escapeHtml(timeOf(last.date))} \xb7 <span class="accent">${escapeHtml(last.projectSlug || '—')}</span>`
     : '—';
   return pinCard({
     meta: [['modes', '+ntr'], ['users', '1'], ['since', '2018']],
@@ -97,8 +97,8 @@ function pinnedProject(p, data) {
 
 function pinnedActivity(data) {
   const catCounts = { log: 0, feature: 0, daily: 0, project: 0 };
-  data.entries.forEach(e => { catCounts[e.cat] = (catCounts[e.cat] || 0) + 1; });
-  const logEntries = data.entries.filter(e => e.cat === 'log');
+  data.entries.forEach(e => { catCounts[e.category] = (catCounts[e.category] || 0) + 1; });
+  const logEntries = data.entries.filter(e => e.category === 'log');
   let range = '—';
   const statsFirst = typeof data.stats?.logFirst === 'string' ? data.stats.logFirst : '';
   const statsLast = typeof data.stats?.logLast === 'string' ? data.stats.logLast : '';

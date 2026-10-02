@@ -30,7 +30,7 @@ function addRow({ raw, project = '', feature = false, lines }) {
   const row = document.createElement('div');
   row.className = `feed-row cat-${feature ? 'feature' : 'log'}`;
   row.dataset.raw = raw;
-  if (project) row.dataset.project = project;
+  if (project) row.dataset.projectSlug = project;
   const msg = document.createElement('div');
   msg.className = 'msg';
   row.append(msg);
