@@ -1,5 +1,6 @@
 // Golden-file tests for mase-fi-update: prepend ordering, the category-free and legacy
-// argument forms, and the malformed-JSON / bad-argument refusal paths.
+// argument forms, the malformed-JSON / bad-argument refusal paths, the per-project
+// feed embargo gate, and the symlink-safe lock file.
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { join } from 'node:path';
 import { readFileSync, writeFileSync, symlinkSync, mkdirSync, lstatSync, existsSync } from 'node:fs';

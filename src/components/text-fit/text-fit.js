@@ -28,6 +28,9 @@ class BaseTextFit extends HTMLElement {
   #mutationObs = null;
   #textEl = null;
   #fontHandler = null;
+  // The title this element last wrote itself. A title attribute that still
+  // equals it is ours to refresh; any other value came from the author.
+  #ownTitle = null;
 
   constructor() {
     super();
@@ -39,9 +42,7 @@ class BaseTextFit extends HTMLElement {
 
   connectedCallback() {
     this.#fullText = this.textContent || '';
-    if (!this.hasAttribute('title')) {
-      this.title = this.#fullText;
-    }
+    this.#syncTitle();
 
     this.#resizeObs = new ResizeObserver((entries) => {
       this.#reflow(entries[0]?.contentRect?.width);
@@ -50,9 +51,7 @@ class BaseTextFit extends HTMLElement {
 
     this.#mutationObs = new MutationObserver(() => {
       this.#fullText = this.textContent || '';
-      if (!this.hasAttribute('title')) {
-        this.title = this.#fullText;
-      }
+      this.#syncTitle();
       this.#prepared = null;
       this.#reflow();
     });
@@ -98,6 +97,15 @@ class BaseTextFit extends HTMLElement {
       console.warn('<base-text-fit>: hyphenate attribute is a no-op stub. Pretext handles pre-existing soft hyphens but cannot insert them.');
     }
     this.#reflow();
+  }
+
+  // Mirror the full text into the tooltip, unless the author set their own.
+  #syncTitle() {
+    const title = this.getAttribute('title');
+    if (title === null || title === this.#ownTitle) {
+      this.title = this.#fullText;
+      this.#ownTitle = this.#fullText;
+    }
   }
 
   #reflow(width) {

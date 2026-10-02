@@ -20,6 +20,19 @@ describe('nickColor', () => {
     expect(nickColor('alice')).toBe(nickColor('alice'));
   });
 
+  it('hashes different nicks onto different palette slots', () => {
+    // Pinned outputs: a hash collapsed to a constant would give every #home
+    // project the same colour and still pass the containment test above.
+    expect(nickColor('stranger')).toBe('#ffbe2a');
+    expect(nickColor('alice')).toBe('#fbbf24');
+    expect(new Set(['alice', 'stranger', 'toString'].map(nickColor)).size).toBe(3);
+  });
+
+  it('hashes prototype keys instead of reading them off NICK_COLORS', () => {
+    expect(nickColor('toString')).toBe('#a16207');
+    expect(nickColor('constructor')).toBe('#a16207');
+  });
+
   it('handles the empty nick without throwing', () => {
     // h stays 0, Math.abs(0) % len === 0 → first palette entry.
     expect(nickColor('')).toBe('#e8a308');

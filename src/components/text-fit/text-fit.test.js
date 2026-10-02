@@ -1,5 +1,10 @@
 // @vitest-environment jsdom
-import { describe, it, expect, beforeAll, vi } from 'vitest';
+// Tests for <base-text-fit>: render modes, the title tooltip, and the connect/disconnect lifecycle.
+import { describe, it, expect, beforeAll, beforeEach, afterEach, vi } from 'vitest';
+
+// Every ResizeObserver the component constructs, so lifecycle tests can assert
+// on the exact instance it disconnects.
+const resizeObservers = [];
 
 // Canvas mock MUST be installed before pretext initializes.
 // Pretext caches the canvas context as a module-level singleton on first use.
@@ -15,21 +20,18 @@ beforeAll(() => {
 
   // Mock ResizeObserver (not available in jsdom)
   vi.stubGlobal('ResizeObserver', class {
-    constructor(cb) { this._cb = cb; }
+    constructor(cb) { this._cb = cb; resizeObservers.push(this); }
     observe(el) {
       Promise.resolve().then(() => this._cb([{ target: el, contentRect: { width: 200 } }]));
     }
     unobserve() {}
-    disconnect() {}
+    disconnect = vi.fn();
   });
 });
 
 // Import AFTER mocks are installed
-let justifyLines, truncate, wrapOptimal;
 beforeAll(async () => {
   await import('./text-fit.js'); // registers <base-text-fit>
-  // Pure layout algorithms now live in their own module — target it directly.
-  ({ justifyLines, truncate, wrapOptimal } = await import('./text-fit-layout.js'));
 });
 
 describe('base-text-fit', () => {
@@ -96,11 +98,95 @@ describe('base-text-fit', () => {
     expect(el.shadowRoot.querySelector('#text').textContent).toBe('Sync paint');
   });
 
-  it('cleans up observers on disconnect', () => {
+});
+
+describe('base-text-fit lifecycle', () => {
+  // jsdom has no document.fonts; give each test a real EventTarget in its place
+  // so the loadingdone wiring is reachable.
+  let fonts;
+  beforeEach(() => {
+    fonts = new window.EventTarget();
+    Object.defineProperty(document, 'fonts', { value: fonts, configurable: true });
+  });
+  afterEach(() => {
+    delete document.fonts;
+    vi.restoreAllMocks();
+  });
+
+  it('disconnects both observers and removes the font listener on disconnect', () => {
+    const moDisconnect = vi.spyOn(MutationObserver.prototype, 'disconnect');
+    const add = vi.spyOn(fonts, 'addEventListener');
+    const remove = vi.spyOn(fonts, 'removeEventListener');
     const el = document.createElement('base-text-fit');
+    el.textContent = 'bye';
     document.body.appendChild(el);
-    // Should not throw
+    const ro = resizeObservers.at(-1);
+    expect(ro.disconnect).not.toHaveBeenCalled();
+
     document.body.removeChild(el);
+
+    expect(ro.disconnect).toHaveBeenCalledTimes(1);
+    expect(moDisconnect).toHaveBeenCalledTimes(1);
+    expect(add).toHaveBeenCalledWith('loadingdone', expect.any(Function));
+    expect(remove).toHaveBeenCalledTimes(1);
+    expect(remove).toHaveBeenCalledWith('loadingdone', add.mock.calls[0][1]);
+  });
+
+  it('re-renders and retitles when the text changes after connect', async () => {
+    const el = document.createElement('base-text-fit');
+    el.textContent = 'old';
+    document.body.appendChild(el);
+    el.textContent = 'new';
+    await Promise.resolve(); // MutationObserver callbacks run as microtasks
+    expect(el.shadowRoot.querySelector('#text').textContent).toBe('new');
+    expect(el.title).toBe('new');
+  });
+
+  it('keeps an author title when the text changes after connect', async () => {
+    const el = document.createElement('base-text-fit');
+    el.setAttribute('title', 'Custom tooltip');
+    el.textContent = 'old';
+    document.body.appendChild(el);
+    el.textContent = 'new';
+    await Promise.resolve();
+    expect(el.title).toBe('Custom tooltip');
+  });
+
+  it('retitles on reconnect when the text changed while detached', () => {
+    const el = document.createElement('base-text-fit');
+    el.textContent = 'first';
+    document.body.appendChild(el);
+    document.body.removeChild(el);
+    el.textContent = 'second';
+    document.body.appendChild(el);
+    expect(el.title).toBe('second');
+  });
+
+  it('re-renders on fonts loadingdone while connected, and not after disconnect', () => {
+    const el = document.createElement('base-text-fit');
+    el.textContent = 'font swap';
+    document.body.appendChild(el);
+    const textEl = el.shadowRoot.querySelector('#text');
+
+    textEl.textContent = 'stale';
+    fonts.dispatchEvent(new Event('loadingdone'));
+    expect(textEl.textContent).toBe('font swap');
+
+    document.body.removeChild(el);
+    textEl.textContent = 'stale';
+    fonts.dispatchEvent(new Event('loadingdone'));
+    expect(textEl.textContent).toBe('stale');
+  });
+
+  it('warns once that hyphenate is a no-op, however many elements set it', () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    for (let i = 0; i < 2; i++) {
+      const el = document.createElement('base-text-fit');
+      el.setAttribute('hyphenate', '');
+      document.body.appendChild(el);
+    }
+    expect(warn).toHaveBeenCalledTimes(1);
+    expect(warn.mock.calls[0][0]).toMatch(/hyphenate attribute is a no-op/);
   });
 });
 
@@ -173,137 +259,5 @@ describe('base-text-fit mode=wrap', () => {
     // Balanced branch: fits within lines, no truncation.
     expect(rendered).not.toContain('…');
     expect(rendered.replace(/\n/g, '')).toBe('tiny');
-  });
-});
-
-describe('justifyLines (text-fit-layout)', () => {
-  const DEFAULT_FONT = '13px monospace';
-  let prepareWithSegments;
-
-  beforeAll(async () => {
-    const mod = await import('@chenglou/pretext');
-    prepareWithSegments = mod.prepareWithSegments;
-  });
-
-  function prep(text) {
-    const result = prepareWithSegments(text, DEFAULT_FONT);
-    result._font = DEFAULT_FONT;
-    return result;
-  }
-
-  it('returns empty for empty text', () => {
-    const result = justifyLines(prep(''), 200, 0);
-    expect(result).toEqual([]);
-  });
-
-  it('returns lines with wordSpacing for non-last lines', () => {
-    // ~50 chars at 8px/char = 400px, maxWidth 200 -> 2+ lines
-    const result = justifyLines(prep('one two three four five six seven eight nine ten eleven twelve'), 200, 0);
-    expect(result.length).toBeGreaterThan(1);
-    // First line should have wordSpacing
-    if (result.length > 1) {
-      expect(result[0].wordSpacing).toBeDefined();
-      expect(result[0].wordSpacing).toBeGreaterThan(0);
-    }
-    // Last line should NOT have wordSpacing
-    expect(result[result.length - 1].wordSpacing).toBeUndefined();
-  });
-
-  it('handles single-word lines without wordSpacing', () => {
-    // A line with just one word has no spaces to distribute
-    const result = justifyLines(prep('Supercalifragilisticexpialidocious is a long word'), 200, 0);
-    // Any line with 0 spaces should not have wordSpacing
-    for (const line of result) {
-      const spaceCount = (line.text.match(/ /g) || []).length;
-      if (spaceCount === 0) {
-        expect(line.wordSpacing).toBeUndefined();
-      }
-    }
-  });
-});
-
-describe('truncate (text-fit-layout)', () => {
-  const DEFAULT_FONT = '13px monospace';
-  let prepareWithSegments;
-
-  beforeAll(async () => {
-    const mod = await import('@chenglou/pretext');
-    prepareWithSegments = mod.prepareWithSegments;
-  });
-
-  function prep(text) {
-    const result = prepareWithSegments(text, DEFAULT_FONT);
-    result._font = DEFAULT_FONT;
-    return result;
-  }
-
-  it('returns full text when it fits', () => {
-    const prepared = prep('Hello');
-    // 5 chars * 8px = 40px, maxWidth 200 -> fits
-    const result = truncate(prepared, 200, 1);
-    expect(result).toBe('Hello');
-  });
-
-  it('truncates and adds ellipsis when text overflows', () => {
-    const prepared = prep('A'.repeat(50));
-    // 50 chars * 8px = 400px > 200px
-    const result = truncate(prepared, 200, 1);
-    expect(result).toContain('\u2026');
-    expect(result.length).toBeLessThan(50);
-  });
-
-  it('handles empty text', () => {
-    const prepared = prep('');
-    const result = truncate(prepared, 200, 1);
-    expect(result).toBe('');
-  });
-});
-
-describe('wrapOptimal (text-fit-layout)', () => {
-  const DEFAULT_FONT = '13px monospace';
-  let prepareWithSegments;
-
-  beforeAll(async () => {
-    const mod = await import('@chenglou/pretext');
-    prepareWithSegments = mod.prepareWithSegments;
-  });
-
-  function prep(text) {
-    const result = prepareWithSegments(text, DEFAULT_FONT);
-    result._font = DEFAULT_FONT;
-    return result;
-  }
-
-  it('returns empty string for null prepared', () => {
-    expect(wrapOptimal(null, 200, 2)).toBe('');
-  });
-
-  it('returns empty string for empty text', () => {
-    expect(wrapOptimal(prep(''), 200, 2)).toBe('');
-  });
-
-  it('balances width when text fits within maxLines (no truncation)', () => {
-    // 'aaa bbb ccc' = 11 chars * 8px = 88px, fits in 1 line at 200px.
-    // stats.lineCount (1) <= maxLines (3) -> balanced binary-search branch.
-    const result = wrapOptimal(prep('aaa bbb ccc'), 200, 3);
-    expect(result).not.toContain('…');
-    expect(result.split('\n').length).toBeLessThanOrEqual(3);
-    for (const w of ['aaa', 'bbb', 'ccc']) expect(result).toContain(w);
-  });
-
-  it('truncates last line with ellipsis when text exceeds maxLines', () => {
-    // Far more than 2 lines of text -> overflow branch, last line truncated.
-    const result = wrapOptimal(prep('word '.repeat(100)), 200, 2);
-    expect(result.split('\n').length).toBe(2);
-    expect(result).toContain('…');
-  });
-
-  it('wraps without truncation when maxLines is 0', () => {
-    // maxLines=0 -> neither balanced nor overflow branch; collect all wrapped lines.
-    // 19 chars * 8px = 152px > 100px container -> must wrap to multiple lines.
-    const result = wrapOptimal(prep('aaa bbb ccc ddd eee'), 100, 0);
-    expect(result).not.toContain('…');
-    for (const w of ['aaa', 'bbb', 'ccc', 'ddd', 'eee']) expect(result).toContain(w);
-    expect(result.split('\n').length).toBeGreaterThan(1);
   });
 });

@@ -125,6 +125,25 @@ describe('base-tabs', () => {
     expect(tabs.activeIndex).toBe(2);
   });
 
+  it.each([['Enter'], [' ']])('%j commits the focused tab and fires tab-change', (key) => {
+    const { tabs } = createTabs([
+      { label: 'P' },
+      { label: 'Q' },
+    ]);
+    const bar = tabs.shadowRoot.querySelector('[role="tablist"]');
+    bar.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowRight', bubbles: true }));
+    const events = [];
+    tabs.addEventListener('tab-change', (e) => events.push(e.detail));
+
+    const press = new KeyboardEvent('keydown', { key, bubbles: true, cancelable: true });
+    bar.dispatchEvent(press);
+
+    expect(events).toEqual([{ index: 1, label: 'Q' }]);
+    expect(press.defaultPrevented).toBe(true);
+    const buttons = tabs.shadowRoot.querySelectorAll('[role="tablist"] button');
+    expect(buttons[1].getAttribute('aria-selected')).toBe('true');
+  });
+
   it('active attribute on base-tab sets initial selection', () => {
     const { tabs } = createTabs([
       { label: 'First' },

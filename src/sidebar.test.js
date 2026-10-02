@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
-// Unit tests for sidebar.js — renderChanlist()'s 5-cell heat-bar mapping and
-// setActiveChannel()'s .active class toggle.
+// Unit tests for sidebar.js — renderChanlist()'s 5-cell heat-bar mapping, click and
+// keyboard navigation, ARIA attributes and escaping, plus setActiveChannel()'s
+// active-state toggle.
 //
 // Each sidebar row renders a .heat span of 5 <b> cells; a cell is "filled" when
 // it carries the `on` class. The fill count is on = Math.max(1, round(heat * 5)),
