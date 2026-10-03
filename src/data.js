@@ -76,14 +76,14 @@ export async function fetchData() {
 
 function normalizeStats(raw) {
   if (!raw || typeof raw !== 'object') return {};
-  const totalCommits = Number(raw.totalCommits);
-  const totalEntries = Number(raw.totalEntries);
-  const archivedLogs = Number(raw.archivedLogs);
+  // No Number() coercion: it maps null, '' and false to 0, and a 0 totalCommits
+  // snapshot would win over counting the logs in memory.
+  const count = (v) => (Number.isFinite(v) ? v : undefined);
   const countMap = (m) => (m && typeof m === 'object' ? m : undefined);
   return {
-    totalCommits: Number.isFinite(totalCommits) ? totalCommits : undefined,
-    totalEntries: Number.isFinite(totalEntries) ? totalEntries : undefined,
-    archivedLogs: Number.isFinite(archivedLogs) ? archivedLogs : undefined,
+    totalCommits: count(raw.totalCommits),
+    totalEntries: count(raw.totalEntries),
+    archivedLogs: count(raw.archivedLogs),
     logFirst: typeof raw.logFirst === 'string' ? raw.logFirst : undefined,
     logLast: typeof raw.logLast === 'string' ? raw.logLast : undefined,
     commitsByProject: countMap(raw.commitsByProject),
@@ -172,7 +172,8 @@ function normalizeEntries(rawEntries, slugToChannel) {
  * Return entries for a given channel id, sorted ascending (oldest first).
  * - home     → daily summaries
  * - activity → all log entries across projects (firehose)
- * - <slug>   → entries matching that project channel (any category)
+ * - <slug>   → that project channel's non-log entries (daily + feature); its
+ *              logs appear only in #activity
  */
 export function entriesFor(channelId, data) {
   if (channelId === 'home') {

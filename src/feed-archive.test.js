@@ -140,3 +140,34 @@ describe('renderFeed when the archive fetch fails', () => {
     await vi.waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(2));
   });
 });
+
+// A throw past the merge (here entriesFor) lands in the reveal's .catch: the
+// sentinel retires so later intersections don't rethrow, and a warn is left.
+describe('renderFeed when revealing archived rows throws', () => {
+  let entriesFor;
+
+  beforeEach(async () => {
+    vi.resetModules();
+    vi.doMock('./data.js', async (importOriginal) => {
+      const real = await importOriginal();
+      entriesFor = vi.fn(real.entriesFor);
+      return { ...real, entriesFor, loadArchive: vi.fn(async () => {}) };
+    });
+    ({ renderFeed } = await import('./feed.js'));
+  });
+
+  afterEach(() => vi.doUnmock('./data.js'));
+
+  it('drops the sentinel and warns once', async () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    render(archiveData(80));
+    const io = ioInstances.at(-1);
+    entriesFor.mockImplementation(() => { throw new Error('render bug'); });
+    io.fire();
+    await vi.waitFor(() => expect(sentinel()).toBeNull());
+    expect(io.disconnected).toBe(true);
+    expect(warn).toHaveBeenCalledOnce();
+    expect(warn.mock.calls[0][0]).toBe('renderFeed: failed to reveal archived rows');
+    expect(rows().length).toBe(80);
+  });
+});

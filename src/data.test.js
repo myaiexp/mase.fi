@@ -3,7 +3,7 @@
 // logStats buckets/last in data-logstats.test.js, and project heat/recency in
 // data-heat.test.js. loadArchive tests live in data-archive.test.js.
 import { describe, it, expect, vi, afterEach } from 'vitest';
-import { fetchData, entriesFor } from './data.js';
+import { fetchData, entriesFor, logStats } from './data.js';
 import { entry, stubFetch } from './data-test-helpers.js';
 
 // ---- helpers -------------------------------------------------------------
@@ -248,6 +248,25 @@ describe('fetchData routing', () => {
     expect(data.stats.archivedByProject).toEqual({ helm: 3 });
     expect(data.hasArchive).toBe(true);
     expect(data.archiveLoaded).toBe(false);
+  });
+
+  // Number(null), Number('') and Number(false) are all 0: a coercing check would
+  // turn a null totalCommits into a 0-commit snapshot that logStats trusts.
+  it('rejects non-number stats instead of coercing them, so logStats counts in memory', async () => {
+    stubFetch({
+      projects: [],
+      entries: [{ category: 'log', project: 'helm', date: '2026-09-01T10:00', text: 'c1' }],
+      stats: {
+        totalCommits: null, totalEntries: true, archivedLogs: '',
+        logFirst: 5, logLast: false, commitsByProject: 'x', archivedByProject: null,
+      },
+    });
+    const data = await fetchData();
+    for (const key of ['totalCommits', 'totalEntries', 'archivedLogs', 'logFirst', 'logLast',
+      'commitsByProject', 'archivedByProject']) {
+      expect(data.stats[key], key).toBeUndefined();
+    }
+    expect(logStats(data).totalCommits).toBe(1);
   });
 
   it('defaults hasArchive to false when stats are absent', async () => {

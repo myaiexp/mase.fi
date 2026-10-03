@@ -211,3 +211,37 @@ describe('revealOlder lays out before scroll compensation', () => {
     expect(firstLayout).toBeLessThan(firstScroll);
   });
 });
+
+// A channel switch (immediate: false) animates only the newest MAX_JITTER rows.
+// playJitter owns the reduced-motion check, so this runs the real jitter.js and
+// reads the `.jitter` class it tags each animating row with.
+describe('renderFeed switch-time jitter', () => {
+  beforeEach(() => vi.useFakeTimers());
+  afterEach(() => {
+    vi.clearAllTimers();
+    vi.useRealTimers();
+  });
+
+  const reducedMotion = (matches) => vi.stubGlobal('matchMedia', (query) => ({ matches, media: query }));
+  const jittering = () => rows().filter((r) => r.classList.contains('jitter'));
+
+  it('jitters exactly the newest 14 rows when motion is allowed', () => {
+    reducedMotion(false);
+    renderFeed('activity', makeData(30), { navigate: () => {} });
+    expect(jittering()).toEqual(rows().slice(-14));
+    expect(jittering().at(-1).dataset.raw).toBe('commit 29');
+  });
+
+  it('jitters nothing under prefers-reduced-motion', () => {
+    reducedMotion(true);
+    renderFeed('activity', makeData(30), { navigate: () => {} });
+    expect(rows().length).toBe(30);
+    expect(jittering()).toEqual([]);
+  });
+
+  it('jitters nothing on an immediate render', () => {
+    reducedMotion(false);
+    renderFeed('activity', makeData(30), { immediate: true, navigate: () => {} });
+    expect(jittering()).toEqual([]);
+  });
+});

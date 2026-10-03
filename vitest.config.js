@@ -1,4 +1,4 @@
-// Vitest config: coverage provider + exclude test files and dist/
+// Vitest config: v8 coverage over src/ (tests and harnesses excluded) with global and per-file fail-on-drop floors
 import { defineConfig } from 'vitest/config';
 
 export default defineConfig({
@@ -19,7 +19,10 @@ export default defineConfig({
       // per file: a glob key is checked against its matches' aggregate (vitest ignores
       // perFile inside a glob entry), which would reopen the same hole.
       thresholds: {
-        lines: 93, functions: 93, statements: 92, branches: 83,
+        lines: 97, functions: 96, statements: 96, branches: 88,
+        // The feed renderer/windowing and the search + slash-command input path.
+        'src/feed.js': { lines: 98, functions: 100, statements: 97, branches: 93 },
+        'src/command.js': { lines: 98, functions: 93, statements: 94, branches: 86 },
         // Off-origin rejection and URL-scheme filtering: every branch is a safety rule.
         'src/project-link.js': { lines: 100, functions: 100, statements: 100, branches: 100 },
         'src/same-origin.js': { lines: 100, functions: 100, statements: 100, branches: 100 },
