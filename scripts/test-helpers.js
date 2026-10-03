@@ -1,6 +1,6 @@
 // Shared harness for the content-pipeline script tests.
 // Runs the REAL scripts against a throwaway updates.json fixture via their env
-// overrides (UPDATES_FILE / SHOWCASE_API / SHOWCASE_EXTRA / CLAUDE_BIN / HELM_BIN), so the
+// overrides (UPDATES_FILE / SHOWCASE_API / SHOWCASE_EXTRA / CLAUDE_BIN / HELM_BIN / NTFY_URL), so the
 // tests exercise the actual jq programs end-to-end (golden-file style) rather
 // than reimplementing them.
 import process from 'node:process';
@@ -28,31 +28,65 @@ export function readJson(file) {
   return JSON.parse(readFileSync(file, 'utf8'));
 }
 
-// Run a pipeline script under bash with env overrides. Never throws — returns
-// { status, stdout, stderr } for both success and non-zero exits so tests can
-// assert on the refusal paths (malformed JSON, bad category, lock busy).
-export function runScript(name, args = [], env = {}) {
+// Every script default below is a live resource on the VPS these suites run on.
+// Only the calling test may set them: a value inherited from the host env is
+// dropped, and an omitted one falls back to a hermetic stand-in. ARCHIVE_FILE is
+// dropped rather than defaulted so the script derives it beside UPDATES_FILE.
+const UNREACHABLE = 'http://127.0.0.1:1/';
+const hermeticDefaults = {
+  // The live /tmp/mase-updates-json.lock: a concurrent deploy would wait on us, and we on it.
+  UPDATES_LOCK: () => join(tmpdir(), `mase-fi-test-${process.pid}.lock`),
+  // The writers ask helm about feed embargoes; the stub answers "clear" for every name.
+  HELM_BIN: () => writeHelmStub(tmpdir(), { name: `mase-fi-test-helm-${process.pid}` }),
+  CLAUDE_BIN: () => writeFailingStub(tmpdir(), `mase-fi-test-claude-${process.pid}`),
+  SHOWCASE_API: () => UNREACHABLE,
+  NTFY_URL: () => UNREACHABLE,
+  NTFY_TOKEN: () => '',
+  // ntfy_send falls back to helm's .env for a token; a missing file means none.
+  HELM_ENV: () => join(tmpdir(), `mase-fi-test-${process.pid}-nonexistent.env`),
+  ARCHIVE_FILE: () => undefined,
+};
+
+// The env a pipeline script runs under: host env, Helsinki TZ, the caller's
+// overrides, and hermeticDefaults for whatever live resource the caller left out.
+export function scriptEnv(env = {}) {
   // Pin Helsinki unless the caller overrides TZ. Both pipeline scripts that
   // compute "today" also force it internally; this keeps fixtures, helpers,
   // and any future date call on the same calendar even if a host TZ leaks in
   // (e.g. `TZ=Pacific/Kiritimati vitest`). Only an explicit per-call env.TZ
   // wins over the pin.
   const merged = { ...process.env, TZ: 'Europe/Helsinki', ...env };
-  // Don't flock the live /tmp/mase-updates-json.lock from tests — a concurrent
-  // deploy would wait on us, and we would wait on it.
-  if (!merged.UPDATES_LOCK) {
-    merged.UPDATES_LOCK = join(tmpdir(), `mase-fi-test-${process.pid}.lock`);
+  for (const [key, fallback] of Object.entries(hermeticDefaults)) {
+    if (key in env) continue;
+    const value = fallback();
+    if (value === undefined) delete merged[key];
+    else merged[key] = value;
   }
-  // The writers ask helm whether the project is under a feed embargo. Never put that to
-  // the live service from a test: default to a stub that answers "clear" for every name.
-  if (!merged.HELM_BIN) {
-    merged.HELM_BIN = writeHelmStub(tmpdir(), { name: `mase-fi-test-helm-${process.pid}` });
+  return merged;
+}
+
+// Run a pipeline script under bash with env overrides. Returns { status, stdout,
+// stderr } for both success and non-zero exits so tests can assert on the refusal
+// paths (malformed JSON, bad category, lock busy). Throws only on harness misuse:
+// a call without its own UPDATES_FILE, whose script default is the live store.
+export function runScript(name, args = [], env = {}) {
+  if (!env.UPDATES_FILE) {
+    throw new Error('runScript: UPDATES_FILE must be set — the script default is the live /var/lib/mase-fi/updates.json');
   }
   const r = spawnSync('bash', [join(SCRIPTS_DIR, name), ...args], {
-    env: merged,
+    env: scriptEnv(env),
     encoding: 'utf8',
   });
   return { status: r.status, stdout: r.stdout ?? '', stderr: r.stderr ?? '' };
+}
+
+// An executable that prints to stderr and exits 1 — the default for a CLI a test
+// did not stub, so an unplanned call fails loudly instead of reaching the real one.
+function writeFailingStub(dir, name) {
+  const path = join(dir, name);
+  writeFileSync(path, `#!/usr/bin/env bash\necho "${name}: unstubbed call from a test" >&2\nexit 1\n`);
+  chmodSync(path, 0o755);
+  return path;
 }
 
 // The exact date string the scripts use for "today" (both force
