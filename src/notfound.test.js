@@ -94,6 +94,14 @@ describe('fuzzyCandidates', () => {
     expect(fuzzyCandidates('/x', routes)).toEqual([]);
     expect(fuzzyCandidates('/zzzzzz', routes)).toEqual([]);
   });
+  it('drops routes at the typed path or a parent prefix — both are known dead', () => {
+    const hrefs = (p) => fuzzyCandidates(p, routes).map((c) => c.route.href);
+    expect(hrefs('/demos/')).not.toContain('/demos');
+    expect(hrefs('/demos')).not.toContain('/demos');
+    expect(hrefs('/games//sub/')).not.toContain('/games');
+    // A different path that merely shares the segment still matches.
+    expect(hrefs('/Games')).toContain('/games');
+  });
   it('caps at three candidates', () => {
     expect(fuzzyCandidates('/games', routes).length).toBeLessThanOrEqual(3);
   });

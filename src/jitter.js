@@ -1,5 +1,6 @@
 // Modem-decode arrival animation for the last 14 feed rows
 import { scramble } from './ascii.js';
+import { prefersReducedMotion } from './motion.js';
 
 const JITTER_MS = 320;
 const STAGGER_MS = 38;
@@ -14,7 +15,7 @@ export function clearJitter() {
 
 /** Play jitter on a list of row elements. Each gets 2–3 scrambled frames before settling. */
 export function playJitter(rowEls) {
-  if (matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+  if (prefersReducedMotion()) return;
   rowEls.forEach(({ row }, i) => {
     const msgEl = row.querySelector('.msg');
     const nickEl = row.querySelector('.nick');

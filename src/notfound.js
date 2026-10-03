@@ -15,12 +15,16 @@ export const EXTRA_ROUTES = [
 const JUNK_MAX_LEN = 120;
 const JUNK_PATTERNS = [/wp-/i, /\.php\b/i, /\.env\b/i, /%2f/i, /\.asp\b/i, /\.cgi\b/i];
 
+// Query/hash dropped, duplicate and trailing slashes collapsed: '/a//b/' -> '/a/b'.
+function cleanPath(pathname) {
+  return String(pathname || '').split(/[?#]/)[0].replace(/\/+/g, '/').replace(/\/$/, '');
+}
+
 // Longest-first parent paths deeper than root: '/a/b/c' -> ['/a/b', '/a'].
 // The typed path itself is excluded (it just 404'd) and so is '/' (root always
 // exists — that is the state-3 fallback, never a "confident match").
 export function parentPrefixes(pathname, cap = 5) {
-  const clean = String(pathname || '').split(/[?#]/)[0].replace(/\/+/g, '/').replace(/\/$/, '');
-  const segs = clean.split('/').filter(Boolean);
+  const segs = cleanPath(pathname).split('/').filter(Boolean);
   const out = [];
   for (let i = segs.length - 1; i >= 1 && out.length < cap; i--) {
     out.push('/' + segs.slice(0, i).join('/'));
@@ -87,12 +91,18 @@ export function levenshtein(a, b) {
 // Score the first typed segment against every route key. The cap scales with
 // segment length — at least half the typed characters must survive — so a
 // 3-char segment can be 1 off, an 8-char one up to 4.
+// The fuzzy rung only runs once the typed path has 404'd and every parent
+// prefix has failed its probe, so a route at any of those paths is known dead:
+// suggesting it would redirect back into this page every 5s (`/demos/` with
+// no index.html matches the `/demos` route at distance 0).
 export function fuzzyCandidates(pathname, routes) {
   const seg = String(pathname || '').split('/').filter(Boolean)[0]?.toLowerCase();
   if (!seg) return [];
+  const dead = new Set([cleanPath(pathname), ...parentPrefixes(pathname)]);
   const maxD = Math.min(4, Math.floor(seg.length / 2));
   const scored = [];
   for (const r of routes) {
+    if (r.kind === 'path' && dead.has(cleanPath(r.href))) continue;
     let best = Infinity;
     for (const k of r.keys) best = Math.min(best, levenshtein(seg, k));
     if (best <= maxD) scored.push({ route: r, distance: best });

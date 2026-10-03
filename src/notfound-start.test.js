@@ -91,6 +91,35 @@ describe('start() — the matching ladder', () => {
     expect(replace).toHaveBeenCalledWith('/explorer');
   });
 
+  it('never counts down to the path that just 404\'d (EXTRA_ROUTES dir with no index)', async () => {
+    loc.pathname = '/demos/';
+    serve({ updates: { projects: [EXPLORER, GAMES] } });
+    await start();
+    expect(bigLink().getAttribute('href')).toBe('/');
+    expect($('countbox').hidden).toBe(true);
+    runOut();
+    expect(replace).not.toHaveBeenCalled();
+  });
+
+  it('never counts down to a parent prefix the probe already found dead', async () => {
+    loc.pathname = '/explorer/operator';
+    serve({ updates: { projects: [EXPLORER, GAMES] } });
+    await start();
+    expect(requests()).toContain('HEAD /explorer');
+    expect(document.querySelector('#sugg a[href="/explorer"]')).toBeNull();
+    runOut();
+    expect(replace).not.toHaveBeenCalled();
+  });
+
+  it('a project route whose deployment is down does not loop on itself', async () => {
+    loc.pathname = '/explorer';
+    serve({ updates: { projects: [{ ...EXPLORER, url: 'https://mase.fi/explorer/' }, GAMES] } });
+    await start();
+    expect(document.querySelector('#sugg a[href^="/explorer"]')).toBeNull();
+    runOut();
+    expect(replace).not.toHaveBeenCalled();
+  });
+
   it('a project that moved to a subdomain redirects to its *.mase.fi origin', async () => {
     loc.pathname = '/prospect';
     serve({ updates: { projects: [project('prospect', 'https://prospect.mase.fi', 'lead finder')] } });

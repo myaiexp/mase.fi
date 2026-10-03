@@ -25,6 +25,9 @@ export function createAutocomplete({
 }) {
   // `idx` = highlighted row; `matches` = current channel+command list.
   const selection = { idx: 0, matches: [] };
+  // Query the current list was ranked for. A new query re-ranks the rows, so
+  // the highlight returns to the top match instead of keeping a stale slot.
+  let lastQ = null;
   let $input = null;
   let $popup = null;
 
@@ -40,6 +43,7 @@ export function createAutocomplete({
     // collapsed the popup).
     selection.matches = [];
     selection.idx = 0;
+    lastQ = null;
     $popup.hidden = true;
     $popup.replaceChildren();
     collapseCombobox($input, $popup);
@@ -96,7 +100,8 @@ export function createAutocomplete({
       .slice(0, 8);
     if (!matches.length) { hide(); return; }
     selection.matches = matches;
-    selection.idx = Math.min(selection.idx, matches.length - 1);
+    selection.idx = q === lastQ ? Math.min(selection.idx, matches.length - 1) : 0;
+    lastQ = q;
     $popup.innerHTML = `
     <div class="cc-head" aria-hidden="true">
       <span>jump to channel</span>

@@ -5,9 +5,10 @@ import { initChannels, applyInitialChannel, navigate } from './channels.js';
 import { renderChanlist } from './sidebar.js';
 import { initCommand } from './command.js';
 import { initTickers } from './tickers.js';
+import { prefersReducedMotion } from './motion.js';
 import './styles/index.css';
 
-const reduced = matchMedia('(prefers-reduced-motion: reduce)').matches;
+const reduced = prefersReducedMotion();
 const dataPromise = fetchData();
 initReplayBoot();
 

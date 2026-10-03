@@ -1,5 +1,6 @@
 // Pretext-measured beam-destruction effect for the home channel ASCII LOGO
 import { prepareWithSegments, measureNaturalWidth } from '@chenglou/pretext';
+import { prefersReducedMotion } from './motion.js';
 
 const SCRAMBLE = '!@#$%&*+=<>/\\|?~^░▒▓█';
 const DECAY_RAMP = ['▓', '▒', '░', '·', ' '];
@@ -89,7 +90,7 @@ export function paintChar(span, original, dest) {
 /** Mount the beam effect over an `.ascii` element. Returns a cleanup fn. */
 export function mountBeam(asciiEl, logoText) {
   if (activeCleanup) activeCleanup();
-  if (matchMedia('(prefers-reduced-motion: reduce)').matches) {
+  if (prefersReducedMotion()) {
     asciiEl.textContent = logoText;
     return null;
   }

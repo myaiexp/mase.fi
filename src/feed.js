@@ -140,7 +140,8 @@ export function renderFeed(id, data, { immediate = false, navigate } = {}) {
   if (shown < entries.length || needsArchive) ensureWindow($feed, state, sentinel);
   else sentinel.remove();
 
-  if (immediate || matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+  // playJitter applies the reduced-motion policy itself.
+  if (immediate) return;
   const tail = rowEls.slice(-MAX_JITTER);
   playJitter(tail);
 }

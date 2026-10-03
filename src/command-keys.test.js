@@ -40,6 +40,16 @@ describe('autocomplete choose', () => {
     expect(el.value).toBe('');
   });
 
+  it('a new query drops the ArrowDown highlight: Enter takes the new top match', () => {
+    const el = type('/'); // home, explorer, activity in registry order
+    press(el, 'ArrowDown'); // highlight → explorer (row 1)
+    type('/e'); // explorer (prefix) ranks above home; a stale row 1 would be home
+    expect(items()[0].dataset.ch).toBe('explorer');
+    expect(items()[0].classList.contains('selected')).toBe(true);
+    press(el, 'Enter');
+    expect(channels.navigate).toHaveBeenCalledWith('explorer');
+  });
+
   it('clicking a hovered item navigates to that channel', () => {
     type('/o'); // matches home + explorer (both contain "o"), in registry order
     const list = items();

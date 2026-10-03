@@ -1,4 +1,5 @@
 // Channel-switch CRT scanline transition over the feed area
+import { prefersReducedMotion } from './motion.js';
 
 // Track the in-flight run's timers so a rapid re-switch can cancel both:
 //  - midTimer:   the mid-sweep content swap. If left to fire after we've already
@@ -11,7 +12,7 @@ let safetyTimer = 0;
 
 /** Play the scanline transition; calls onMid ~a third of the way in, where content should swap. */
 export function playSwitchTransition(onMid) {
-  if (matchMedia('(prefers-reduced-motion: reduce)').matches) {
+  if (prefersReducedMotion()) {
     onMid();
     return;
   }

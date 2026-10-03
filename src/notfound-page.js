@@ -5,9 +5,9 @@
 import { parentPrefixes, isJunkPath, buildRoutes, fuzzyCandidates, decide, reasonFor, isSafeRedirect } from './notfound.js';
 import { sameOriginPath } from './same-origin.js';
 import { fetchJson, fetchWithTimeout } from './fetch-json.js';
+import { prefersReducedMotion } from './motion.js';
 
 const $ = (id) => document.getElementById(id);
-const prefersReducedMotion = () => matchMedia('(prefers-reduced-motion: reduce)').matches;
 const isPreview = () => location.pathname === '/404.html';
 const PATH_CLAMP = 160;
 
