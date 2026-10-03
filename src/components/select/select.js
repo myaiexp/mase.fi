@@ -22,7 +22,6 @@ class BaseSelect extends HTMLElement {
   // calls `_selectOption` — those two stay `_`; everything else is #private.
   #open = false;
   #highlightIdx = -1;
-  #blurTimeout = null;
   #typeahead = createLetterJump();
   #triggerWrap = null;
   #observer = null;
@@ -50,7 +49,6 @@ class BaseSelect extends HTMLElement {
   disconnectedCallback() {
     removeOverlayListeners(this);
     this.#observer?.disconnect();
-    if (this.#blurTimeout) clearTimeout(this.#blurTimeout);
   }
 
   attributeChangedCallback(name) {

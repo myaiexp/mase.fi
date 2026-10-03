@@ -62,7 +62,7 @@ class BaseTextFit extends HTMLElement {
       this.#prepared = null;
       this.#reflow();
     };
-    if (typeof document !== 'undefined' && document.fonts) {
+    if (document.fonts) {
       document.fonts.addEventListener('loadingdone', this.#fontHandler);
     }
 
@@ -82,7 +82,7 @@ class BaseTextFit extends HTMLElement {
       this.#mutationObs.disconnect();
       this.#mutationObs = null;
     }
-    if (this.#fontHandler && typeof document !== 'undefined' && document.fonts) {
+    if (this.#fontHandler && document.fonts) {
       document.fonts.removeEventListener('loadingdone', this.#fontHandler);
     }
     this.#fontHandler = null;

@@ -134,7 +134,7 @@ export function truncate(prepared, maxWidth, maxLines, ellipsis = '…') {
     cursor = line.end;
   }
 
-  return maxLines > 1 ? lines.join('\n') : lines.join('');
+  return lines.join('\n');
 }
 
 // Wrap text to minimize ragged width. When it fits within maxLines, binary-
@@ -166,6 +166,6 @@ export function wrapOptimal(prepared, maxWidth, maxLines) {
     return kept.join('\n');
   }
 
-  // maxLines = 0 or text fits naturally
+  // maxLines <= 0 (no limit): plain wrap at maxWidth
   return collectLines(prepared, maxWidth).join('\n');
 }
