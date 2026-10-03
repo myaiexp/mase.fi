@@ -99,6 +99,42 @@ describe('autocomplete render', () => {
     expect(items().map((el) => el.dataset.ch)).toEqual(['home', 'shop', 'chrome']);
   });
 
+  it('caps the list at 8 rows and the header count reports the capped number', () => {
+    setChannels(registry, Array.from({ length: 10 }, (_, i) => ch(`chan${i}`)));
+    type('/');
+    expect(items()).toHaveLength(8);
+    expect(items().map((el) => el.dataset.ch)).toEqual(Array.from({ length: 8 }, (_, i) => `chan${i}`));
+    expect(cc().querySelector('kbd').textContent).toBe('8');
+  });
+
+  it('ArrowUp from the first row wraps to the last rendered row, not an unrendered match', () => {
+    setChannels(registry, Array.from({ length: 10 }, (_, i) => ch(`chan${i}`)));
+    const el = type('/');
+    el.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowUp', bubbles: true }));
+    expect(el.getAttribute('aria-activedescendant')).toBe('cc-opt-7');
+    expect(items()[7].classList.contains('selected')).toBe(true);
+  });
+
+  it('re-rendering the same query keeps the ArrowDown highlight', () => {
+    setChannels(registry, [ch('explorer'), ch('home'), ch('editor')]);
+    const el = type('/e'); // all three contain "e"
+    el.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowDown', bubbles: true }));
+    type('/e');
+    expect(el.getAttribute('aria-activedescendant')).toBe('cc-opt-1');
+    expect(items()[1].classList.contains('selected')).toBe(true);
+  });
+
+  it('re-rendering the same query clamps the highlight to a shorter list', () => {
+    setChannels(registry, [ch('explorer'), ch('home'), ch('editor')]);
+    const el = type('/e');
+    expect(items()).toHaveLength(3);
+    el.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowUp', bubbles: true })); // → row 2
+    setChannels(registry, [ch('explorer'), ch('home')]);
+    type('/e');
+    expect(items()).toHaveLength(2);
+    expect(el.getAttribute('aria-activedescendant')).toBe('cc-opt-1');
+  });
+
   it('hides the popup when nothing matches', () => {
     type('/zzz');
     expect(cc().hidden).toBe(true);
