@@ -9,10 +9,10 @@ import {
 } from './notfound-page.js';
 import { installNotFound, removeNotFound, stubReducedMotion, mountDom } from './notfound-test-helpers.js';
 
-const PLAN = { target: '/explorer', targetLabel: '/explorer', targetName: 'map explorer' };
+const PLAN = { target: '/explorer', targetLabel: '/explorer', targetCaption: 'map explorer' };
 const CANDIDATES = [
-  { route: { href: '/explorer', label: '/explorer', name: 'map explorer', kind: 'path' }, distance: 1 },
-  { route: { href: '/games', label: '/games', name: 'games', kind: 'path' }, distance: 2 },
+  { route: { href: '/explorer', label: '/explorer', caption: 'map explorer', kind: 'path' }, distance: 1 },
+  { route: { href: '/games', label: '/games', caption: 'games', kind: 'path' }, distance: 2 },
 ];
 
 let loc, replace, hrefWrites, fetchMock;

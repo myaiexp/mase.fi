@@ -65,11 +65,19 @@ describe('buildRoutes', () => {
     expect(r.filter((x) => !x.extra)).toEqual([]);
   });
   it('skips entries with missing or unparsable urls', () => {
-    expect(routes.some((r) => r.name === 'broken' || r.name === 'nourl')).toBe(false);
+    expect(routes.some((r) => r.caption === 'broken' || r.caption === 'nourl')).toBe(false);
   });
   it('appends the extra webroot routes and survives junk input', () => {
     expect(routes.some((r) => r.href === '/blog')).toBe(true);
     expect(buildRoutes(null)).toEqual(EXTRA_ROUTES.map((r) => expect.objectContaining({ href: r.href })));
+  });
+  it('captions a project route with its short desc, else its name', () => {
+    expect(routes.find((r) => r.href === '/explorer').caption).toBe('map explorer');
+    const long = buildRoutes({ projects: [{ name: 'Wander', slug: 'wander', url: 'https://mase.fi/wander', desc: 'x'.repeat(49) }] });
+    expect(long[0].caption).toBe('wander');
+  });
+  it('shows an extra route as its href, captioned by its own caption', () => {
+    expect(routes.find((r) => r.href === '/card-games')).toMatchObject({ label: '/card-games', caption: 'card games', keys: ['card-games'] });
   });
 });
 
@@ -115,7 +123,7 @@ describe('decide', () => {
   const routes = buildRoutes(UPDATES);
   it('prefix hit wins and renders as a diff', () => {
     const d = decide({
-      prefixHit: { href: '/explorer', label: '/explorer', name: 'explorer' },
+      prefixHit: { href: '/explorer', label: '/explorer', caption: 'explorer' },
       candidates: [],
       path: '/explorer/operator',
     });
@@ -129,17 +137,17 @@ describe('decide', () => {
     const d = decide({ prefixHit: null, candidates: fuzzyCandidates('/diet', routes), path: '/diet' });
     expect(d.state).toBe('confident');
     expect(d.target).toBe('https://diet.mase.fi');
-    expect(d.targetName).toMatch(/moved/);
+    expect(d.targetCaption).toMatch(/moved/);
   });
   it('ambiguous candidates render as a pick-list', () => {
     const close = [
-      { route: { href: '/a', label: '/a', name: 'a', kind: 'path' }, distance: 2 },
-      { route: { href: '/b', label: '/b', name: 'b', kind: 'path' }, distance: 2 },
+      { route: { href: '/a', label: '/a', caption: 'a', kind: 'path' }, distance: 2 },
+      { route: { href: '/b', label: '/b', caption: 'b', kind: 'path' }, distance: 2 },
     ];
     expect(decide({ prefixHit: null, candidates: close, path: '/ab' }).state).toBe('fuzzy');
   });
   it('weak matches render as a pick-list, no auto-redirect', () => {
-    const weak = [{ route: { href: '/a', label: '/a', name: 'a', kind: 'path' }, distance: 3 }];
+    const weak = [{ route: { href: '/a', label: '/a', caption: 'a', kind: 'path' }, distance: 3 }];
     expect(decide({ prefixHit: null, candidates: weak, path: '/abcdefgh' }).state).toBe('fuzzy');
   });
   it('nothing matches -> state none', () => {

@@ -4,12 +4,13 @@
 
 // Top-level webroot dirs that are real destinations but not showcase projects,
 // so updates.json never lists them. Verify against /var/www/html when touching.
+// buildRoutes derives each one's label (the shown route) and key from href.
 export const EXTRA_ROUTES = [
-  { href: '/blog', label: 'blog', name: 'blog' },
-  { href: '/demos', label: 'demos', name: 'demos' },
-  { href: '/userscripts', label: 'userscripts', name: 'userscripts' },
-  { href: '/chess', label: 'chess', name: 'chess' },
-  { href: '/card-games', label: 'card-games', name: 'card games' },
+  { href: '/blog', caption: 'blog' },
+  { href: '/demos', caption: 'demos' },
+  { href: '/userscripts', caption: 'userscripts' },
+  { href: '/chess', caption: 'chess' },
+  { href: '/card-games', caption: 'card games' },
 ];
 
 const JUNK_MAX_LEN = 120;
@@ -39,7 +40,9 @@ export function isJunkPath(pathname) {
   return JUNK_PATTERNS.some((re) => re.test(p));
 }
 
-// Normalize updates.json projects into route entries the fuzzy rung scores.
+// Normalize updates.json projects into route entries the fuzzy rung scores:
+// { href, label (the route as shown: '/explorer', 'diet.mase.fi'), caption
+// (trailing human text), keys (fuzzy-match targets), kind, extra? }.
 // mase.fi-path urls become path routes; other hosts become subdomain routes
 // (the "moved" case — typing the app's old mase.fi path should point at its
 // new home). Bad/missing urls are skipped, never thrown on.
@@ -54,21 +57,21 @@ export function buildRoutes(updates) {
     } catch {
       continue;
     }
-    // The trailing human label: a short desc reads better than restating the
-    // route ("map explorer" vs "explorer"); long descs fall back to the name.
-    const bare = (p.name || p.slug || '').toLowerCase();
-    const name = (typeof p.desc === 'string' && p.desc.length > 0 && p.desc.length <= 48 ? p.desc : bare).toLowerCase();
-    const keys = [p.slug, p.channel, bare].filter(Boolean).map((k) => String(k).toLowerCase());
+    // A short desc reads better than restating the route ("map explorer" vs
+    // "explorer"); long descs fall back to the project name.
+    const projectName = (p.name || p.slug || '').toLowerCase();
+    const caption = (typeof p.desc === 'string' && p.desc.length > 0 && p.desc.length <= 48 ? p.desc : projectName).toLowerCase();
+    const keys = [p.slug, p.channel, projectName].filter(Boolean).map((k) => String(k).toLowerCase());
     if (u.hostname === 'mase.fi' && u.pathname !== '/') {
       const seg = u.pathname.replace(/\/$/, '').split('/').filter(Boolean)[0];
-      routes.push({ href: u.pathname, label: '/' + seg, name, keys: [...new Set([seg, ...keys])], kind: 'path' });
+      routes.push({ href: u.pathname, label: '/' + seg, caption, keys: [...new Set([seg, ...keys])], kind: 'path' });
     } else if (u.hostname.endsWith('.mase.fi')) {
       const sub = u.hostname.slice(0, -'.mase.fi'.length);
-      routes.push({ href: u.origin, label: u.hostname, name, keys: [...new Set([sub, ...keys])], kind: 'subdomain' });
+      routes.push({ href: u.origin, label: u.hostname, caption, keys: [...new Set([sub, ...keys])], kind: 'subdomain' });
     }
   }
   for (const r of EXTRA_ROUTES) {
-    routes.push({ href: r.href, label: r.href, name: r.name, keys: [r.href.slice(1)], kind: 'path', extra: true });
+    routes.push({ href: r.href, label: r.href, caption: r.caption, keys: [r.href.slice(1)], kind: 'path', extra: true });
   }
   return routes;
 }
@@ -116,7 +119,7 @@ export function fuzzyCandidates(pathname, routes) {
 // runner-up auto-redirects too; anything weaker renders as a pick-list.
 export function decide({ prefixHit, candidates, path }) {
   if (prefixHit) {
-    return { state: 'confident', target: prefixHit.href, targetLabel: prefixHit.label, targetName: prefixHit.name, tail: path.slice(prefixHit.href.length), diff: true };
+    return { state: 'confident', target: prefixHit.href, targetLabel: prefixHit.label, targetCaption: prefixHit.caption, tail: path.slice(prefixHit.href.length), diff: true };
   }
   const c = candidates || [];
   if (c.length) {
@@ -127,7 +130,7 @@ export function decide({ prefixHit, candidates, path }) {
         state: 'confident',
         target: best.route.href,
         targetLabel: best.route.label,
-        targetName: best.route.kind === 'subdomain' ? best.route.name + ' — moved to a subdomain' : best.route.name,
+        targetCaption: best.route.kind === 'subdomain' ? best.route.caption + ' — moved to a subdomain' : best.route.caption,
         diff: false,
       };
     }
