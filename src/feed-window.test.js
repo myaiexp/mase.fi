@@ -1,10 +1,10 @@
 // @vitest-environment jsdom
-// Windowing tests for renderFeed: it materializes only the newest WINDOW_SIZE
-// rows and lazy-loads older batches when the top sentinel intersects. jsdom has
-// no IntersectionObserver/ResizeObserver and no layout, so the observers are
-// stubbed (feed-test-helpers.js; the IO stub is hand-fired to simulate scroll-up)
-// and we assert pure DOM structure — row counts, the sentinel, and day-separator
-// seam dedup across batches. Archive lazy-load lives in feed-archive.test.js.
+// renderFeed tests: newest-WINDOW_SIZE windowing and scroll-up lazy reveal (with
+// day-separator seam dedup), proj-pill chip navigation, layout-before-scroll-
+// compensation ordering, and switch-time jitter. jsdom has no
+// IntersectionObserver/ResizeObserver and no layout, so the observers are stubbed
+// (feed-test-helpers.js; the IO stub is hand-fired to simulate scroll-up). Archive
+// lazy-load lives in feed-archive.test.js.
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import {
   ioInstances, installFeedDom, removeFeedStubs, makeData, distinctDays, rows, dayHeaders, sentinel,

@@ -7,7 +7,7 @@ import {
   effectivePath, renderConfident, renderFuzzy, renderNone, startCountdown,
   probePrefixes, applyRealStatus,
 } from './notfound-page.js';
-import { installNotFound, removeNotFound, stubReducedMotion, mountDom } from './notfound-test-helpers.js';
+import { installNotFound, removeNotFound, stubReducedMotion } from './notfound-test-helpers.js';
 
 const PLAN = { target: '/explorer', targetLabel: '/explorer', targetCaption: 'map explorer' };
 const CANDIDATES = [
@@ -118,17 +118,42 @@ describe('startCountdown', () => {
     expect(replace).not.toHaveBeenCalled();
   });
 
-  it('Enter goes now; any other key cancels', () => {
+  // replace() only starts a navigation: the page stays live until it unloads,
+  // so the countdown must be over once the visitor has chosen to go.
+  it('Enter goes now, once: the timer never fires a second replace() and later keys do not cancel', () => {
     vi.useFakeTimers();
     startCountdown(PLAN, null);
     document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
+    expect(replace).toHaveBeenCalledOnce();
     expect(replace).toHaveBeenCalledWith('/explorer');
+    vi.advanceTimersByTime(5000);
+    expect(replace).toHaveBeenCalledOnce();
+    document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+    document.body.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    document.getElementById('staybtn').click();
+    expect(document.getElementById('cancelnote').hidden).toBe(true);
+    expect(replace).toHaveBeenCalledOnce();
+  });
 
-    replace.mockClear();
-    mountDom();
+  it('#gobtn goes now, once: the timer never fires a second replace() and later input does not cancel', () => {
+    vi.useFakeTimers();
+    startCountdown(PLAN, null);
+    document.getElementById('gobtn').click();
+    document.getElementById('gobtn').click();
+    expect(replace).toHaveBeenCalledOnce();
+    vi.advanceTimersByTime(5000);
+    expect(replace).toHaveBeenCalledOnce();
+    document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+    document.body.dispatchEvent(new Event('touchstart', { bubbles: true }));
+    expect(document.getElementById('cancelnote').hidden).toBe(true);
+  });
+
+  it('any key other than Enter cancels', () => {
+    vi.useFakeTimers();
     startCountdown(PLAN, null);
     document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
     expect(document.getElementById('countbox').hidden).toBe(true);
+    expect(document.getElementById('cancelnote').hidden).toBe(false);
     vi.advanceTimersByTime(5000);
     expect(replace).not.toHaveBeenCalled();
   });
@@ -194,6 +219,9 @@ describe('startCountdown', () => {
     startCountdown({ target: 'javascript:alert(1)', targetLabel: 'x' }, null);
     vi.advanceTimersByTime(5000);
     expect(replace).not.toHaveBeenCalled();
+    // The refused go() must still end the timer, not tick on below zero.
+    vi.advanceTimersByTime(3000);
+    expect(document.getElementById('cnum').textContent).toBe('1');
   });
 });
 
