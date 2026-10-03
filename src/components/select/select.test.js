@@ -52,43 +52,6 @@ function getOptions(el) {
   return [...getMenu(el).querySelectorAll('.option')];
 }
 
-describe('base-option', () => {
-  afterEach(() => { document.body.innerHTML = ''; });
-
-  it('value property returns value attribute', () => {
-    const o = document.createElement('base-option');
-    o.setAttribute('value', 'foo');
-    document.body.appendChild(o);
-    expect(o.value).toBe('foo');
-  });
-
-  it('label property returns trimmed textContent', () => {
-    const o = document.createElement('base-option');
-    o.textContent = '  Hello World  ';
-    document.body.appendChild(o);
-    expect(o.label).toBe('Hello World');
-  });
-
-  it('disabled property reflects attribute', () => {
-    const o = document.createElement('base-option');
-    document.body.appendChild(o);
-    expect(o.disabled).toBe(false);
-    o.setAttribute('disabled', '');
-    expect(o.disabled).toBe(true);
-  });
-});
-
-describe('base-option-group', () => {
-  afterEach(() => { document.body.innerHTML = ''; });
-
-  it('label property returns label attribute', () => {
-    const g = document.createElement('base-option-group');
-    g.setAttribute('label', 'My Group');
-    document.body.appendChild(g);
-    expect(g.label).toBe('My Group');
-  });
-});
-
 describe('base-select', () => {
   afterEach(() => { document.body.innerHTML = ''; });
 

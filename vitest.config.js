@@ -34,6 +34,18 @@ export default defineConfig({
         'src/log-stats.js': { lines: 100, functions: 100, statements: 100, branches: 95 },
         'src/data-normalize.js': { lines: 98, functions: 100, statements: 98, branches: 85 },
         'src/data-archive.js': { lines: 98, functions: 100, statements: 98, branches: 85 },
+        // The base-components library: other apps load it unversioned, so every
+        // push reaches them with no redeploy on their side.
+        'src/components/badge/badge.js': { lines: 99, functions: 100, statements: 99, branches: 98 },
+        'src/components/context-menu/context-menu.js': { lines: 99, functions: 100, statements: 97, branches: 84 },
+        'src/components/dropdown/dropdown.js': { lines: 99, functions: 100, statements: 99, branches: 79 },
+        'src/components/modal/modal.js': { lines: 99, functions: 91, statements: 95, branches: 80 },
+        'src/components/select/select.js': { lines: 97, functions: 95, statements: 94, branches: 83 },
+        'src/components/select/select-menu.js': { lines: 99, functions: 100, statements: 99, branches: 88 },
+        'src/components/select/select-option.js': { lines: 100, functions: 100, statements: 100, branches: 100 },
+        'src/components/tabs/tabs.js': { lines: 99, functions: 100, statements: 96, branches: 82 },
+        'src/components/text-fit/text-fit.js': { lines: 99, functions: 100, statements: 97, branches: 86 },
+        'src/components/toast/toast.js': { lines: 99, functions: 100, statements: 99, branches: 88 },
       },
     },
   },
