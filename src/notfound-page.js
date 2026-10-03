@@ -183,28 +183,35 @@ export function renderNone(projectCount) {
 export function startCountdown(plan, suggEl) {
   const box = $('countbox');
   box.hidden = false;
+  // Every listener below hangs off this signal, so stop() ends them all at once.
+  const ac = new AbortController();
+  const on = { signal: ac.signal };
+  let iv;
+  const stop = () => {
+    clearInterval(iv);
+    ac.abort();
+  };
+  // replace() only starts a navigation and the page stays live until it
+  // unloads, so going ends the countdown: a live timer would replace() again,
+  // and a later key or click would show "redirect cancelled" mid-navigation.
   const go = () => {
     if (!isSafeRedirect(plan.target, location.origin)) return;
+    stop();
     location.replace(plan.target);
   };
-  $('gobtn').addEventListener('click', go);
+  $('gobtn').addEventListener('click', go, on);
   if (prefersReducedMotion()) {
     // An involuntary navigation is a motion problem too: buttons only, no timer.
     $('cnum').textContent = '—';
     for (const s of $('csegs').children) s.classList.remove('on');
-    $('staybtn').addEventListener('click', () => { box.hidden = true; });
+    $('staybtn').addEventListener('click', () => { box.hidden = true; }, on);
     return;
   }
   const drain = $('drain');
   drain.hidden = false;
   let count = 5;
-  let iv;
   const cancel = () => {
-    clearInterval(iv);
-    document.removeEventListener('keydown', onKey);
-    document.removeEventListener('click', onAny);
-    document.removeEventListener('wheel', onAny);
-    document.removeEventListener('touchstart', onAny);
+    stop();
     drain.hidden = true;
     box.hidden = true;
     const note = $('cancelnote');
@@ -226,16 +233,16 @@ export function startCountdown(plan, suggEl) {
     if (e.key === 'Enter') go();
     else cancel();
   };
-  $('staybtn').addEventListener('click', cancel);
-  document.addEventListener('keydown', onKey);
-  document.addEventListener('click', onAny);
-  document.addEventListener('wheel', onAny, { passive: true });
-  document.addEventListener('touchstart', onAny, { passive: true });
+  $('staybtn').addEventListener('click', cancel, on);
+  document.addEventListener('keydown', onKey, on);
+  document.addEventListener('click', onAny, on);
+  document.addEventListener('wheel', onAny, { ...on, passive: true });
+  document.addEventListener('touchstart', onAny, { ...on, passive: true });
   const tick = () => {
     count--;
-    // Stop ticking first: go() only starts a navigation, so a live interval
-    // would call replace() again every second until the page unloads.
-    if (count <= 0) { clearInterval(iv); go(); return; }
+    // stop() here too: go() refuses an unsafe target without stopping, and
+    // the interval would otherwise tick on into negative counts.
+    if (count <= 0) { stop(); go(); return; }
     $('cnum').textContent = String(count);
     const segs = [...$('csegs').children];
     segs.forEach((s, i) => s.classList.toggle('on', i < count));
