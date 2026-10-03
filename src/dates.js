@@ -1,4 +1,4 @@
-// Entry-date parse/normalize, day/time accessors, and UTC-day bucketing
+// Entry-date parse/normalize, day/time accessors, UTC-day bucketing, writer-zone now
 
 const EPOCH = '1970-01-01T00:00';
 // Canonical stored shape from normalizeDate: "YYYY-MM-DDTHH:MM" (16 chars).
@@ -69,4 +69,27 @@ export function normalizeDate(s) {
  */
 export function utcDayStart(d) {
   return Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate());
+}
+
+// The zone writers stamp "today" in (docs/content-pipeline.md § Store). Entry
+// stamps carry no zone, so "now" must be read in the same zone to compare.
+const WRITER_TZ = 'Europe/Helsinki';
+const writerClock = new Intl.DateTimeFormat('en-CA', {
+  timeZone: WRITER_TZ,
+  year: 'numeric', month: '2-digit', day: '2-digit',
+  hour: '2-digit', minute: '2-digit', second: '2-digit',
+  hourCycle: 'h23',
+});
+
+/**
+ * "Now" on the entry-date axis (ms): the writers' Europe/Helsinki wall clock,
+ * read as UTC the way parseEntryDate reads an entry stamp. Use it, never
+ * Date.now(), wherever "now" or "today" is compared against entry dates — the
+ * viewer's UTC clock runs 2–3 hours behind the stamps, so for that window each
+ * night the newest Helsinki day would sit one day in the future.
+ */
+export function entryNow(now = Date.now()) {
+  const p = {};
+  for (const { type, value } of writerClock.formatToParts(now)) p[type] = Number(value);
+  return Date.UTC(p.year, p.month - 1, p.day, p.hour, p.minute, p.second);
 }

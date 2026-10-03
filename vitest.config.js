@@ -31,6 +31,7 @@ export default defineConfig({
         'src/notfound-page.js': { lines: 95, functions: 100, statements: 94, branches: 86 },
         // Normalization, channel routing and the stats rules.
         'src/data.js': { lines: 98, functions: 100, statements: 97, branches: 87 },
+        'src/log-stats.js': { lines: 100, functions: 100, statements: 100, branches: 95 },
         'src/data-normalize.js': { lines: 98, functions: 100, statements: 98, branches: 85 },
         'src/data-archive.js': { lines: 98, functions: 100, statements: 98, branches: 85 },
       },

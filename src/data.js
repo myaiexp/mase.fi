@@ -1,8 +1,8 @@
 // Data adapter: fetches updates.json and normalizes it to the shape the UI expects.
 import { projectLink } from './project-link.js';
-import { parseEntryDate, utcDayStart } from './dates.js';
+import { entryNow, parseEntryDate } from './dates.js';
 import { fetchDemos, raceTimeout, DEMOS_GRACE_MS } from './data-demos.js';
-import { buildSlugToChannel, entrySlug, isRawEntry, isRawProject, normalizeEntry, projectSlug } from './data-normalize.js';
+import { buildSlugToChannel, isRawEntry, isRawProject, normalizeEntry, projectSlug } from './data-normalize.js';
 import { fetchJson } from './fetch-json.js';
 export { fetchDemos };
 export { loadArchive } from './data-archive.js';
@@ -101,7 +101,8 @@ function normalizeStats(raw) {
  * never sets the heat ceiling.
  */
 function aggregateActivity(entries) {
-  const cutoff = Date.now() - 30 * 86400000;
+  // On the entry-date axis (entryNow), so the 30-day edge sits where the stamps do.
+  const cutoff = entryNow() - 30 * 86400000;
   const counts = new Map();
   const lastActivity = new Map();
   for (const e of entries) {
@@ -183,86 +184,4 @@ export function entriesFor(channelId, data) {
     return data.entries.filter((e) => e.category === 'log');
   }
   return data.entries.filter((e) => e.channel === channelId && e.category !== 'log');
-}
-
-/**
- * Single-pass log aggregate for the pinned cards. Walks data.entries once:
- *   - totalCommits: all-history `log` count (allHistoryLogs below)
- *   - totalEntries: all-history entry count — the non-log rows (never archived,
- *                   so all of them are in memory) plus totalCommits
- *   - buckets:      last-`days` per-day counts, oldest first (finite, in-range
- *                   dates only) — the #home heatstrip and the #activity rate
- *   - last:         newest `log` entry by date string, or null
- * Buckets are keyed by UTC calendar day (parseEntryDate → utcDayStart), the same
- * day definition the feed's separators use, so a viewer off UTC sees a heatstrip
- * aligned with the feed instead of a locally-shifted one. The finite-date guard
- * is a nested branch (not `continue`) so a malformed date still counts toward
- * totalCommits and the newest-entry comparison — only the day bucket needs a
- * parseable date.
- */
-export function logStats(data, days = 28) {
-  const buckets = new Array(days).fill(0);
-  const todayUTC = utcDayStart(new Date());
-  let inMemoryLogs = 0;
-  let nonLogEntries = 0;
-  let last = null;
-  for (const e of data.entries) {
-    if (e.category !== 'log') {
-      nonLogEntries++;
-      continue;
-    }
-    inMemoryLogs++;
-    const d = parseEntryDate(e.date);
-    const t = d.getTime();
-    if (Number.isFinite(t)) {
-      // Whole UTC days between the entry and today; the index counts back from the
-      // newest (last) bucket. Both ends snap to UTC midnight, so the difference is
-      // an exact day count — no raw-ms flooring that drifts an hour across a DST edge.
-      const idx = days - 1 - Math.round((todayUTC - utcDayStart(d)) / 86400000);
-      if (idx >= 0 && idx < days) buckets[idx]++;
-    }
-    if (!last || e.date > last.date) last = e;
-  }
-  const totalCommits = allHistoryLogs(data, inMemoryLogs);
-  return { totalCommits, totalEntries: nonLogEntries + totalCommits, buckets, last };
-}
-
-// All-history log count. The one home of the archive-cut rule; both pinned
-// cards read it through logStats.
-//   - archive merged: every log row is in memory, so inMemoryLogs is the total
-//   - archivedLogs present: the compact's archived count plus the hot rows, which
-//     stays live while deploys prepend logs between nightly compacts
-//   - neither: a compact from before archivedLogs existed, so its totalCommits
-//     snapshot; else inMemoryLogs (an uncompacted file holds every row)
-function allHistoryLogs(data, inMemoryLogs) {
-  if (data.archiveLoaded) return inMemoryLogs;
-  if (Number.isFinite(data.stats.archivedLogs)) return data.stats.archivedLogs + inMemoryLogs;
-  if (Number.isFinite(data.stats.totalCommits)) return data.stats.totalCommits;
-  return inMemoryLogs;
-}
-
-/**
- * All-history commit count for one project channel, by the same cut rule as
- * allHistoryLogs: the channel's log rows in memory, plus archivedByProject's
- * compact-time count of archived rows when the archive is not merged. Archive
- * keys are raw entry.project strings, slugged by entrySlug and matched against
- * the normalized project's routing slug (project.slug) the way normalizeEntry
- * routes rows. A compact from before archivedByProject existed falls back to
- * its commitsByProject snapshot, keyed by slug, then by channel.
- */
-export function commitsForProject(project, data) {
-  const inMemory = data.entries.filter((e) => e.channel === project.channel && e.category === 'log').length;
-  if (data.archiveLoaded) return inMemory;
-  const archived = data.stats.archivedByProject;
-  if (archived) {
-    let total = inMemory;
-    for (const [key, n] of Object.entries(archived)) {
-      if (entrySlug(key) === project.slug && Number.isFinite(n)) total += n;
-    }
-    return total;
-  }
-  const byProject = data.stats.commitsByProject;
-  if (Number.isFinite(byProject?.[project.slug])) return byProject[project.slug];
-  if (Number.isFinite(byProject?.[project.channel])) return byProject[project.channel];
-  return inMemory;
 }

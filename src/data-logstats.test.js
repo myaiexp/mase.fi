@@ -1,7 +1,7 @@
 // Unit tests for logStats.buckets and logStats.last (time-windowed rollups).
 // Totals and commitsForProject live in data-stats.test.js.
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import { logStats } from './data.js';
+import { logStats } from './log-stats.js';
 import { entry } from './data-test-helpers.js';
 
 // Pin the clock: dayStr builds fixtures from "now" and logStats reads "now" again,
@@ -134,5 +134,20 @@ describe('logStats last', () => {
   it('still considers a log entry whose date is unparseable', () => {
     const data = dataWith([entry('log', 'activity', { date: 'zzz-unparseable' })]);
     expect(logStats(data).last.date).toBe('zzz-unparseable');
+  });
+});
+
+// ---- writer-zone "today" (finding #11013) ------------------------------------
+
+describe('logStats today follows the writers\' Europe/Helsinki day', () => {
+  it('buckets an entry stamped on the new Helsinki day before UTC midnight as today', () => {
+    // 22:30 UTC is 01:30 the next day in Helsinki (EEST, +3): a writer
+    // defaulting to "today" stamps 2026-06-28 while the UTC day is still the 27th.
+    vi.setSystemTime(new Date('2026-06-27T22:30:00Z'));
+    const data = dataWith([
+      entry('log', 'activity', { date: '2026-06-28T00:00' }),
+      entry('log', 'activity', { date: '2026-06-27T00:00' }),
+    ]);
+    expect(logStats(data, 3).buckets).toEqual([0, 1, 1]);
   });
 });

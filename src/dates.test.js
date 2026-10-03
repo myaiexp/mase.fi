@@ -1,6 +1,6 @@
-// Unit tests for dates.js: normalizeDate, day/time accessors, parseEntryDate.
-import { describe, it, expect } from 'vitest';
-import { normalizeDate, parseEntryDate, dayOf, timeOf, utcDayStart } from './dates.js';
+// Unit tests for dates.js: normalizeDate, day/time accessors, parseEntryDate, entryNow.
+import { describe, it, expect, vi } from 'vitest';
+import { normalizeDate, parseEntryDate, dayOf, timeOf, utcDayStart, entryNow } from './dates.js';
 
 const EPOCH = '1970-01-01T00:00';
 
@@ -163,5 +163,29 @@ describe('utcDayStart', () => {
     const after = utcDayStart(new Date('2026-03-30T12:00:00Z'));
     expect(on - before).toBe(86400000);
     expect(after - on).toBe(86400000);
+  });
+});
+
+describe('entryNow', () => {
+  it('reads the Helsinki wall clock onto the UTC-labelled entry axis (summer, +3)', () => {
+    expect(new Date(entryNow(Date.parse('2026-06-27T22:30:00Z'))).toISOString()).toBe('2026-06-28T01:30:00.000Z');
+  });
+
+  it('follows the winter offset (+2)', () => {
+    expect(new Date(entryNow(Date.parse('2026-01-15T23:15:45Z'))).toISOString()).toBe('2026-01-16T01:15:45.000Z');
+  });
+
+  it('maps Helsinki midnight to 00, never 24', () => {
+    expect(new Date(entryNow(Date.parse('2026-01-15T22:00:00Z'))).toISOString()).toBe('2026-01-16T00:00:00.000Z');
+  });
+
+  it('defaults to the current clock', () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-06-27T10:00:00Z'));
+    try {
+      expect(entryNow()).toBe(Date.parse('2026-06-27T13:00:00Z'));
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });

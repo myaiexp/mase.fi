@@ -1,6 +1,6 @@
-// Unit tests for the all-history stat rules: logStats totals + commitsForProject.
+// Unit tests for the all-history stat rules: logStats totals, counts, range + commitsForProject.
 import { describe, it, expect } from 'vitest';
-import { logStats, commitsForProject } from './data.js';
+import { logStats, commitsForProject } from './log-stats.js';
 import { entry } from './data-test-helpers.js';
 
 // stats is always present on fetchData's output, possibly empty.
@@ -196,5 +196,57 @@ describe('commitsForProject — live between compacts (idea #4713)', () => {
   it('ignores non-numeric archived counts', () => {
     const data = { entries: hot(), stats: { archivedByProject: { helm: 'x', HELM: 2 } } };
     expect(commitsForProject(project, data)).toBe(5);
+  });
+});
+
+// ---- logStats.counts / first / logRange ------------------------------------
+
+describe('logStats counts', () => {
+  it('counts non-log rows from memory and logs by the archive-cut rule', () => {
+    const data = {
+      entries: [entry('log', 'activity'), entry('feature', 'explorer'), entry('daily', 'home'), entry('daily', 'home')],
+      stats: { archivedLogs: 40 },
+    };
+    const s = logStats(data);
+    expect(s.counts).toEqual({ log: 41, feature: 1, daily: 2 });
+    expect(s.totalEntries).toBe(44);
+  });
+});
+
+describe('logStats first', () => {
+  it('returns the oldest log entry regardless of input order, ignoring non-logs', () => {
+    const data = dataWith([
+      entry('log', 'activity', { date: '2026-03-20T08:00' }),
+      entry('log', 'activity', { date: '2026-01-10T08:00' }),
+      entry('daily', 'home', { date: '2025-01-01T08:00' }),
+    ]);
+    expect(logStats(data).first.date).toBe('2026-01-10T08:00');
+  });
+});
+
+describe('logStats logRange', () => {
+  it('is null with no logs and no compact-time range', () => {
+    expect(logStats(dataWith([entry('daily', 'home')])).logRange).toBeNull();
+  });
+
+  it('spans the in-memory logs when stats has no range', () => {
+    const data = dataWith([
+      entry('log', 'activity', { date: '2026-01-10T08:00' }),
+      entry('log', 'activity', { date: '2026-03-20T08:00' }),
+    ]);
+    expect(logStats(data).logRange).toEqual({ from: '2026-01-10', to: '2026-03-20' });
+  });
+
+  it('takes the wider end from stats and memory', () => {
+    const data = {
+      entries: [entry('log', 'activity', { date: '2026-08-01T08:00' })],
+      stats: { logFirst: '2026-03-05', logLast: '2026-07-30' },
+    };
+    expect(logStats(data).logRange).toEqual({ from: '2026-03-05', to: '2026-08-01' });
+  });
+
+  it('uses the compact-time range alone when no log is in memory', () => {
+    const data = { entries: [], stats: { logFirst: '2026-03-05', logLast: '2026-09-02' } };
+    expect(logStats(data).logRange).toEqual({ from: '2026-03-05', to: '2026-09-02' });
   });
 });

@@ -106,8 +106,8 @@ function suggestionLink(plan) {
   const arr = Object.assign(document.createElement('span'), { className: 'arr', textContent: '→' });
   const targetSpan = Object.assign(document.createElement('span'), { className: 'bu', textContent: plan.targetLabel });
   a.append(arr, targetSpan);
-  if (plan.targetName) {
-    a.append(Object.assign(document.createElement('span'), { className: 'bname', textContent: plan.targetName }));
+  if (plan.targetCaption) {
+    a.append(Object.assign(document.createElement('span'), { className: 'bname', textContent: plan.targetCaption }));
   }
   return a;
 }
@@ -143,7 +143,7 @@ export function renderFuzzy(path, candidates) {
     a.className = i === 0 ? 'cand first' : 'cand';
     a.href = safeHref(c.route.href);
     a.append(Object.assign(document.createElement('span'), { className: 'croute', textContent: '→ ' + c.route.label }));
-    if (c.route.name) a.append(Object.assign(document.createElement('span'), { className: 'cname', textContent: c.route.name }));
+    if (c.route.caption) a.append(Object.assign(document.createElement('span'), { className: 'cname', textContent: c.route.caption }));
     a.append(Object.assign(document.createElement('span'), { className: 'creason', textContent: reasonFor(c) }));
     list.append(a);
   });
@@ -171,7 +171,7 @@ export function renderNone(projectCount) {
   const link = suggestionLink({
     target: '/',
     targetLabel: 'mase.fi',
-    targetName: 'the full directory' + (projectCount ? ` — ${projectCount} active projects` : ''),
+    targetCaption: 'the full directory' + (projectCount ? ` — ${projectCount} active projects` : ''),
   });
   sugg.append(link);
   setHints(['enter for home'], [{ href: '/', textContent: 'mase.fi' }, ' for the full directory']);
@@ -257,7 +257,7 @@ export async function start() {
     // Project urls may end in `/`; parent prefixes never do.
     const known = routes.find((r) => r.kind === 'path' && r.href.replace(/\/$/, '') === prefix);
     renderConfident(path, decide({
-      prefixHit: { href: prefix, label: prefix, name: known ? known.name : '' },
+      prefixHit: { href: prefix, label: prefix, caption: known ? known.caption : '' },
       candidates: [],
       path,
     }));

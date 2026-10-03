@@ -81,3 +81,14 @@ describe('dayLabel', () => {
     expect(typeof dayLabel('not-a-date')).toBe('string');
   });
 });
+
+describe('dayLabel uses the writers\' Europe/Helsinki day (finding #11013)', () => {
+  afterEach(() => vi.useRealTimers());
+
+  it("labels the new Helsinki day 'today' while UTC is still on the previous one", () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-06-27T22:30:00Z'));
+    expect(dayLabel('2026-06-28T00:00')).toBe('today \xb7 2026-06-28');
+    expect(dayLabel('2026-06-27T00:00')).toBe('yesterday \xb7 2026-06-27');
+  });
+});

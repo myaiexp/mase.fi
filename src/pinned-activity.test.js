@@ -115,3 +115,42 @@ describe('renderPinned — activity', () => {
     expect(html).toContain('<i>rate</i><b>—</b>');
   });
 });
+
+describe('renderPinned — activity stream art (finding #11019)', () => {
+  // The art's numbers, top to bottom: log, feature, daily.
+  const artCounts = () => [...pinnedEl().querySelector('pre.ascii').textContent.matchAll(/(\d+)\s+│/g)].map((m) => Number(m[1]));
+
+  it('counts logs by the archive-cut rule, so log + feature + daily equals the total row', () => {
+    const data = {
+      projects: [],
+      entries: [
+        logEntry({ date: '2026-08-01T08:00' }),
+        logEntry({ date: '2026-08-02T08:00' }),
+        { channel: 'explorer', category: 'feature', date: '2026-08-01T08:00', nick: 'explorer', text: 'f' },
+        { channel: 'home', category: 'daily', date: '2026-08-01T08:00', nick: 'mase', text: 'd' },
+      ],
+      stats: { archivedLogs: 11735 },
+    };
+    renderPinned('activity', data);
+    expect(artCounts()).toEqual([11737, 1, 1]);
+    expect(pinnedEl().innerHTML).toContain('11739 entries');
+  });
+
+  it('keeps the box borders aligned however wide the counts grow', () => {
+    const data = { projects: [], entries: [logEntry()], stats: { archivedLogs: 123456 } };
+    renderPinned('activity', data);
+    const widths = pinnedEl().querySelector('pre.ascii').textContent.split('\n').map((l) => [...l].length);
+    expect(new Set(widths).size).toBe(1);
+  });
+
+  it('extends a compact-time logLast with a newer in-memory log', () => {
+    // Deploys prepend logs between nightly compacts, so stats.logLast goes stale.
+    const data = {
+      projects: [],
+      entries: [logEntry({ date: '2026-09-05T08:00' })],
+      stats: { archivedLogs: 10, logFirst: '2026-03-05', logLast: '2026-09-02' },
+    };
+    renderPinned('activity', data);
+    expect(pinnedEl().innerHTML).toContain('2026-03-05 → 2026-09-05');
+  });
+});
