@@ -1,6 +1,6 @@
 // Feed rendering — day separators, IRC-style rows, windowed with lazy scroll-up
 import { entriesFor, loadArchive } from './data.js';
-import { dayOf, timeOf } from './dates.js';
+import { dayOf, entryNow, timeOf } from './dates.js';
 import { playJitter, clearJitter } from './jitter.js';
 import { relayoutAll, layoutRow, measureFeedMetrics } from './feed-layout.js';
 
@@ -37,8 +37,10 @@ export function nickColor(nick) {
 
 export function dayLabel(date) {
   const d = dayOf(date);
-  const today = dayOf(new Date().toISOString());
-  const yest = dayOf(new Date(Date.now() - 86400000).toISOString());
+  // Writers' "today" (entryNow), not the viewer's UTC day — see dates.js.
+  const now = entryNow();
+  const today = dayOf(new Date(now).toISOString());
+  const yest = dayOf(new Date(now - 86400000).toISOString());
   if (d === today) return 'today \xb7 ' + d;
   if (d === yest) return 'yesterday \xb7 ' + d;
   return d;

@@ -1,7 +1,7 @@
 // Command input — slash-jump, ?-help, plain-text search; global / ? g-leader shortcuts.
 import { navigate } from './channels.js';
 import { entriesFor } from './data.js';
-import { parseEntryDate } from './dates.js';
+import { entryNow, parseEntryDate } from './dates.js';
 import { buildCommands } from './slash-commands.js';
 import { applySearch } from './command-search.js';
 import { markHelp } from './command-aria.js';
@@ -112,7 +112,7 @@ function formatRelativeActivity(id) {
   const es = entriesFor(id, _data);
   if (!es.length) return '—';
   const t = parseEntryDate(es[es.length - 1].date);
-  const mins = Math.max(0, Math.round((new Date() - t) / 60000));
+  const mins = Math.max(0, Math.round((entryNow() - t) / 60000));
   if (mins < 60) return mins + 'm';
   if (mins < 1440) return Math.round(mins / 60) + 'h';
   return Math.round(mins / 1440) + 'd';

@@ -3,7 +3,8 @@
 // logStats buckets/last in data-logstats.test.js, and project heat/recency in
 // data-heat.test.js. loadArchive tests live in data-archive.test.js.
 import { describe, it, expect, vi, afterEach } from 'vitest';
-import { fetchData, entriesFor, logStats } from './data.js';
+import { fetchData, entriesFor } from './data.js';
+import { logStats } from './log-stats.js';
 import { entry, stubFetch } from './data-test-helpers.js';
 
 // ---- helpers -------------------------------------------------------------

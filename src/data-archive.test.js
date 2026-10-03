@@ -1,6 +1,7 @@
 // Unit tests for loadArchive: archive merge, failure degrade, shared normalization
 import { describe, it, expect, vi, afterEach } from 'vitest';
-import { fetchData, entriesFor, logStats } from './data.js';
+import { fetchData, entriesFor } from './data.js';
+import { logStats } from './log-stats.js';
 import { loadArchive } from './data-archive.js';
 import { entry, stubFetch } from './data-test-helpers.js';
 

@@ -28,6 +28,8 @@ beforeEach(async () => {
 });
 
 describe('formatRelativeActivity (cc-last column)', () => {
+  // 12:00 UTC is 15:00 in Helsinki (EEST). Fixtures are Helsinki wall-clock
+  // stamps, the zone writers use, so ages are measured from 15:00.
   const NOW = new Date('2026-06-13T12:00:00Z');
 
   function lastCell() {
@@ -52,17 +54,17 @@ describe('formatRelativeActivity (cc-last column)', () => {
   });
 
   it("renders '3m' for an entry three minutes ago", () => {
-    data.entriesFor.mockReturnValue(entryAt('2026-06-13T11:57'));
+    data.entriesFor.mockReturnValue(entryAt('2026-06-13T14:57'));
     expect(lastCell()).toBe('3m');
   });
 
   it("renders '2h' for an entry two hours ago", () => {
-    data.entriesFor.mockReturnValue(entryAt('2026-06-13T10:00'));
+    data.entriesFor.mockReturnValue(entryAt('2026-06-13T13:00'));
     expect(lastCell()).toBe('2h');
   });
 
   it("renders '3d' for an entry three days ago", () => {
-    data.entriesFor.mockReturnValue(entryAt('2026-06-10T12:00'));
+    data.entriesFor.mockReturnValue(entryAt('2026-06-10T15:00'));
     expect(lastCell()).toBe('3d');
   });
 
@@ -71,7 +73,7 @@ describe('formatRelativeActivity (cc-last column)', () => {
   });
 
   it("clamps a future-dated entry to '0m'", () => {
-    data.entriesFor.mockReturnValue(entryAt('2026-06-13T12:05'));
+    data.entriesFor.mockReturnValue(entryAt('2026-06-13T15:05'));
     expect(lastCell()).toBe('0m');
   });
 });

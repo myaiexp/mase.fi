@@ -1,6 +1,6 @@
 // Pinned hero card renderers — one per channel kind
 import { LOGO, PROJECT_ART, sparkbar } from './ascii.js';
-import { logStats, commitsForProject } from './data.js';
+import { logStats, commitsForProject } from './log-stats.js';
 import { dayOf, timeOf } from './dates.js';
 import { mountBeam, unmountBeam } from './beam.js';
 import { escapeHtml } from './html.js';
@@ -110,45 +110,35 @@ function pinnedProject(p, data) {
   });
 }
 
+// The #activity stream art: one row per category, bars decorative, the box
+// widened to the widest count so the right border stays aligned.
+function streamArt(counts) {
+  const rows = [['log', '▇▇▇▇▇▇▇▇▇'], ['feature', '▇▇▇'], ['daily', '▇▇▇▇▇']]
+    .map(([cat, bar]) => [cat, bar, String(counts[cat] || 0)]);
+  const w = Math.max(2, ...rows.map(([, , n]) => n.length));
+  const inner = 24 + w; // '  ' + label(9) + bar(9) + '  ' + count + '  '
+  return [
+    '  ╭─ stream ' + '─'.repeat(inner - 9) + '╮',
+    ...rows.map(([cat, bar, n]) => '  │  ' + cat.padEnd(9) + bar.padEnd(9) + '  ' + n.padStart(w) + '  │'),
+    '  ╰' + '─'.repeat(inner) + '╯',
+  ].join('\n');
+}
+
 function pinnedActivity(data) {
-  // Only the categories the stream art displays; entries arrive date-sorted, so
-  // the first and last log rows seen are the oldest and newest.
-  const catCounts = { log: 0, feature: 0, daily: 0 };
-  let firstLog = null;
-  let lastLog = null;
-  for (const e of data.entries) {
-    if (Object.hasOwn(catCounts, e.category)) catCounts[e.category]++;
-    if (e.category !== 'log') continue;
-    firstLog ??= e;
-    lastLog = e;
-  }
-  let range = '—';
-  const { logFirst, logLast } = data.stats;
-  if (logFirst && logLast) {
-    range = escapeHtml(logFirst) + ' → ' + escapeHtml(logLast);
-  } else if (firstLog) {
-    range = escapeHtml(dayOf(firstLog.date)) + ' → ' + escapeHtml(dayOf(lastLog.date));
-  }
+  const { counts, totalEntries, buckets: recent, logRange } = logStats(data, 28);
+  const range = logRange ? escapeHtml(logRange.from) + ' → ' + escapeHtml(logRange.to) : '—';
   // Real recent commit rate: average log entries per ACTIVE day over the last 28
   // days (idle days excluded so the figure reflects "when I push, ~N/day" rather
   // than a calendar average diluted to near-zero). Recomputed every render — no
   // stale hardcoded constant. '—' when there's been no recent activity.
-  const { buckets: recent, totalEntries } = logStats(data, 28);
   const activeDays = recent.filter(n => n > 0).length;
   const rate = activeDays
     ? '~' + Math.round(recent.reduce((a, b) => a + b, 0) / activeDays) + '/day'
     : '—';
-  const artLines = [
-    '  ╭─ stream ────────────────╮',
-    '  │  log      ▇▇▇▇▇▇▇▇▇  ' + String(catCounts.log).padStart(2) + '  │',
-    '  │  feature  ▇▇▇        ' + String(catCounts.feature).padStart(2) + '  │',
-    '  │  daily    ▇▇▇▇▇      ' + String(catCounts.daily).padStart(2) + '  │',
-    '  ╰───────────────────────╯',
-  ].join('\n');
   return pinCard({
     meta: [['modes', '+mn'], ['source', 'post-receive'], ['rate', rate]],
     right: 'live tail',
-    art: artLines,
+    art: streamArt(counts),
     tagline: 'the unfiltered tail. git hooks push here directly, one line per commit, every project.',
     rows: [
       ['total', totalEntries + ' entries', 'accent'],
