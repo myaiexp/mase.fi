@@ -1,5 +1,15 @@
 # Design handoff: smart 404 page (from claude.ai/design, 2026-08-24)
 
+> **Implementation note.** The visual and state design below (three states, the
+> 5-second cancellable countdown, the 403 variant) is still the reference. The data
+> model is not: the shipped page makes network calls. It fetches `/updates.json` at
+> runtime and builds its fuzzy routes from it (`buildRoutes` in `src/notfound.js`,
+> `loadRoutes` in `src/notfound-page.js`). It HEAD-probes parent paths for the
+> confident match (`probePrefixes`) and HEAD-requests the path itself to detect a
+> 403 (`applyRealStatus`). There is no hardcoded route table, so ignore the
+> "no network calls", "No storage, no fetch" and "baked into the file at deploy
+> time" lines below.
+
 
 ## Overview
 The error page nginx serves for any unmatched path on `mase.fi`. It is a single static
