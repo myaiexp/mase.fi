@@ -52,6 +52,18 @@ describe('fetchData project heat + recency', () => {
     expect(cold.lastActivity).toBeGreaterThan(0);
   });
 
+  it('a feature row for an unshown project never renders, so it never sets the heat ceiling', async () => {
+    const data = await load(
+      [{ name: 'Shown', channel: 'shown' }],
+      [
+        { category: 'log', project: 'shown', date: IN, text: 'a' },
+        { category: 'feature', project: 'hidden', date: IN, text: 'f1' },
+        { category: 'feature', project: 'hidden', date: IN, text: 'f2' },
+      ],
+    );
+    expect(byChannel(data.projects).shown.heat).toBe(1);
+  });
+
   it('normalizes the busiest project to heat 1.0 and a half-as-busy one to 0.5', async () => {
     const data = await load(
       [

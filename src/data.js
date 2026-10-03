@@ -1,8 +1,8 @@
 // Data adapter: fetches updates.json and normalizes it to the shape the UI expects.
 import { projectLink } from './project-link.js';
-import { parseEntryDate, normalizeDate, utcDayStart } from './dates.js';
+import { parseEntryDate, utcDayStart } from './dates.js';
 import { fetchDemos, raceTimeout, DEMOS_GRACE_MS } from './data-demos.js';
-import { buildSlugToChannel, isRawEntry, isRawProject, normalizeEntry, projectSlug } from './data-normalize.js';
+import { buildSlugToChannel, entrySlug, isRawEntry, isRawProject, normalizeEntry, projectSlug } from './data-normalize.js';
 import { fetchJson } from './fetch-json.js';
 export { fetchDemos };
 export { loadArchive } from './data-archive.js';
@@ -56,9 +56,9 @@ export async function fetchData() {
     if (skipped) console.warn(`fetchData: skipped ${skipped} malformed row(s) in ${SOURCE_URL}`);
 
     const slugToChannel = buildSlugToChannel(rawProjects);
-    const { counts, lastActivity } = aggregateActivity(rawEntries);
-    const projects = normalizeProjects(rawProjects, counts, lastActivity);
     const entries = normalizeEntries(rawEntries, slugToChannel);
+    const { counts, lastActivity } = aggregateActivity(entries);
+    const projects = normalizeProjects(rawProjects, counts, lastActivity);
     const stats = normalizeStats(raw.stats);
 
     return {
@@ -93,22 +93,24 @@ function normalizeStats(raw) {
 }
 
 /**
- * Aggregate per-project activity from raw entries in a single pass:
+ * Aggregate per-project activity from normalized entries in a single pass:
  *  - counts:       last-30d log|feature entry count per slug (drives heat)
  *  - lastActivity: newest activity timestamp (ms) per slug (drives recency sort)
- * Only finite-dated, project-bearing log/feature entries contribute.
+ * Only finite-dated, project-bearing log/feature entries contribute — the rows
+ * the feed holds, so a feature row normalizeEntry dropped (no mapped project)
+ * never sets the heat ceiling.
  */
-function aggregateActivity(rawEntries) {
+function aggregateActivity(entries) {
   const cutoff = Date.now() - 30 * 86400000;
   const counts = new Map();
   const lastActivity = new Map();
-  for (const e of rawEntries) {
-    if (!e.project) continue;
+  for (const e of entries) {
+    const slug = e.projectSlug;
+    if (!slug) continue;
     if (e.category !== 'log' && e.category !== 'feature') continue;
     // Parse as UTC so heat/recency agree with the feed's day separators.
-    const t = parseEntryDate(normalizeDate(e.date)).getTime();
+    const t = parseEntryDate(e.date).getTime();
     if (!Number.isFinite(t)) continue;
-    const slug = e.project.toLowerCase();
     if (t >= cutoff) counts.set(slug, (counts.get(slug) || 0) + 1);
     if (t > (lastActivity.get(slug) || 0)) lastActivity.set(slug, t);
   }
@@ -200,15 +202,15 @@ export function entriesFor(channelId, data) {
 export function logStats(data, days = 28) {
   const buckets = new Array(days).fill(0);
   const todayUTC = utcDayStart(new Date());
-  let counted = 0;
-  let nonLog = 0;
+  let inMemoryLogs = 0;
+  let nonLogEntries = 0;
   let last = null;
   for (const e of data.entries) {
     if (e.category !== 'log') {
-      nonLog++;
+      nonLogEntries++;
       continue;
     }
-    counted++;
+    inMemoryLogs++;
     const d = parseEntryDate(e.date);
     const t = d.getTime();
     if (Number.isFinite(t)) {
@@ -220,30 +222,30 @@ export function logStats(data, days = 28) {
     }
     if (!last || e.date > last.date) last = e;
   }
-  const totalCommits = allHistoryLogs(data, counted);
-  return { totalCommits, totalEntries: nonLog + totalCommits, buckets, last };
+  const totalCommits = allHistoryLogs(data, inMemoryLogs);
+  return { totalCommits, totalEntries: nonLogEntries + totalCommits, buckets, last };
 }
 
-// All-history log count from `counted`, the log rows in memory. The one home of
-// the archive-cut rule; both pinned cards read it through logStats.
-//   - archive merged: every log row is in memory, so counted is the total
+// All-history log count. The one home of the archive-cut rule; both pinned
+// cards read it through logStats.
+//   - archive merged: every log row is in memory, so inMemoryLogs is the total
 //   - archivedLogs present: the compact's archived count plus the hot rows, which
 //     stays live while deploys prepend logs between nightly compacts
 //   - neither: a compact from before archivedLogs existed, so its totalCommits
-//     snapshot; else counted (an uncompacted file holds every row)
-function allHistoryLogs(data, counted) {
-  if (data.archiveLoaded) return counted;
-  if (Number.isFinite(data.stats.archivedLogs)) return data.stats.archivedLogs + counted;
+//     snapshot; else inMemoryLogs (an uncompacted file holds every row)
+function allHistoryLogs(data, inMemoryLogs) {
+  if (data.archiveLoaded) return inMemoryLogs;
+  if (Number.isFinite(data.stats.archivedLogs)) return data.stats.archivedLogs + inMemoryLogs;
   if (Number.isFinite(data.stats.totalCommits)) return data.stats.totalCommits;
-  return counted;
+  return inMemoryLogs;
 }
 
 /**
  * All-history commit count for one project channel, by the same cut rule as
  * allHistoryLogs: the channel's log rows in memory, plus archivedByProject's
  * compact-time count of archived rows when the archive is not merged. Archive
- * keys are raw entry.project strings, matched case-insensitively against the
- * normalized project's routing slug (project.slug) the way normalizeEntry
+ * keys are raw entry.project strings, slugged by entrySlug and matched against
+ * the normalized project's routing slug (project.slug) the way normalizeEntry
  * routes rows. A compact from before archivedByProject existed falls back to
  * its commitsByProject snapshot, keyed by slug, then by channel.
  */
@@ -254,7 +256,7 @@ export function commitsForProject(project, data) {
   if (archived) {
     let total = inMemory;
     for (const [key, n] of Object.entries(archived)) {
-      if (key.toLowerCase() === project.slug && Number.isFinite(n)) total += n;
+      if (entrySlug(key) === project.slug && Number.isFinite(n)) total += n;
     }
     return total;
   }

@@ -154,6 +154,8 @@ class BaseModal extends HTMLElement {
   }
 
   open() {
+    // Re-opening would overwrite #onKeyDown and orphan the bound listener.
+    if (this.#open) return;
     this.#open = true;
     this.setAttribute('open', '');
 

@@ -22,6 +22,15 @@ export function projectSlug(p) {
   return typeof slug === 'string' ? slug.toLowerCase() : '';
 }
 
+/**
+ * An entry's project slug: its raw `project` string lowercased, '' when absent.
+ * The entry-side half of the match projectSlug sets up — normalizeEntry and the
+ * archive-count keys (commitsForProject) both resolve through it.
+ */
+export function entrySlug(project) {
+  return (project || '').toLowerCase();
+}
+
 /** Build the entry-slug → channel lookup over (raw or normalized) projects. */
 export function buildSlugToChannel(projects) {
   const slugToChannel = new Map();
@@ -41,10 +50,9 @@ export function buildSlugToChannel(projects) {
  *   feature entries all speak as that project.
  * - project-less → 'mase'.
  */
-export function pickNick(e) {
-  if (e.category === 'log') return 'git';
-  if (e.project) return String(e.project).toLowerCase();
-  return 'mase';
+export function pickNick(category, slug) {
+  if (category === 'log') return 'git';
+  return slug || 'mase';
 }
 
 /**
@@ -60,7 +68,7 @@ export function pickNick(e) {
  * rows can't drift.
  */
 export function normalizeEntry(e, slugToChannel) {
-  const slug = (e.project || '').toLowerCase();
+  const slug = entrySlug(e.project);
   const projectChannel = slugToChannel.get(slug);
   const channel = projectChannel
     || (e.category === 'daily' ? 'home' : e.category === 'log' ? 'activity' : null);
@@ -69,7 +77,7 @@ export function normalizeEntry(e, slugToChannel) {
     channel,
     category: e.category,
     date: normalizeDate(e.date),
-    nick: pickNick(e),
+    nick: pickNick(e.category, slug),
     text: e.text || e.summary || '',
     projectSlug: slug || undefined,
     projectChannel,

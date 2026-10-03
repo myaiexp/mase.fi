@@ -120,8 +120,6 @@ export function runBoot() {
     }
     const [text, kind, delay] = script[i];
     i++;
-    const line = document.createElement('div');
-    line.className = 'boot-line';
     if (kind === 'logo-block') {
       const pre = document.createElement('pre');
       pre.className = 'boot-line boot-logo';
@@ -131,12 +129,14 @@ export function runBoot() {
       setTimeout(renderOne, delay);
       return;
     }
-    if (kind === 'ok' || kind === 'fail' || kind === 'warn') {
+    const line = document.createElement('div');
+    line.className = 'boot-line';
+    if (kind === 'ok' || kind === 'warn') {
       const body = document.createElement('span');
       body.textContent = text + ' ';
       const tag = document.createElement('span');
       tag.className = 'boot-' + kind;
-      tag.textContent = kind === 'ok' ? '[  OK  ]' : kind === 'fail' ? '[ FAIL ]' : '[ WARN ]';
+      tag.textContent = kind === 'ok' ? '[  OK  ]' : '[ WARN ]';
       line.append(body, tag);
     } else {
       line.classList.add('boot-dim');

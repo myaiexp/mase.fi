@@ -162,6 +162,20 @@ describe('base-modal', () => {
     expect(handler).toHaveBeenCalledTimes(2);
   });
 
+  it('open() twice then close() leaves no keydown listener on document', () => {
+    const add = vi.spyOn(document, 'addEventListener');
+    const remove = vi.spyOn(document, 'removeEventListener');
+    const modal = createModal();
+    modal.open();
+    modal.open();
+    modal.close();
+    const keydownOf = (spy) => spy.mock.calls.filter(([type]) => type === 'keydown').map(([, fn]) => fn);
+    const live = keydownOf(add).filter((fn) => !keydownOf(remove).includes(fn));
+    add.mockRestore();
+    remove.mockRestore();
+    expect(live).toEqual([]);
+  });
+
   it('open() focuses the first light-DOM field, not the close button', async () => {
     // Initial focus must land on the first user-meaningful slotted control, not
     // the shadow close button (which leads the focusable list for Tab-order).

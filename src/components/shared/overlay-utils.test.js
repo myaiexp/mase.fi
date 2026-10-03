@@ -197,6 +197,19 @@ describe('overlay-utils', () => {
     expect(c.close).not.toHaveBeenCalled();
   });
 
+  it('a second add detaches the previous batch instead of leaking it', async () => {
+    const c = track(makeComponent());
+    addOverlayListeners(c, () => true);
+    await tick();
+    addOverlayListeners(c, () => true);
+    await tick();
+
+    keydown('Escape');
+    clickOn(document.body);
+    // One live batch: one close per event, not two.
+    expect(c.close).toHaveBeenCalledTimes(2);
+  });
+
   it('removeOverlayListeners nulls the storage slot', () => {
     const c = track(makeComponent());
     addOverlayListeners(c, () => false);

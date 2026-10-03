@@ -13,8 +13,11 @@
 // `extraListeners` is an array of { target, type, handler, options } descriptors.
 //
 // The registered descriptors are stored on `component._overlayListeners` so
-// `removeOverlayListeners` can detach exactly what was attached.
+// `removeOverlayListeners` can detach exactly what was attached. A batch still
+// live from an earlier open()/show() is detached first: the storage slot holds
+// one batch, so overwriting it would orphan the old listeners on document/window.
 export function addOverlayListeners(component, onClickOutside, extraListeners = []) {
+  removeOverlayListeners(component);
   const onDocClick = (e) => {
     if (onClickOutside(e)) component.close();
   };
