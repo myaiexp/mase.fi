@@ -60,6 +60,10 @@ describe('buildRoutes', () => {
     expect(diet).toMatchObject({ href: 'https://diet.mase.fi', kind: 'subdomain' });
     expect(diet.keys).toContain('diet');
   });
+  it('a lookalike host ending in "mase.fi" without the dot is not a subdomain route', () => {
+    const r = buildRoutes({ projects: [{ name: 'Evil', slug: 'evil', url: 'https://evilmase.fi' }] });
+    expect(r.filter((x) => !x.extra)).toEqual([]);
+  });
   it('skips entries with missing or unparsable urls', () => {
     expect(routes.some((r) => r.name === 'broken' || r.name === 'nourl')).toBe(false);
   });
@@ -166,6 +170,9 @@ describe('isSafeRedirect', () => {
     expect(isSafeRedirect('/\\evil.com', ORIGIN)).toBe(false);
     expect(isSafeRedirect('https://evil.com/x', ORIGIN)).toBe(false);
     expect(isSafeRedirect('https://mase.fi.evil.com', ORIGIN)).toBe(false);
+    // Lookalikes that end in "mase.fi" without the subdomain dot, and userinfo tricks.
+    expect(isSafeRedirect('https://evilmase.fi/x', ORIGIN)).toBe(false);
+    expect(isSafeRedirect('https://mase.fi@evil.com', ORIGIN)).toBe(false);
     expect(isSafeRedirect('javascript:alert(1)', ORIGIN)).toBe(false);
     expect(isSafeRedirect('', ORIGIN)).toBe(false);
   });

@@ -142,6 +142,40 @@ describe('startCountdown', () => {
     expect(replace).not.toHaveBeenCalled();
   });
 
+  it('ignores keys held with ctrl/meta/alt: browser shortcuts neither cancel nor go', () => {
+    vi.useFakeTimers();
+    startCountdown(PLAN, null);
+    for (const mod of ['ctrlKey', 'metaKey', 'altKey']) {
+      document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', [mod]: true, bubbles: true }));
+      document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', [mod]: true, bubbles: true }));
+    }
+    expect(replace).not.toHaveBeenCalled();
+    expect(document.getElementById('countbox').hidden).toBe(false);
+    expect(document.getElementById('cancelnote').hidden).toBe(true);
+    vi.advanceTimersByTime(5000);
+    expect(replace).toHaveBeenCalledWith('/explorer');
+  });
+
+  it('touchstart anywhere cancels the timer (mobile "tap anywhere to stay")', () => {
+    vi.useFakeTimers();
+    startCountdown(PLAN, null);
+    document.body.dispatchEvent(new Event('touchstart', { bubbles: true }));
+    expect(document.getElementById('countbox').hidden).toBe(true);
+    expect(document.getElementById('cancelnote').hidden).toBe(false);
+    vi.advanceTimersByTime(5000);
+    expect(replace).not.toHaveBeenCalled();
+  });
+
+  it('each tick updates the visible count, lit segments and drain bar', () => {
+    vi.useFakeTimers();
+    startCountdown(PLAN, null);
+    vi.advanceTimersByTime(2000);
+    expect(document.getElementById('cnum').textContent).toBe('3');
+    const segs = [...document.getElementById('csegs').children];
+    expect(segs.map((s) => s.classList.contains('on'))).toEqual([true, true, true, false, false]);
+    expect(document.getElementById('drain').style.width).toBe('60%');
+  });
+
   it('reduced-motion shows buttons with no timer and never auto-redirects', () => {
     stubReducedMotion(true);
     vi.useFakeTimers();
@@ -173,6 +207,15 @@ describe('renderFuzzy / renderNone / applyRealStatus / renderConfident', () => {
     expect(hrefWrites).toEqual(['/']);
   });
 
+  it('1–n with ctrl/meta/alt held (browser tab switching) does not jump', () => {
+    renderFuzzy('/exploer', CANDIDATES);
+    for (const mod of ['ctrlKey', 'metaKey', 'altKey']) {
+      document.dispatchEvent(new KeyboardEvent('keydown', { key: '1', [mod]: true, bubbles: true }));
+      document.dispatchEvent(new KeyboardEvent('keydown', { key: 'h', [mod]: true, bubbles: true }));
+    }
+    expect(hrefWrites).toEqual([]);
+  });
+
   it('Enter on the none-state goes home', () => {
     renderNone(3);
     document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
@@ -202,5 +245,17 @@ describe('renderFuzzy / renderNone / applyRealStatus / renderConfident', () => {
     expect(document.getElementById('countbox').hidden).toBe(false);
     vi.advanceTimersByTime(5000);
     expect(replace).toHaveBeenCalledWith('/explorer');
+  });
+
+  it('clamps an over-long typed path to 160 chars and explains the truncation', () => {
+    vi.useFakeTimers();
+    const long = '/explorer/' + 'x'.repeat(190); // 200 chars
+    renderConfident(long, { ...PLAN, tail: long.slice(9), diff: true });
+    const shown = document.getElementById('phead').textContent + document.getElementById('ptail').textContent;
+    expect(shown).toBe(long.slice(0, 160));
+    expect(document.getElementById('pellip').hidden).toBe(false);
+    const note = document.getElementById('pnote');
+    expect(note.hidden).toBe(false);
+    expect(note.textContent).toContain('200 chars');
   });
 });

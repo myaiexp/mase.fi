@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 // Command input key sequences: leftover slash→help, Tab-complete, global
 // shortcuts, Escape, and autocomplete choose (Enter/click channel navigation).
-import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { setupDom, setChannels, ch, type, press, items, cc } from './command-test-helpers.js';
 
 vi.mock('./registry.js', () => ({
@@ -28,6 +28,10 @@ beforeEach(async () => {
   command = await import('./command.js');
   setChannels(registry, [ch('home'), ch('explorer', 'explorer', 'file explorer'), ch('activity')]);
   command.initCommand({});
+});
+
+afterEach(() => {
+  vi.useRealTimers();
 });
 
 // ---- autocomplete choose (channel navigation) ----------------------------
@@ -112,6 +116,18 @@ describe('Tab-complete', () => {
   });
 });
 
+describe('arrow highlight', () => {
+  it('ArrowUp from the first row wraps to the last row', () => {
+    const el = type('/'); // home, explorer, activity
+    expect(el.getAttribute('aria-activedescendant')).toBe('cc-opt-0');
+    press(el, 'ArrowUp');
+    expect(el.getAttribute('aria-activedescendant')).toBe('cc-opt-2');
+    expect(items()[2].classList.contains('selected')).toBe(true);
+    press(el, 'Enter');
+    expect(channels.navigate).toHaveBeenCalledWith('activity');
+  });
+});
+
 describe('global shortcuts (window keydown, non-input target)', () => {
   it('"/" focuses the command input in slash mode', () => {
     press(document.body, '/');
@@ -139,6 +155,26 @@ describe('global shortcuts (window keydown, non-input target)', () => {
     press(document.body, 'g');
     press(document.body, 'a');
     expect(channels.navigate).toHaveBeenCalledWith('activity');
+  });
+
+  it('the g leader expires after 900ms: a late h does not navigate', () => {
+    vi.useFakeTimers();
+    press(document.body, 'g');
+    vi.advanceTimersByTime(901);
+    press(document.body, 'h');
+    expect(channels.navigate).not.toHaveBeenCalled();
+  });
+
+  it('g then h typed into a textarea neither navigates nor steals focus', () => {
+    const area = document.createElement('textarea');
+    document.body.appendChild(area);
+    area.focus();
+    press(area, 'g');
+    press(area, 'h');
+    press(area, '/');
+    expect(channels.navigate).not.toHaveBeenCalled();
+    expect(input().value).toBe('');
+    expect(document.activeElement).toBe(area);
   });
 
   it('h without a preceding g does not navigate', () => {

@@ -43,7 +43,7 @@ Shared web components library built from `src/components/` via Vite library mode
 - **Build:** `pnpm build:components` → `dist/base-components.js` (IIFE)
 - **URL:** `https://mase.fi/base-components.js`
 - Full per-component API (props/attrs/behavior for `<base-text-fit>`, `<base-context-menu>`, etc.): `docs/base-components.md`
-- **Cross-origin caching:** `base.css` and `base-components.js` are served to other apps. Unversioned URLs get `max-age=0, stale-while-revalidate=7d` (a push reaches consumers with no consumer redeploy); any `?v=` makes them `immutable`. Consumers link them unversioned — no deploy-hash `?v=`, no SRI pin, no service-worker `cacheFirst`. `/fonts/` is the content-hashed exception. Full contract: `docs/shared-assets.md`
+- **Cross-origin caching:** `base.css` and `base-components.js` are served to other apps. Unversioned URLs get `max-age=0, stale-while-revalidate=7d` (a push reaches consumers with no consumer redeploy); any `?v=` makes them `immutable`. Consumers link them unversioned — no deploy-hash `?v=`, no service-worker `cacheFirst`; an SRI pin is allowed but goes stale on every mase.fi push (deploy ntfys stale pins). `/fonts/` is the content-hashed exception. Full contract: `docs/shared-assets.md`
 
 ## Deploy
 
