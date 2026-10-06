@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <title>type family · prototype</title>
 <!-- Consumes the worktree's own base.css: the @font-face + --font token render live -->
-<link rel="stylesheet" href="src/base.css">
+<link rel="stylesheet" href="../../../src/base.css">
 <style>
   body { padding: 24px 28px 64px; max-width: 880px; color: var(--text); }
 
@@ -96,12 +96,12 @@
 
 <section>
   <div class="recipe">Weights</div>
-  <h2>Two files, four weights</h2>
-  <p class="note">Only <b>Regular</b> and <b>Bold</b> ship. The <code>@font-face</code> ranges map the in-between weights to a real file: <code>400-500 → Regular</code>, <code>600-700 → Bold</code>. So the on-screen step is Regular → Bold; 500 and 600 are the same pixels as 400 and 700, chosen for authoring intent.</p>
-  <div class="w-row"><span class="w-sample" style="font-weight:400">Body, prose, meta, timestamps</span><span class="w-meta"><b>400</b> · <span class="w-file">Regular</span></span></div>
-  <div class="w-row"><span class="w-sample" style="font-weight:500">Labels, badges, buttons, section headers</span><span class="w-meta"><b>500</b> · <span class="w-file">Regular</span></span></div>
-  <div class="w-row"><span class="w-sample" style="font-weight:600">Nicks, subheads, active-channel</span><span class="w-meta"><b>600</b> · <span class="w-file">Bold</span></span></div>
-  <div class="w-row"><span class="w-sample" style="font-weight:700">Headings, .bold, hard emphasis</span><span class="w-meta"><b>700</b> · <span class="w-file">Bold</span></span></div>
+  <h2>One file, four weights</h2>
+  <p class="note">One variable woff2 ships with <code>font-weight: 400 700</code>. Each of the four weights below renders from its own wght instance of that axis, so 500 and 600 are distinct from 400 and 700.</p>
+  <div class="w-row"><span class="w-sample" style="font-weight:400">Body, prose, meta, timestamps</span><span class="w-meta"><b>400</b> · <span class="w-file">wght 400</span></span></div>
+  <div class="w-row"><span class="w-sample" style="font-weight:500">Labels, badges, buttons, section headers</span><span class="w-meta"><b>500</b> · <span class="w-file">wght 500</span></span></div>
+  <div class="w-row"><span class="w-sample" style="font-weight:600">Nicks, subheads, active-channel</span><span class="w-meta"><b>600</b> · <span class="w-file">wght 600</span></span></div>
+  <div class="w-row"><span class="w-sample" style="font-weight:700">Headings, .bold, hard emphasis</span><span class="w-meta"><b>700</b> · <span class="w-file">wght 700</span></span></div>
 </section>
 
 <section>

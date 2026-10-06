@@ -1,27 +1,10 @@
 // @vitest-environment jsdom
 import { describe, it, expect, beforeAll, afterEach, vi } from 'vitest';
+import { createModal } from './modal-test-helpers.js';
 
 beforeAll(async () => {
   await import('./modal.js');
 });
-
-function createModal(slottedHtml = '') {
-  const el = document.createElement('base-modal');
-  if (slottedHtml) el.innerHTML = slottedHtml;
-  document.body.appendChild(el);
-  return el;
-}
-
-// Build a focusable button in light DOM via createElement (security hook blocks innerHTML=)
-function appendButton(modal, label, { disabled = false, hidden = false, slot = null } = {}) {
-  const btn = document.createElement('button');
-  btn.textContent = label;
-  if (disabled) btn.disabled = true;
-  if (hidden) btn.hidden = true;
-  if (slot) btn.setAttribute('slot', slot);
-  modal.appendChild(btn);
-  return btn;
-}
 
 afterEach(() => {
   document.querySelectorAll('base-modal').forEach(el => el.remove());
@@ -174,97 +157,6 @@ describe('base-modal', () => {
     add.mockRestore();
     remove.mockRestore();
     expect(live).toEqual([]);
-  });
-
-  it('open() focuses the first light-DOM field, not the close button', async () => {
-    // Initial focus must land on the first user-meaningful slotted control, not
-    // the shadow close button (which leads the focusable list for Tab-order).
-    const modal = createModal();
-    const field = appendButton(modal, 'First field');
-    appendButton(modal, 'Second field');
-    const closeBtn = modal.shadowRoot.querySelector('[data-close]');
-    const fieldSpy = vi.spyOn(field, 'focus');
-    const closeSpy = vi.spyOn(closeBtn, 'focus');
-    modal.open();
-    await new Promise((resolve) => requestAnimationFrame(resolve));
-    expect(fieldSpy).toHaveBeenCalled();
-    expect(closeSpy).not.toHaveBeenCalled();
-  });
-
-  it('open() falls back to the close button when no light-DOM focusable exists', async () => {
-    const modal = createModal();
-    const closeBtn = modal.shadowRoot.querySelector('[data-close]');
-    const closeSpy = vi.spyOn(closeBtn, 'focus');
-    modal.open();
-    await new Promise((resolve) => requestAnimationFrame(resolve));
-    expect(closeSpy).toHaveBeenCalled();
-  });
-
-  it('Shift+Tab from the shadow close button wraps to the last light element', () => {
-    // Regression: the close button lives in the shadow root, so document.active-
-    // Element reports the host, not the button. The trap must use shadowRoot.active-
-    // Element to detect it; otherwise Shift+Tab from the close button escapes the modal.
-    const modal = createModal();
-    appendButton(modal, 'B1');
-    appendButton(modal, 'B2');
-    modal.open();
-
-    const focusable = modal._getFocusableElements();
-    const closeBtn = modal.shadowRoot.querySelector('[data-close]');
-    expect(focusable[0]).toBe(closeBtn); // close button leads the Tab order
-    const last = focusable[focusable.length - 1];
-
-    closeBtn.focus();
-    expect(modal.shadowRoot.activeElement).toBe(closeBtn);
-
-    const lastFocusSpy = vi.spyOn(last, 'focus');
-    modal._handleKeyDown(new KeyboardEvent('keydown', { key: 'Tab', shiftKey: true }));
-    expect(lastFocusSpy).toHaveBeenCalled();
-  });
-
-  it('focus trap excludes disabled focusables', () => {
-    const modal = createModal();
-    const b1 = appendButton(modal, 'B1');
-    const disabled = appendButton(modal, 'B2', { disabled: true });
-    const b3 = appendButton(modal, 'B3');
-
-    const focusable = modal._getFocusableElements();
-    expect(focusable).toContain(b1);
-    expect(focusable).toContain(b3);
-    expect(focusable).not.toContain(disabled);
-  });
-
-  it('focus trap excludes hidden focusables (#1789)', () => {
-    // The trap must skip controls the user can't see: the hidden attribute,
-    // display:none, and visibility:hidden all disqualify an element.
-    const modal = createModal();
-    const visible = appendButton(modal, 'V');
-    const hidden = appendButton(modal, 'H', { hidden: true });
-
-    const displayNone = appendButton(modal, 'D');
-    displayNone.style.display = 'none';
-    const invisible = appendButton(modal, 'I');
-    invisible.style.visibility = 'hidden';
-
-    const focusable = modal._getFocusableElements();
-    expect(focusable).toContain(visible);
-    expect(focusable).not.toContain(hidden);
-    expect(focusable).not.toContain(displayNone);
-    expect(focusable).not.toContain(invisible);
-  });
-
-  it('focus trap excludes a disabled control matched only by [tabindex] (#1789)', () => {
-    // FOCUSABLE_SELECTORS' :not([disabled]) only applies to the native-control
-    // clauses, so a disabled element carrying tabindex slips in via the
-    // [tabindex] clause. isFocusable's el.disabled check catches it.
-    const modal = createModal();
-    const ok = appendButton(modal, 'OK');
-    const sneaky = appendButton(modal, 'SNEAKY', { disabled: true });
-    sneaky.setAttribute('tabindex', '0');
-
-    const focusable = modal._getFocusableElements();
-    expect(focusable).toContain(ok);
-    expect(focusable).not.toContain(sneaky);
   });
 
   it('close event carries bubbles, composed, and null detail', () => {

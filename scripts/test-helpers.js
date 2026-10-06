@@ -50,11 +50,13 @@ const hermeticDefaults = {
 // The env a pipeline script runs under: host env, Helsinki TZ, the caller's
 // overrides, and hermeticDefaults for whatever live resource the caller left out.
 export function scriptEnv(env = {}) {
-  // Pin Helsinki unless the caller overrides TZ. Both pipeline scripts that
-  // compute "today" also force it internally; this keeps fixtures, helpers,
-  // and any future date call on the same calendar even if a host TZ leaks in
-  // (e.g. `TZ=Pacific/Kiritimati vitest`). Only an explicit per-call env.TZ
-  // wins over the pin.
+  // Pin Helsinki unless the caller overrides TZ, so a spawned script never
+  // inherits a hostile host TZ (e.g. `TZ=Pacific/Kiritimati vitest`). Only an
+  // explicit per-call env.TZ wins over the pin. mase-fi-update,
+  // mase-fi-daily-summary, and mase-fi-compact-updates also force Helsinki on
+  // their own date calls. The pin applies to this child environment only: it
+  // does not set the vitest process TZ, so fixtures or helpers that call
+  // `new Date()` in-process still follow the host TZ.
   const merged = { ...process.env, TZ: 'Europe/Helsinki', ...env };
   for (const [key, fallback] of Object.entries(hermeticDefaults)) {
     if (key in env) continue;
@@ -89,7 +91,7 @@ function writeFailingStub(dir, name) {
   return path;
 }
 
-// The exact date string the scripts use for "today" (both force
+// The exact date string the scripts use for "today" (each writer forces
 // `TZ="Europe/Helsinki" date +%Y-%m-%d`; runScript pins the same TZ so a
 // fixture seeded before spawn cannot drift). Shell out so there is zero chance
 // of TZ drift between the fixture and the script.

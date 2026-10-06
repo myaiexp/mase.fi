@@ -345,6 +345,26 @@ describe('base-context-menu', () => {
     expect(highlighted.textContent).toBe('A');
   });
 
+  // nextEnabledIndex stops after one lap; a loop without that bound never
+  // returns here and the key press hangs the page.
+  it.each(['ArrowDown', 'ArrowUp'])('%s highlights nothing when every item is disabled or a separator', (key) => {
+    const cm = createMenu();
+    const action = vi.fn();
+    cm.show(100, 100, [
+      { label: 'A', action, disabled: true },
+      { separator: true },
+      { label: 'B', action, disabled: true },
+    ]);
+
+    document.dispatchEvent(new KeyboardEvent('keydown', { key, bubbles: true }));
+    expect(cm.shadowRoot.querySelector('.item.highlighted')).toBeNull();
+
+    // With no highlight, Enter has nothing to run and the menu stays up.
+    document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
+    expect(action).not.toHaveBeenCalled();
+    expect(cm.isOpen).toBe(true);
+  });
+
   // 19. Enter on highlighted item calls action and closes
   it('Enter on highlighted item calls action and closes', () => {
     const cm = createMenu();

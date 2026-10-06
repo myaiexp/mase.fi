@@ -9,6 +9,14 @@
 > 403 (`applyRealStatus`). There is no hardcoded route table, so ignore the
 > "no network calls", "No storage, no fetch" and "baked into the file at deploy
 > time" lines below.
+>
+> The packaging changed too. The shipped page is not one hand-written static file:
+> `404.html` is a second Vite entry (the `notfound` input in `vite.config.js`), built
+> with the rest of the site. Its script is a module,
+> `import { start } from '/src/notfound-page.js'`, which pulls in the pure matching
+> ladder from `src/notfound.js`. Ignore the "no build step", "single static HTML
+> file", "inline `<script>`", "no dependencies" and "under 15 KB" lines below; there
+> is no page-weight budget. nginx still serves it through `error_page`.
 
 
 ## Overview

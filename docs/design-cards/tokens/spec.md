@@ -65,7 +65,7 @@ One accent for the whole system. `--accent-glow` is the accent's tint surface (u
 |---|---|---|
 | `--accent` | `#e8a308` | Accent fills, focus ring, active state |
 | `--accent-text` | `#e8a308` | Accent-colored text (same hue, separate token so text vs fill can diverge later) |
-| `--accent-glow` | `rgba(232,163,8,0.12)` | Accent tint surface — primary-button bg, glow fills |
+| `--accent-glow` | `color-mix(in srgb, var(--accent) 12%, transparent)` | Accent tint surface — primary-button bg, glow fills. Resolves to `rgba(232,163,8,0.12)` on the default amber and follows an `--accent` override on the root |
 
 ## Semantic palette
 
@@ -83,18 +83,19 @@ want a green. Each maps to a fixed meaning across every project.
 
 ### Semantic surfaces (15% tint)
 
-Pre-mixed fill tints for banners/badges. Note the asymmetry: **there is no `--cyan-bg`**
-(cyan is used as text/marks, not as a filled surface). If you need a tint that isn't listed,
-mix it at the point of use with `color-mix(in srgb, var(--x) N%, transparent)` rather than
-adding a one-off token.
+Pre-mixed fill tints for banners/badges. Each is `color-mix(in srgb, var(--x) 15%, transparent)`,
+so a root override of `--green` (or any other source color) re-tints its surface. If you need a
+tint that isn't listed, mix it at the point of use with the same expression rather than adding
+a one-off token.
 
-| Token | Value |
-|---|---|
-| `--green-bg` | `rgba(34,197,94,0.15)` |
-| `--red-bg` | `rgba(239,68,68,0.15)` |
-| `--orange-bg` | `rgba(210,153,34,0.15)` |
-| `--blue-bg` | `rgba(88,166,255,0.15)` |
-| `--purple-bg` | `rgba(188,140,255,0.15)` |
+| Token | Value | Default resolved |
+|---|---|---|
+| `--green-bg` | `color-mix(in srgb, var(--green) 15%, transparent)` | `rgba(34,197,94,0.15)` |
+| `--red-bg` | `color-mix(in srgb, var(--red) 15%, transparent)` | `rgba(239,68,68,0.15)` |
+| `--orange-bg` | `color-mix(in srgb, var(--orange) 15%, transparent)` | `rgba(210,153,34,0.15)` |
+| `--blue-bg` | `color-mix(in srgb, var(--blue) 15%, transparent)` | `rgba(88,166,255,0.15)` |
+| `--purple-bg` | `color-mix(in srgb, var(--purple) 15%, transparent)` | `rgba(188,140,255,0.15)` |
+| `--cyan-bg` | `color-mix(in srgb, var(--cyan) 15%, transparent)` | `rgba(6,182,212,0.15)` |
 
 ## Type
 
@@ -112,8 +113,8 @@ Monospace-only system. One family, five sizes, two line-heights.
 | `--leading` | `1.4` | Default line-height |
 | `--leading-tight` | `1.2` | Headings, dense rows |
 
-Only two weights ship (400 + 700 `@font-face`). `font-weight: 500` renders from the 400 file
-— safe to use for a subtle emphasis without loading a third weight.
+One variable woff2 ships (`@font-face` `font-weight: 400 700`). 400, 500, 600, and 700 each
+render from their own wght instance of that axis, with no synthesis (see **type-family**).
 
 ## Spacing (2 / 4 / 8 / 12 / 16 / 24)
 

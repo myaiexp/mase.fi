@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <title>tokens · prototype</title>
 <!-- Consumes the worktree's own base.css so any token refinement renders live -->
-<link rel="stylesheet" href="src/base.css">
+<link rel="stylesheet" href="../../../src/base.css">
 <style>
   body {
     padding: 24px 28px 64px;
@@ -180,14 +180,14 @@
 <section>
   <div class="recipe">Semantic surfaces</div>
   <h2>15% tints</h2>
-  <p class="note">Pre-mixed fills for banners and badges, over true-black. Note the asymmetry — there is no <code>--cyan-bg</code> (cyan is a mark/text color, not a filled surface).</p>
+  <p class="note">Pre-mixed fills for banners and badges, over true-black. Each is <code>color-mix(in srgb, var(--x) 15%, transparent)</code>, so a root override of the source color re-tints it.</p>
   <div class="grid" data-group="semanticBg"></div>
 </section>
 
 <section>
   <div class="recipe">Type</div>
   <h2>Five sizes, one family</h2>
-  <p class="note">Monospace-only. Only 400 + 700 ship; <code>font-weight: 500</code> renders from the 400 file — safe subtle emphasis without a third weight.</p>
+  <p class="note">Monospace-only. One variable woff2 ships; 400, 500, 600, and 700 each render from their own wght instance, with no synthesis.</p>
   <div data-group="type"></div>
   <p class="kv" style="margin-top:12px;">family <b id="fam"></b> · line-height <b id="lh"></b> / <b id="lht"></b> tight</p>
 </section>
@@ -230,7 +230,7 @@
     borders:    ['--border', '--border-hover', '--border-overlay'],
     accent:     ['--accent', '--accent-text', '--accent-glow'],
     semantic:   ['--green', '--red', '--blue', '--cyan', '--orange', '--purple'],
-    semanticBg: ['--green-bg', '--red-bg', '--orange-bg', '--blue-bg', '--purple-bg'],
+    semanticBg: ['--green-bg', '--red-bg', '--orange-bg', '--blue-bg', '--purple-bg', '--cyan-bg'],
   };
   for (const [group, names] of Object.entries(GROUPS)) {
     const host = document.querySelector(`[data-group="${group}"]`);

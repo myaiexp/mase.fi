@@ -247,6 +247,48 @@ describe('base-select', () => {
 
   // --- Keyboard ---
 
+  it.each(['ArrowDown', 'ArrowUp'])('%s on a closed select opens it on the first enabled option', (key) => {
+    const el = createSelect({ options: [
+      { value: 'a', label: 'A', disabled: true },
+      { value: 'b', label: 'B' },
+      { value: 'c', label: 'C' },
+    ] });
+    const received = [];
+    el.addEventListener('change', (e) => received.push(e.detail));
+    expect(el.isOpen).toBe(false);
+
+    const press = new KeyboardEvent('keydown', { key, bubbles: true, cancelable: true });
+    getTrigger(el).dispatchEvent(press);
+
+    expect(el.isOpen).toBe(true);
+    expect(getMenu(el).hidden).toBe(false);
+    expect(press.defaultPrevented).toBe(true); // the arrow must not scroll the page
+    // Opening consumes the key: the highlight starts on the first enabled option
+    // for both arrows, and nothing is selected yet.
+    expect(getOptions(el).map((o) => o.classList.contains('active'))).toEqual([false, true, false]);
+    expect(received).toEqual([]);
+    expect(el.value).toBe('');
+  });
+
+  it.each(['ArrowDown', 'ArrowUp'])('%s opens a closed searchable select from its input', (key) => {
+    const el = createSelect({ searchable: true, options: [{ value: 'a', label: 'A' }, { value: 'b', label: 'B' }] });
+    expect(el.isOpen).toBe(false);
+
+    const press = new KeyboardEvent('keydown', { key, bubbles: true, cancelable: true });
+    getTrigger(el).dispatchEvent(press);
+
+    expect(el.isOpen).toBe(true);
+    expect(press.defaultPrevented).toBe(true);
+    expect(getOptions(el)[0].classList.contains('active')).toBe(true);
+  });
+
+  it.each(['ArrowDown', 'ArrowUp'])('%s leaves a disabled select closed', (key) => {
+    const el = createSelect({ disabled: true, options: [{ value: 'a', label: 'A' }] });
+    getTrigger(el).dispatchEvent(new KeyboardEvent('keydown', { key, bubbles: true, cancelable: true }));
+    expect(el.isOpen).toBe(false);
+    expect(getMenu(el).hidden).toBe(true);
+  });
+
   it('ArrowDown/Up navigates options', () => {
     const el = createSelect({ options: [{ value: 'a', label: 'A' }, { value: 'b', label: 'B' }, { value: 'c', label: 'C' }] });
     el.open();

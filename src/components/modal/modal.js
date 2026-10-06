@@ -103,13 +103,19 @@ const FOCUSABLE_SELECTORS = [
   '[tabindex]:not([tabindex="-1"])',
 ].join(', ');
 
-// True when `el` can actually receive focus: not disabled and not hidden. The
-// FOCUSABLE_SELECTORS query is a coarse first pass; this is the precise gate.
+// True when `el` is a Tab stop: not disabled, not hidden, and not taken out of
+// the Tab order by a negative tabindex. The FOCUSABLE_SELECTORS query is a
+// coarse first pass; this is the precise gate.
 // Visibility is checked on the element itself (hidden attribute, display:none,
 // visibility:hidden/collapse) — the reliable signals in a layout-less DOM. The
 // browser-only "ancestor display:none / zero-size" case isn't caught here.
 function isFocusable(el) {
   if (el.disabled || el.getAttribute('aria-disabled') === 'true') return false;
+  // The native-control clauses match a control whatever its tabindex, and the
+  // [tabindex] clause only rejects the literal "-1". The browser skips every
+  // negative value on Tab, so one of those as the trap's first/last entry never
+  // equals the focused element and Tab walks out of the dialog.
+  if (parseInt(el.getAttribute('tabindex'), 10) < 0) return false;
   if (el.hidden) return false;
   const style = getComputedStyle(el);
   if (style.display === 'none') return false;
@@ -122,7 +128,7 @@ class BaseModal extends HTMLElement {
   // hard-private internal state; `_member` is deliberately reachable by a friend
   // module or test. The focus-trap internals (`_handleKeyDown`,
   // `_getFocusableElements`, `_getLightFocusables`) are exercised directly by
-  // modal.test.js — those stay `_`; everything else is #private.
+  // modal.test.js and modal-focus.test.js — those stay `_`; everything else is #private.
   #open = false;
   #onKeyDown = null;
 
@@ -229,9 +235,10 @@ class BaseModal extends HTMLElement {
 
   // Focusable controls from the slotted light DOM, already gated by isFocusable.
   // The selectors only filter [disabled] on the native-control clauses, so a
-  // hidden control (hidden attr / display:none / visibility:hidden) or a disabled
-  // element matched solely by the [tabindex] clause still slips through; drop
-  // those — the trap must never park focus on something the user can't see or use.
+  // hidden control (hidden attr / display:none / visibility:hidden), a disabled
+  // element matched solely by the [tabindex] clause, or a native control with a
+  // negative tabindex still slips through; drop those — the trap must never park
+  // focus on something the user can't see, use, or Tab to.
   _getLightFocusables() {
     return Array.from(this.querySelectorAll(FOCUSABLE_SELECTORS)).filter((el) => isFocusable(el));
   }

@@ -66,14 +66,16 @@ reading the canonical `--fg-*` is stranded at the base value. It works today bec
 own components read the aliases — but it's a forward trap the moment a consumer styles against
 `--fg-*`. Prefer overriding the root.
 
-## Pre-mixed tints don't track
+## Pre-mixed tints track a root override only
 
-The semantic **surface** tokens (`--green-bg` … `--purple-bg`) and any component that hardcodes an
-rgba are **frozen literals of the default hue** — they do **not** follow a re-themed `--green`. A
-theme that re-tints a semantic color must also re-declare that color's tint, **or** the component
-should mix at the call site: `color-mix(in srgb, var(--green) 15%, transparent)`. That is the
-pattern `.status` / `.tag` already use, and it tracks a theme for free. Prefer it over a frozen
-`--*-bg` when authoring anything meant to re-theme cleanly.
+The semantic **surface** tokens (`--green-bg` … `--cyan-bg`) and `--accent-glow` are declared on
+`:root` as `color-mix(in srgb, var(--green) 15%, transparent)` (12% for `--accent-glow`). The
+`var()` inside resolves on the element the token is **declared** on, so a theme that re-declares
+`--green` on the root (`[data-theme]` on `<html>`, a project's own `:root`) re-tints `--green-bg`
+with it. An override set on a **descendant** does not reach it: that subtree still inherits the
+root's computed tint. A scope that re-tints a semantic color below the root must re-declare the
+tint there too, **or** mix at the call site (`color-mix(in srgb, var(--green) 15%, transparent)`),
+which is what `.status` / `.tag` do. A component that hardcodes an rgba follows neither.
 
 ## Composable modifiers
 

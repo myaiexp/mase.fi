@@ -320,7 +320,7 @@ pre code {
 /* ===== Status / Tag badges (dot+tint recipe) ===== */
 /* Additive — coexists with .label*. .status = live state (leading dot),
    .tag = static classification (no dot). Tints via color-mix so they track the color var.
-   font-weight:500 renders from the Regular file — its @font-face declares the 400-500 range. */
+   font-weight:500 is a real wght instance of the variable face (@font-face: 400 700), not synthesized. */
 
 .status,
 .tag {

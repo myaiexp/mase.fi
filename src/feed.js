@@ -2,7 +2,7 @@
 import { entriesFor, loadArchive } from './data.js';
 import { dayOf, entryNow, timeOf } from './dates.js';
 import { playJitter, clearJitter } from './jitter.js';
-import { relayoutAll, layoutRow, measureFeedMetrics } from './feed-layout.js';
+import { relayoutAll, relayoutRow, layoutRow, measureFeedMetrics } from './feed-layout.js';
 
 const MAX_JITTER = 14;
 // Rows materialized on first paint / revealed per scroll-up batch. Windowing
@@ -145,7 +145,13 @@ export function renderFeed(id, data, { immediate = false, navigate } = {}) {
   // playJitter applies the reduced-motion policy itself.
   if (immediate) return;
   const tail = rowEls.slice(-MAX_JITTER);
-  playJitter(tail);
+  // Each row is laid out again from dataset.raw at the width it has when its
+  // scramble ends, then announced like any other relayout so an active search
+  // (command.js) re-marks it.
+  playJitter(tail, (row) => {
+    relayoutRow($feed, row);
+    $feed.dispatchEvent(new CustomEvent('feed:relayout'));
+  });
 }
 
 // Watch the top sentinel; when it nears the top of the scroll viewport and older

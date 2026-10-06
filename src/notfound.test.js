@@ -184,4 +184,17 @@ describe('isSafeRedirect', () => {
     expect(isSafeRedirect('javascript:alert(1)', ORIGIN)).toBe(false);
     expect(isSafeRedirect('', ORIGIN)).toBe(false);
   });
+  // `new URL` throws on a target or origin it cannot parse. The guard has to
+  // answer false: a throw would escape go() instead of refusing the navigation.
+  it('refuses, without throwing, a target or origin that does not parse', () => {
+    expect(isSafeRedirect('http://[', ORIGIN)).toBe(false);
+    expect(isSafeRedirect('/explorer', 'not a url')).toBe(false);
+    expect(isSafeRedirect('/explorer', '')).toBe(false);
+    expect(isSafeRedirect('/explorer', undefined)).toBe(false);
+  });
+  it('refuses a non-string target', () => {
+    for (const target of [null, undefined, 42, {}, ['/explorer']]) {
+      expect(isSafeRedirect(target, ORIGIN)).toBe(false);
+    }
+  });
 });
