@@ -57,10 +57,6 @@ the browser's weight-fallback algorithm.
 | 600 | wght 600 | Nicks, subheads, active-channel, dense-row emphasis (mase.fi app) |
 | 700 | wght 700 | Headings (`h1`/`h2`/`h3`), `.bold`, hard emphasis |
 
-400 and 500 are the same file; 600 and 700 are the same file. The step that reads on screen
-is Regular → Bold; 500 and 600 are the same pixels as 400 and 700 respectively, chosen for
-authoring intent, not a distinct rendered weight.
-
 ## Features
 
 `base.css` sets **no** `font-feature-settings`, so JetBrains Mono renders at the browser
