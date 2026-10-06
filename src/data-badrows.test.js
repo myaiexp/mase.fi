@@ -51,6 +51,32 @@ describe('fetchData with malformed rows', () => {
   });
 });
 
+// A container that is not an array counts as empty; the other container still
+// loads. Without the Array.isArray guards `.filter` throws and the outer catch
+// returns emptyData, dropping the valid half too.
+describe('fetchData with a non-array container', () => {
+  const daily = { category: 'daily', date: '2026-01-03T10:00', summary: 'kept-daily' };
+  const helm = { name: 'Helm', channel: 'helm', slug: 'helm' };
+
+  it.each([[null], [{}], ['helm'], [7]])('keeps the entries when projects is %j', async (projects) => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    stubFetch({ projects, entries: [daily] });
+    const data = await fetchData();
+    expect(data.projects).toEqual([]);
+    expect(data.entries.map((e) => e.text)).toEqual(['kept-daily']);
+    expect(warn).not.toHaveBeenCalled(); // neither the bad-row count nor the degrade-to-empty path
+  });
+
+  it.each([[null], [{}], ['x'], [7]])('keeps the projects when entries is %j', async (entries) => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    stubFetch({ projects: [helm], entries });
+    const data = await fetchData();
+    expect(data.projects.map((p) => p.channel)).toEqual(['helm']);
+    expect(data.entries).toEqual([]);
+    expect(warn).not.toHaveBeenCalled();
+  });
+});
+
 describe('loadArchive with malformed rows', () => {
   it('skips a log row with a non-string project instead of failing the merge', async () => {
     vi.spyOn(console, 'warn').mockImplementation(() => {});

@@ -125,6 +125,25 @@ describe('base-tabs', () => {
     expect(tabs.activeIndex).toBe(2);
   });
 
+  // nextEnabledIndex stops after one lap; a loop without that bound never
+  // returns here and the key press hangs the page.
+  it.each(['ArrowRight', 'ArrowLeft'])('%s returns without moving when every tab is disabled', (key) => {
+    const { tabs } = createTabs([
+      { label: 'P', disabled: true },
+      { label: 'Q', disabled: true },
+      { label: 'R', disabled: true },
+    ]);
+    const bar = tabs.shadowRoot.querySelector('[role="tablist"]');
+    const before = tabs.activeIndex;
+    const events = [];
+    tabs.addEventListener('tab-change', (e) => events.push(e.detail));
+
+    bar.dispatchEvent(new KeyboardEvent('keydown', { key, bubbles: true }));
+
+    expect(tabs.activeIndex).toBe(before);
+    expect(events).toEqual([]);
+  });
+
   it.each([['Enter'], [' ']])('%j commits the focused tab and fires tab-change', (key) => {
     const { tabs } = createTabs([
       { label: 'P' },

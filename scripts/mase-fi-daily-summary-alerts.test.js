@@ -1,13 +1,14 @@
 // Golden-file tests for mase-fi-daily-summary's ntfy alerts: the compact FAILED/degraded
-// pushes, the on_exit FAILED push on a hard abort, and ntfy_send's token handling
-// (stdin not argv, the HELM_ENV fallback, the CR/LF strip). A recording fake curl
+// pushes, the degraded-run pushes (summaries that fell back to a commit count, projects
+// whose feed embargo could not be checked), the on_exit FAILED push on a hard abort, and
+// ntfy_send's token handling (stdin not argv, the HELM_ENV fallback, the CR/LF strip). A recording fake curl
 // stands in for ntfy; `claude -p` is stubbed via CLAUDE_BIN and the showcase API is
 // unreachable, so every run is hermetic.
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import process from 'node:process';
 import { join } from 'node:path';
 import { chmodSync, existsSync, mkdirSync, writeFileSync, readFileSync } from 'node:fs';
-import { makeTempDir, cleanup, writeJson, readJson, runScript, todayHelsinki, writeClaudeStub } from './test-helpers.js';
+import { makeTempDir, cleanup, writeJson, readJson, runScript, todayHelsinki, writeClaudeStub, writeHelmStub } from './test-helpers.js';
 
 // Each run spawns the whole script (jq, curl, the compactor, the stubs): ~2s alone on
 // the VPS, and past vitest's 5s default once the other script suites run beside it.
@@ -107,6 +108,61 @@ describe('mase-fi-daily-summary — compact alerts (finding #9443)', () => {
     expect(dailies()).toHaveLength(1);
     expect(curl.pushes()).toBe('');
     expect(readJson(join(dir, 'updates-archive.json')).entries.map((e) => e.text)).toEqual(['ancient commit']);
+  });
+});
+
+// Both paths end in a successful run whose output is thinner than it should be: the
+// push is the only signal, since stdout goes to a journal nobody is reading.
+describe('mase-fi-daily-summary — degraded-run alerts', () => {
+  const DEGRADED = /^Title: mase\.fi daily-summary degraded$/gm;
+  const titles = (curl) => curl.stdin().match(DEGRADED) ?? [];
+
+  it('pushes one alert with the fallback ratio when claude fails', () => {
+    seed([log('alpha', 'feat: one'), log('alpha', 'feat: two'), log('beta', 'fix: a'), log('beta', 'fix: b'), log('gamma', 'chore: solo')]);
+    const curl = fakeCurl();
+    const r = run({ ...curl.env, CLAUDE_BIN: writeClaudeStub(dir, { exitCode: 1 }) });
+    expect(r.status).toBe(0);
+    expect(dailies().map((e) => e.summary).sort()).toEqual(['alpha: 2 commits', 'beta: 2 commits', 'chore: solo']);
+    // One consolidated push, not one per project; gamma's single commit never reached claude.
+    expect(titles(curl)).toHaveLength(1);
+    expect(curl.argv()).toContain(`${TODAY}: 2/2 project summaries fell back to commit counts`);
+  });
+
+  it('pushes an alert counting the projects whose feed embargo could not be checked', () => {
+    seed([log('unreachable', 'feat: a thing'), log('alpha', 'feat(alpha): visible')]);
+    const curl = fakeCurl();
+    const r = run({ ...curl.env, HELM_BIN: writeHelmStub(dir, { unknown: ['unreachable'] }) });
+    expect(r.status).toBe(0);
+    expect(dailies().map((e) => e.project)).toEqual(['alpha']);
+    expect(titles(curl)).toHaveLength(1);
+    expect(curl.argv()).toContain(`${TODAY}: 1 project(s) got no daily entry — their feed embargo could not be checked`);
+  });
+
+  it('pushes both alerts when a run hits both', () => {
+    seed([log('unreachable', 'feat: a thing'), log('alpha', 'feat: one'), log('alpha', 'feat: two')]);
+    const curl = fakeCurl();
+    run({
+      ...curl.env,
+      HELM_BIN: writeHelmStub(dir, { unknown: ['unreachable'] }),
+      CLAUDE_BIN: writeClaudeStub(dir, { exitCode: 1 }),
+    });
+    expect(titles(curl)).toHaveLength(2);
+    expect(curl.argv()).toMatch(/1 project\(s\) got no daily entry/);
+    expect(curl.argv()).toMatch(/1\/1 project summaries fell back/);
+  });
+
+  // An embargoed project is the gate working, and a summary claude did write is not degraded.
+  it('pushes nothing for an embargoed project or a summary that came back', () => {
+    seed([log('held-back', 'feat: hidden'), log('alpha', 'feat: one'), log('alpha', 'feat: two')]);
+    const curl = fakeCurl();
+    const r = run({
+      ...curl.env,
+      HELM_BIN: writeHelmStub(dir, { embargoed: ['held-back'] }),
+      CLAUDE_BIN: writeClaudeStub(dir, { output: 'shipped two things' }),
+    });
+    expect(r.status).toBe(0);
+    expect(dailies().map((e) => e.summary)).toEqual(['shipped two things']);
+    expect(curl.pushes()).toBe('');
   });
 });
 

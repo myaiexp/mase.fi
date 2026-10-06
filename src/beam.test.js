@@ -217,4 +217,69 @@ describe('mountBeam', () => {
     vi.advanceTimersByTime(1600);
     expect(vi.getTimerCount()).toBe(0);
   });
+
+  // Fake timers drive requestAnimationFrame too (one frame per 16ms) and count
+  // a pending frame in getTimerCount.
+  const FRAME_MS = 16;
+  const beamOf = (host) => host.querySelector('.ascii-beam');
+  const charsOf = (host) => [...host.querySelectorAll('.bch')].map((el) => el.textContent).join('');
+
+  it('self-cleans within one frame when the host is detached mid-sweep', () => {
+    // play()'s entry check only runs between phases. A host detached while a
+    // sweep is in flight is caught by step(): without that guard the sweep keeps
+    // painting the detached spans until the phase ends.
+    stubReducedMotion(false);
+    const host = makeHost();
+    mountBeam(host, 'AB');
+    vi.advanceTimersByTime(1600 + 3 * FRAME_MS);
+    expect(beamOf(host).style.opacity).not.toBe('0'); // the sweep is running
+    expect(vi.getTimerCount()).toBe(1); // the next frame
+
+    host.remove();
+    vi.advanceTimersByTime(FRAME_MS);
+
+    expect(vi.getTimerCount()).toBe(0);
+    expect(host.classList.contains('beam-host')).toBe(false);
+    expect(host.textContent).toBe('AB'); // spans replaced by the plain logo
+  });
+
+  it('a click during the first delay starts the sweep at once', () => {
+    stubReducedMotion(false);
+    const host = makeHost();
+    mountBeam(host, 'AB');
+    expect(beamOf(host).style.opacity).toBe('');
+
+    host.click();
+    vi.advanceTimersByTime(3 * FRAME_MS); // far short of FIRST_DELAY_MS
+
+    expect(beamOf(host).style.opacity).not.toBe('0');
+    expect(beamOf(host).style.transform).toMatch(/^translateX\(/);
+    expect(vi.getTimerCount()).toBe(1); // the pending first-delay timeout was cleared
+  });
+
+  it('a click mid-sweep cancels the frame in flight and replays from pristine', () => {
+    stubReducedMotion(false);
+    const host = makeHost();
+    mountBeam(host, 'AB');
+    vi.advanceTimersByTime(1600 + 3 * FRAME_MS);
+    const cancel = vi.spyOn(globalThis, 'cancelAnimationFrame');
+
+    host.click();
+
+    expect(cancel).toHaveBeenCalledTimes(1);
+    expect(charsOf(host)).toBe('AB');
+    expect(beamOf(host).style.opacity).toBe('0');
+    expect(vi.getTimerCount()).toBe(1); // one chain: the old frame is gone, the replay's is queued
+    vi.advanceTimersByTime(3 * FRAME_MS);
+    expect(beamOf(host).style.opacity).not.toBe('0');
+  });
+
+  it('a click after unmount starts nothing', () => {
+    stubReducedMotion(false);
+    const host = makeHost();
+    mountBeam(host, 'AB');
+    unmountBeam();
+    host.click();
+    expect(vi.getTimerCount()).toBe(0);
+  });
 });
