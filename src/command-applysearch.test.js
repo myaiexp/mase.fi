@@ -4,7 +4,7 @@
 // feed:relayout re-apply. The lower-level applySearch(el, term) unit tests
 // against pretext-laid-out rows live in command-search.test.js.
 import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { setupDom, setChannels, ch, type, feedRow } from './command-test-helpers.js';
+import { setupDom, setChannels, ch, type, press, feedRow } from './command-test-helpers.js';
 
 vi.mock('./registry.js', () => ({
   getChannels: vi.fn(() => []),
@@ -50,6 +50,36 @@ describe('applySearch', () => {
   it('clearing the query removes all marks and un-dims every row', () => {
     type('world');
     type('');
+    expect(document.querySelector('mark')).toBeNull();
+    expect(document.querySelector('.search-dim')).toBeNull();
+  });
+
+  // Once the input holds a "/" jump or "?" help it no longer shows the query, so
+  // the feed must not stay dimmed for it under the popup.
+  it.each(['/', '/ho', '?'])('typing %j over an active search drops its marks and dimming', (value) => {
+    type('world');
+    expect(document.querySelector('mark')).not.toBeNull();
+    type(value);
+    expect(document.querySelector('mark')).toBeNull();
+    expect(document.querySelector('.search-dim')).toBeNull();
+    expect([...document.querySelectorAll('.feed-row .msg')].map((m) => m.textContent))
+      .toEqual(['hello world', 'goodbye moon']);
+  });
+
+  // The global shortcuts replace the input value from outside the input.
+  it.each(['/', '?'])('the global %j shortcut drops an active search', (key) => {
+    const input = type('world');
+    input.blur();
+    press(document.body, key);
+    expect(input.value).toBe(key);
+    expect(document.querySelector('mark')).toBeNull();
+    expect(document.querySelector('.search-dim')).toBeNull();
+  });
+
+  it('a search replaced by "/" is not re-applied by a later feed:relayout', () => {
+    type('world');
+    type('/');
+    document.getElementById('feed').dispatchEvent(new CustomEvent('feed:relayout'));
     expect(document.querySelector('mark')).toBeNull();
     expect(document.querySelector('.search-dim')).toBeNull();
   });

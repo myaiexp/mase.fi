@@ -13,13 +13,16 @@ export function clearJitter() {
   timers = [];
 }
 
-/** Play jitter on a list of row elements. Each gets 2–3 scrambled frames before settling. */
-export function playJitter(rowEls) {
+/** Play jitter on a list of row elements. Each gets 2–3 scrambled frames before settling.
+ *  The frames overwrite .msg in place, and `settle(row)` rebuilds it when the row's
+ *  animation ends. It is rebuilt rather than restored from a copy taken here: a
+ *  copy would undo a resize relayout or a search highlight that reached the row
+ *  mid-animation. */
+export function playJitter(rowEls, settle) {
   if (prefersReducedMotion()) return;
   rowEls.forEach(({ row }, i) => {
     const msgEl = row.querySelector('.msg');
     const nickEl = row.querySelector('.nick');
-    const originalMsg = msgEl.cloneNode(true); // live DOM snapshot — no HTML parse/serialize round-trip
     const originalText = msgEl.textContent;
     const originalNick = nickEl.textContent;
     row.classList.add('jitter');
@@ -35,7 +38,7 @@ export function playJitter(rowEls) {
       }, at));
     }
     timers.push(setTimeout(() => {
-      msgEl.replaceChildren(...originalMsg.cloneNode(true).childNodes); // restore from the live-DOM snapshot
+      settle(row);
       nickEl.textContent = originalNick;
       row.classList.remove('jitter');
     }, start + JITTER_MS));

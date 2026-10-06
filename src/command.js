@@ -24,6 +24,10 @@ let $cmd, $cmdInput, $cmdPrompt, $cmdHint, $cmdComplete, $feed;
 function updateMode() {
   const v = $cmdInput.value;
   $cmd.classList.remove('mode-slash', 'mode-search', 'mode-help');
+  // A "/" jump or "?" help replaces the query in the input, so the search it
+  // was showing ends here: otherwise the feed stays marked and dimmed under the
+  // popup, and feed:relayout keeps re-applying a term nothing displays.
+  if (searchTerm && /^[/?]/.test(v)) search('');
   if (v.startsWith('/')) {
     $cmd.classList.add('mode-slash');
     $cmdPrompt.textContent = '/';

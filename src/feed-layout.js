@@ -106,6 +106,14 @@ export function measureFeedMetrics(feedEl) {
   };
 }
 
+/** Lay out one row at the feed's current metrics. Unlike relayoutAll this never
+ *  skips: with no measurable width the row gets layoutRow's plain fallback, so a
+ *  caller that overwrote .msg always gets real content back. */
+export function relayoutRow(feedEl, row) {
+  const m = measureFeedMetrics(feedEl);
+  layoutRow(row, m ? m.msgWidth : 0, m ? m.font : '');
+}
+
 /** Lay out every .feed-row currently in the feed. */
 export function relayoutAll(feedEl) {
   const m = measureFeedMetrics(feedEl);
