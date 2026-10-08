@@ -8,6 +8,21 @@ export { fetchDemos };
 export { loadArchive } from './data-archive.js';
 
 const SOURCE_URL = '/updates.json';
+// Distinct from any array fetchDemos can return, so a timeout is not an empty manifest.
+const DEMOS_UNREADY = Symbol('demos-unready');
+
+// The manifest races the grace window. A win is the slug list. A loss keeps the
+// still-running promise so the caller can apply it after first paint.
+async function demosWithinGrace(demosPromise) {
+  const raced = await raceTimeout(demosPromise, DEMOS_GRACE_MS, DEMOS_UNREADY);
+  if (raced === DEMOS_UNREADY) return { demos: [], pendingDemos: demosPromise };
+  return { demos: raced };
+}
+
+function withPendingDemos(data, demoFields) {
+  if (demoFields.pendingDemos) data.pendingDemos = demoFields.pendingDemos;
+  return data;
+}
 
 // The degraded shape, and the base the success path overrides — one literal so
 // the two fetchData branches cannot drift apart.
@@ -25,11 +40,14 @@ function emptyData(demos) {
 
 /**
  * Fetch + normalize the live updates.json into the canonical shape used by the UI:
- *   { meta, projects, entries, demos, stats, hasArchive, archiveLoaded }
+ *   { meta, projects, entries, demos, stats, hasArchive, archiveLoaded, pendingDemos? }
+ *
+ * pendingDemos is set only when the manifest lost DEMOS_GRACE_MS. It fulfills
+ * with the slug list; demos stays [] until the caller applies it.
  *
  * The real /updates.json carries a different shape — see docs/content-pipeline.md — so we map here.
  *  - entry.category → category
- *  - entry.project (slug) → channel / projectSlug / projectChannel (via project.slug or project.channel match)
+ *  - entry.project → channel / projectSlug / projectChannel (slug, or channel only when slug is absent)
  *  - entry.text || entry.summary → text
  *  - project.heat is computed from last-30d entry count, normalized 0..1
  *  - project.tag, project.links don't exist live — we synthesize: tag = "" (dropped chip), links = [project.url]
@@ -61,16 +79,18 @@ export async function fetchData() {
     const projects = normalizeProjects(rawProjects, counts, lastActivity);
     const stats = normalizeStats(raw.stats);
 
-    return {
-      ...emptyData(await raceTimeout(demosPromise, DEMOS_GRACE_MS, [])),
+    const demoFields = await demosWithinGrace(demosPromise);
+    return withPendingDemos({
+      ...emptyData(demoFields.demos),
       projects,
       entries,
       stats,
       hasArchive: stats.archive === true,
-    };
+    }, demoFields);
   } catch (err) {
     console.warn('fetchData: failed to load/normalize updates.json, degrading to empty state', err);
-    return emptyData(await raceTimeout(demosPromise, DEMOS_GRACE_MS, []));
+    const demoFields = await demosWithinGrace(demosPromise);
+    return withPendingDemos(emptyData(demoFields.demos), demoFields);
   }
 }
 

@@ -18,6 +18,7 @@ const m = vi.hoisted(() => {
     initReplayBoot: spy('initReplayBoot'),
     initChannels: spy('initChannels'),
     applyInitialChannel: spy('applyInitialChannel'),
+    applyLateDemos: spy('applyLateDemos'),
     renderChanlist: spy('renderChanlist'),
     initCommand: spy('initCommand'),
     initTickers: spy('initTickers'),
@@ -34,6 +35,7 @@ vi.mock('./boot.js', () => ({
 vi.mock('./channels.js', () => ({
   initChannels: m.initChannels,
   applyInitialChannel: m.applyInitialChannel,
+  applyLateDemos: m.applyLateDemos,
   navigate: m.navigate,
 }));
 vi.mock('./sidebar.js', () => ({ renderChanlist: m.renderChanlist }));
@@ -142,5 +144,25 @@ describe('main.js boot path', () => {
     window.dispatchEvent(new Event('mase:booted'));
     await settle();
     expect(initCalls()).toEqual(INIT_ORDER);
+  });
+});
+
+describe('main.js late demos', () => {
+  it('applies a manifest that resolves after the first render', async () => {
+    let resolveDemos;
+    const late = {
+      ...data,
+      demos: [],
+      pendingDemos: new Promise((r) => { resolveDemos = r; }),
+    };
+    m.fetchData.mockImplementation(() => Promise.resolve(late));
+    await loadMain({ skip: true });
+    await settle();
+    expect(m.applyLateDemos).not.toHaveBeenCalled();
+    resolveDemos(['explorer']);
+    await settle();
+    expect(m.applyLateDemos).toHaveBeenCalledWith(['explorer']);
+    // Wiring happens after the channel is on screen, not before init.
+    expect(m.order.indexOf('applyInitialChannel')).toBeLessThan(m.order.indexOf('applyLateDemos'));
   });
 });
