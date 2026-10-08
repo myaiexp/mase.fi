@@ -30,7 +30,7 @@ Reference implementation — helm's `web/themes.css` (`frost` / `terminal` / `em
 [data-theme="frost"] {
   --bg-surface: #0e1117; --bg-raised: #151a22; --bg-hover: #1e2530;
   --border: #2a3040; --border-hover: #3a4858;
-  --text-dim: #9aa8b8; --text-muted: #4c5a6b;
+  --fg-2: #9aa8b8; --fg-3: #4c5a6b;
   --accent: #7dc4e4; --accent-glow: rgba(125,196,228,0.15); --accent-text: #7dc4e4;
   --green:#55d48e; --red:#e85c6a; --blue:#7dc4e4; --cyan:#52d6e8; --orange:#d4a055; --purple:#a8aaee;
 }
@@ -61,10 +61,10 @@ Reference implementation — helm's `web/themes.css` (`frost` / `terminal` / `em
 
 `base.css` defines `--text-dim: var(--fg-2)`, `--text-muted: var(--fg-3)`, `--accent-text` alongside
 `--accent`. Override the **canonical root** (`--fg-2`, `--fg-3`) and the alias re-tints with it for
-free. Override only the `--text-*` alias (as helm's `themes.css` currently does) and any component
-reading the canonical `--fg-*` is stranded at the base value. It works today because `base.css`'s
-own components read the aliases — but it's a forward trap the moment a consumer styles against
-`--fg-*`. Prefer overriding the root.
+free. Override only the `--text-*` alias and any component reading the canonical `--fg-*` is stranded
+at the base value. helm's `web/themes.css` used to override the aliases; it now sets `--fg-2` /
+`--fg-3` (frost stays `#9aa8b8` / `#4c5a6b`), and `web/themes.test.ts` treats an alias override as
+the bug (idea #2466). Copy the root, not the alias.
 
 ## Pre-mixed tints track a root override only
 
