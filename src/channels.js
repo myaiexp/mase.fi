@@ -33,7 +33,12 @@ function setTopicMeta(id) {
 }
 
 export function navigate(id, { fromHash = false } = {}) {
-  if (!channelById(id)) id = 'home';
+  const known = channelById(id);
+  if (!known) id = 'home';
+  // Repair before the same-id return: a bad hash while already on home would
+  // otherwise stick, and the Home click would no-op. replaceState does not
+  // re-enter through hashchange. A real channel keeps the hash the URL has.
+  if (fromHash && !known) window.history.replaceState(null, '', '#/' + id);
   if (id === currentId) return;
   const prevId = currentId;
   currentId = id;
@@ -76,4 +81,17 @@ export function initChannels(data) {
 /** Drive the initial render based on location.hash. Call after the sidebar/tabbar are in the DOM. */
 export function applyInitialChannel() {
   navigate(parseHash(), { fromHash: true });
+}
+
+/**
+ * A demos manifest that lost the startup grace race. Writes the list onto the
+ * live data object (later navigations read it) and refreshes the open channel's
+ * hero card and hero line only when that channel actually gained a chip.
+ */
+export function applyLateDemos(demos) {
+  if (!_data || !Array.isArray(demos)) return;
+  _data.demos = demos;
+  if (!currentId || !demos.includes(currentId)) return;
+  renderHeroLine(currentId, _data);
+  renderPinned(currentId, _data);
 }

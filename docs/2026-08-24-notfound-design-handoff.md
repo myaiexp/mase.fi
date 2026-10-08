@@ -4,11 +4,13 @@
 > 5-second cancellable countdown, the 403 variant) is still the reference. The data
 > model is not: the shipped page makes network calls. It fetches `/updates.json` at
 > runtime and builds its fuzzy routes from it (`buildRoutes` in `src/notfound.js`,
-> `loadRoutes` in `src/notfound-page.js`). It HEAD-probes parent paths for the
+> `loadRoutes` in `src/notfound-page.js`), then always appends `EXTRA_ROUTES` in
+> `src/notfound.js`: `/blog`, `/demos`, `/userscripts`, `/chess`, and `/card-games`
+> (webroot dirs that are not showcase projects). It HEAD-probes parent paths for the
 > confident match (`probePrefixes`) and HEAD-requests the path itself to detect a
-> 403 (`applyRealStatus`). There is no hardcoded route table, so ignore the
+> 403 (`applyRealStatus`). Project routes are fetched, not baked in, so ignore the
 > "no network calls", "No storage, no fetch" and "baked into the file at deploy
-> time" lines below.
+> time" lines below — those describe the design's full route table, not `EXTRA_ROUTES`.
 >
 > The packaging changed too. The shipped page is not one hand-written static file:
 > `404.html` is a second Vite entry (the `notfound` input in `vite.config.js`), built

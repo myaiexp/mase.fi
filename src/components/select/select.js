@@ -42,8 +42,13 @@ class BaseSelect extends HTMLElement {
     this.#buildTrigger();
     buildMenu(this);
     this.#syncSizer();
-    this.#observer = new MutationObserver(() => { buildMenu(this); this.#syncSizer(); });
-    this.#observer.observe(this, { childList: true, subtree: true });
+    // childList misses attribute edits. A text replacement rebuilds the menu
+    // without refreshing the closed trigger, which still shows the old label.
+    this.#observer = new MutationObserver(() => { buildMenu(this); this.#syncSizer(); this.#syncTriggerText(); });
+    this.#observer.observe(this, {
+      childList: true, subtree: true, attributes: true, characterData: true,
+      attributeFilter: ['value', 'disabled', 'action', 'label'],
+    });
   }
 
   disconnectedCallback() {
