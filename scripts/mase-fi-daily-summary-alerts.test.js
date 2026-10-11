@@ -67,6 +67,19 @@ beforeEach(() => {
 });
 afterEach(() => cleanup(dir));
 
+describe('mase-fi-daily-summary — private purge', () => {
+  it('alerts and still exits 0 when the purge fails', () => {
+    seedSkip();
+    const curl = fakeCurl();
+    const stub = join(dir, 'purge-stub');
+    writeFileSync(stub, '#!/usr/bin/env bash\nexit 1\n');
+    chmodSync(stub, 0o755);
+    const r = run({ ...curl.env, PURGE_BIN: stub });
+    expect(r.status).toBe(0);
+    expect(curl.pushes()).toMatch(/purge FAILED \(exit 1\)/);
+  });
+});
+
 describe('mase-fi-daily-summary — compact alerts (finding #9443)', () => {
   it('pushes a FAILED alert, exits 0, and leaves both files alone on a malformed archive', () => {
     seedSkip();

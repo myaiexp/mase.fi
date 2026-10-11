@@ -53,13 +53,19 @@ describe('mase-fi-projects — showcase merge', () => {
     expect(channels).toEqual(['aaa', 'porssi']); // sorted, both present
   });
 
-  it('dedupes a channel collision (unique_by), the API entry winning over extra', () => {
-    const SHOWCASE_API = setApi([{ name: 'FromApi', slug: 'dup', url: 'https://api', tagline: 'api one' }]);
-    const SHOWCASE_EXTRA = setExtra([{ name: 'FromExtra', slug: 'dup', channel: 'dup', url: 'https://extra', desc: 'extra one' }]);
+  it('dedupes by slug, the extra entry winning over the API (porssi overrides spot-price)', () => {
+    const SHOWCASE_API = setApi([{ name: 'Spot Price', slug: 'spot-price', url: 'https://api', tagline: 'api one' }]);
+    const SHOWCASE_EXTRA = setExtra([{ name: 'Porssi', slug: 'spot-price', channel: 'porssi', url: 'https://p', desc: 'spot' }]);
     run({ SHOWCASE_API, SHOWCASE_EXTRA });
-    const dup = readJson(file).projects.filter((p) => p.channel === 'dup');
-    expect(dup).toHaveLength(1);
-    expect(dup[0].name).toBe('FromApi');
+    expect(readJson(file).projects).toEqual([
+      { name: 'Porssi', slug: 'spot-price', channel: 'porssi', url: 'https://p', desc: 'spot' },
+    ]);
+  });
+
+  it('passes a null url through', () => {
+    const SHOWCASE_API = setApi([{ name: 'A', slug: 'a', url: null, tagline: 't' }]);
+    run({ SHOWCASE_API, SHOWCASE_EXTRA: setExtra([]) });
+    expect(readJson(file).projects[0].url).toBeNull();
   });
 
   it('sorts the merged projects by channel', () => {
@@ -97,7 +103,7 @@ describe('mase-fi-projects — leave-unchanged safety valves', () => {
     expect(snapshot()).toBe(before);
   });
 
-  it('leaves .projects unchanged when zero projects are showcased', () => {
+  it('leaves .projects unchanged when the channel list is empty', () => {
     const before = snapshot();
     const SHOWCASE_API = setApi([]);
     const r = run({ SHOWCASE_API, SHOWCASE_EXTRA: setExtra([]) });

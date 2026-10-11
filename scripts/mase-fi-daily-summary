@@ -24,11 +24,8 @@ CLAUDE_TIMEOUT="${CLAUDE_TIMEOUT:-120}"
 MAX_LINES="${MAX_LINES:-3}"
 NTFY_URL="${NTFY_URL:-https://ntfy.mase.fi/kelo}"
 HELM_ENV="${HELM_ENV:-/home/mase/Projects/helm/.env}"
-# Run claude from a throwaway empty dir. Invoked inside a project checkout it
-# would auto-load that repo's CLAUDE.md + recent-commit context into its prompt,
-# which leaks into the summary (e.g. describing today's commits instead of the
-# ones passed in). An empty dir has neither, so output depends only on the prompt
-# regardless of where the script runs. Removed in the exit trap.
+# Run claude from a throwaway empty dir. A project checkout would auto-load that
+# repo's CLAUDE.md into the prompt. Removed in the exit trap.
 CLAUDE_CWD="$(mktemp -d)"
 # Private working dir (mode 0700, unpredictable name) for this run's intermediate
 # JSON — replaces the old fixed /tmp/daily_*.json paths a co-tenant could
@@ -74,14 +71,9 @@ on_exit() {
 }
 trap on_exit EXIT
 
-# Compact after every run, skip paths included: strip unused commits[], archive
-# logs older than LOG_HOT_DAYS, rewrite stats (finding #8804). The compact script
-# owns the lock and the LOG_HOT_DAYS / ARCHIVE_FILE defaults (both still
-# env-overridable). Non-fatal like the projects refresh — a compact miss must
-# not fail a successful daily write; the next run retries — but a degraded
-# (exit 3) or failed compact pushes an ntfy alert, since on_exit never sees it.
-# TODAY is passed so a run that crosses midnight compacts against the day it
-# summarized.
+# Compact after every run, including skips (finding #8804). Non-fatal: a
+# degraded or failed compact alerts, because on_exit never sees it. TODAY is
+# passed so a midnight-crossing run compacts against the day it summarized.
 run_compact() {
   local rc=0 err="$WORK_DIR/compact.err" why
   UPDATES_FILE="$UPDATES_FILE" TODAY="$TODAY" "$SCRIPT_DIR/mase-fi-compact-updates" 2>"$err" || rc=$?
@@ -102,11 +94,17 @@ if [[ ! -f "$UPDATES_FILE" ]]; then
     exit 0
 fi
 
-# Refresh the homepage projects list from helm showcase flags first — it is
-# derived, not hand-maintained (see scripts/mase-fi-projects). Best-effort and
-# independent of the summary logic below; leaves .projects untouched if helm is
-# unreachable, so a bad run can never blank the sidebar.
+# Channel list, then drop rows for projects that have gone private. Both are
+# non-fatal and run before the idempotency skip, so a private flip is not stuck
+# behind "already summarized". A bad list leaves .projects untouched.
 "$SCRIPT_DIR/mase-fi-projects" || echo "projects refresh failed (non-fatal)" >&2
+purge_rc=0
+"${PURGE_BIN:-$SCRIPT_DIR/mase-fi-purge-private}" || purge_rc=$?
+if [[ "$purge_rc" -ne 0 ]]; then
+  echo "purge failed (non-fatal, exit $purge_rc)" >&2
+  ntfy_send "mase.fi purge FAILED (exit $purge_rc)" \
+    "${TODAY}: private rows were not removed from the feed — check: journalctl --user -u mase-fi-daily-summary"
+fi
 
 # Skip if daily entries already exist for today (idempotency)
 DAILY_EXISTS=$(jq --arg date "$TODAY" '[.entries[] | select(.category == "daily" and .date == $date)] | length' "$UPDATES_FILE")

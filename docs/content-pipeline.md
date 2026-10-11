@@ -39,19 +39,13 @@ helm's commit logger (`scripts/log-commits-to-updates`, used by `deploy` Step 3 
 
 ## `.projects` — `scripts/mase-fi-projects`
 
-Derived, not hand-edited. Regenerated from **helm showcase flags**:
+Derived, not hand-edited. Regenerated from helm's public channel list (`GET /api/projects/showcase`). A project is listed unless its visibility resolves private — its own setting, or the nearest registered ancestor's — or a feed embargo is in force. `helm project update <name> --visibility private` takes it off the list and purges rows already published; `--visibility inherit` drops the project's own setting so an ancestor decides. There is no showcase opt-in flag.
 
-```
-helm project set-showcase <name> --url <url> --tagline "<blurb>" [--name "<Display>"]
-```
+`channel` = the helm project name (e.g. `"channel": "wander"`), unless `scripts/showcase-extra.json` overrides it. Heat/recency are computed client-side from entries. A stored `url` of null is left null; the client renders no link.
 
-That is how a project is added or removed from the homepage. `channel` = the helm project name (e.g. `"channel": "wander"`). Heat/recency are computed client-side from entries.
+Runs at the top of `mase-fi-daily-summary` (nightly), which then runs `mase-fi-purge-private`, and can be run by hand. Leaves `.projects` untouched if helm is unreachable or returns nothing.
 
-Runs at the top of `mase-fi-daily-summary` (nightly) and can be run by hand. Leaves `.projects` untouched if helm is unreachable or returns nothing.
-
-Projects not in the helm registry, or whose channel must differ from their helm name (e.g. `porssi` ↔ `spot-price`), live in `scripts/showcase-extra.json`.
-
-**Visibility:** only showcase projects with a public GitHub repo or live public deployment. Internal tools stay unflagged and appear only in update entries.
+Projects not in the helm registry, or whose channel must differ from their helm name (e.g. `porssi` ↔ `spot-price`), live in `scripts/showcase-extra.json`. Extras are applied first and win on slug, so that override replaces the API row.
 
 ## `.entries`
 
@@ -72,22 +66,24 @@ Both go through helm's `scripts/log-commits-to-updates` (one jq pass under the s
 - **`deploy`** (`~/Projects/helm/scripts/deploy`) logs `OLD_HEAD..NEW_HEAD`, dated by deploy day. The CLAUDE.md Deploy section is the command that ships the site; the same invocation logs the commits.
 - **Remote projects** (r-proxy, e.g. `modding` on the desktop) never run `deploy`: sessions ship with `r git push`. helm's 15-min `vps-copy-refresh` timer logs each VPS copy's `refs/helm/activity-logged..HEAD`, dated by commit day in Helsinki (helm `docs/substrates.md`, idea #5221).
 - Desktop `git deployboth` (machine-configs) still appends the last commit of a push on its own; the ±1-day dedupe keeps it from doubling the timer's row.
-- A project under a **feed embargo** (below) is not logged by any of the three: the writer prints `Feed embargo — logged 0 of N commit(s)` and exits 0.
+- A project held back from the feed — private visibility, or a **feed embargo** (below) — is not logged by any of the three: the writer prints `Feed embargo — logged 0 of N commit(s)` and exits 0.
 
-### Feed embargo — keeping a project out of the feed for a period
+### Feed visibility and embargo — keeping a project out of the feed
 
-A project opts out of the feed with a file in its own repo: `.embargo` at the repo root, whose first non-blank line that does not start with `#` is a date, `YYYY-MM-DD`. While today in `Europe/Helsinki` is before that date, nothing about the project is written to `updates.json` — no `log` rows, no `feature` entry, no `daily` summary, no homepage project-list entry. From the date on, writing resumes for what happens after it; nothing withheld is added later. A `.embargo` with no valid date on that line embargoes the project indefinitely (fail closed), and so does a check that could not be made.
+A project is public unless its visibility resolves private. Visibility is a helm setting (`helm project update <name> --visibility public|private|inherit`): the project's own setting wins, else the nearest registered ancestor that has one, else public. Going private purges that project's rows from both feed files (`scripts/mase-fi-purge-private`, also run nightly by `mase-fi-daily-summary` right after the channel-list refresh). Going public again does not backfill. A purge failure alerts via ntfy and does not fail the nightly summary; the next night retries.
 
-helm owns the decision, because it knows where each project's repo is: `helm project embargo <project>` exits **0** when the project is clear, **3** when it is embargoed (printing the file and the date), anything else when it could not tell. The details are in helm's `docs/deployment.md` § Feed embargo. On this side:
+`.embargo` is a separate, time-limited withhold and does not purge by itself. The file sits at the repo root; its first non-blank line that does not start with `#` is a date, `YYYY-MM-DD`. While today in `Europe/Helsinki` is before that date, nothing new about the project is written to `updates.json` — no `log` rows, no `feature` entry, no `daily` summary, and the channel list omits it. From the date on, writing resumes for what happens after it; nothing withheld is added later. A `.embargo` with no valid date on that line embargoes the project indefinitely (fail closed), and so does a check that could not be made.
+
+helm owns the decision, because it knows where each project's repo is and what its visibility resolves to: `helm project embargo <project>` exits **0** when the project is clear, **3** when it is embargoed or private (the line names which), anything else when it could not tell. The details are in helm's `docs/deployment.md` § Feed visibility and embargo. On this side:
 
 - `feed_embargo_gate <project>` in `scripts/updates-write.sh` runs that command (`HELM_BIN`, default the absolute path of the VPS's helm CLI) and returns 0 only on a clear answer. **Any writer that takes a project name calls it before writing.**
-- `mase-fi-update` calls it before touching the file: an embargoed project exits **3** with the file and date on stderr, an undetermined check exits 1. helm's `deploy --update` reports the 3 as an info line and still succeeds.
+- `mase-fi-update` calls it before touching the file: a held-back project exits **3** with helm's line on stderr, an undetermined check exits 1. helm's `deploy --update` reports the 3 as an info line and still succeeds.
 - `mase-fi-daily-summary` calls it per project, before the commits go to the summarizer. This covers `log` rows written before a project's `.embargo` existed, which are still in the day's batch. A project skipped because the check could not be made is counted and alerted through ntfy.
-- `mase-fi-projects` needs no gate of its own: helm's showcase API already omits an embargoed project.
+- `mase-fi-projects` needs no gate of its own: helm's channel list already omits a private or embargoed project. `mase-fi-purge-private` is what removes rows already published; it reads `GET /api/projects/private` and writes nothing if that list is missing or malformed.
 
 ### Feature entries — `scripts/mase-fi-update`
 
-`mase-fi-update <project> <text> [date]` prepends one `feature` entry (helm's `deploy --update "<text>"` calls it). It refuses a project under a feed embargo (above). Features are the only manual category: `project` (a "new project" announcement) and the per-category `sticky` flag predate the IRC rework, and the current frontend reads neither, so both are gone and the old `project` rows were rewritten as `feature`. A leading `feature`/`project` word is still accepted and ignored, so older callers keep working. Omitted date defaults to today in `Europe/Helsinki` (`TZ="Europe/Helsinki" date +%Y-%m-%d`), matching daily-summary. A supplied `[date]` must be a real `YYYY-MM-DD` calendar day — anything else is refused before the flock.
+`mase-fi-update <project> <text> [date]` prepends one `feature` entry (helm's `deploy --update "<text>"` calls it). It refuses a project helm's check holds back — private or embargoed (above). Features are the only manual category: `project` (a "new project" announcement) and the per-category `sticky` flag predate the IRC rework, and the current frontend reads neither, so both are gone and the old `project` rows were rewritten as `feature`. A leading `feature`/`project` word is still accepted and ignored, so older callers keep working. Omitted date defaults to today in `Europe/Helsinki` (`TZ="Europe/Helsinki" date +%Y-%m-%d`), matching daily-summary. A supplied `[date]` must be a real `YYYY-MM-DD` calendar day — anything else is refused before the flock.
 
 On the laptop/desktop, `mase-fi-update` is a **machine-configs wrapper** (`.local/bin/mase-fi-update`, synced by `config-sync`) that SSHes to the VPS and runs `scripts/mase-fi-update` via `sudo -n -u mase` — `Host vps` logs in as root there, and the writer must run as mase (root can't take the mase-owned flock under `fs.protected_regular`). The wrapper forwards `UPDATES_FILE`, so `UPDATES_FILE=/tmp/x.json mase-fi-update wander "…"` exercises the whole chain against a throwaway file; a "broken on the laptop" report starts with that wrapper, not this script.
 
