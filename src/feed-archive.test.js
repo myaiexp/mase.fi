@@ -59,6 +59,45 @@ describe('renderFeed archive lazy-load', () => {
     expect(data.archiveLoaded).toBe(true);
   });
 
+  // The topic line is written by navigate() from the hot window. Archive rows
+  // land later, on the feed, which must not import the router — channels hears
+  // feed:archive and recomputes the count. Finding #12603.
+  it('updates the topic count when archived rows appear', async () => {
+    vi.stubGlobal('matchMedia', () => ({ matches: true, media: '' }));
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        entries: [
+          { category: 'log', project: 'helm', date: '2026-01-01T10:00', text: 'archived-old' },
+        ],
+      }),
+    }));
+    for (const id of ['pane', 'topic-hash', 'topic-text', 'topic-meta', 'hero-line', 'pinned']) {
+      const el = document.createElement('div');
+      el.id = id;
+      document.body.appendChild(el);
+    }
+    const data = archiveData(250);
+    data.stats = {};
+    const channels = await import('./channels.js');
+    // Don't leave this module's hashchange handler on window after resetModules.
+    const spy = vi.spyOn(window, 'addEventListener').mockImplementation(() => {});
+    channels.initChannels(data);
+    spy.mockRestore();
+    channels.navigate('activity', { fromHash: true });
+
+    const meta = document.getElementById('topic-meta');
+    expect(meta.firstChild.textContent).toBe('250 msgs');
+    expect(meta.lastChild.textContent).toBe('read-only');
+
+    ioInstances.at(-1).fire(); // 200 → 250, in-memory exhausted → archive fetch
+    await vi.waitFor(() => {
+      expect(rows().some((r) => r.dataset.raw === 'archived-old')).toBe(true);
+    });
+    expect(meta.firstChild.textContent).toBe('251 msgs');
+    expect(meta.lastChild.textContent).toBe('read-only');
+  });
+
   it('shows archived rows when the hot window holds no logs at all', async () => {
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
       ok: true,

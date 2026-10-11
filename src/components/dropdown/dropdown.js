@@ -207,6 +207,14 @@ class BaseDropdown extends HTMLElement {
   }
 
   #onItemKeydown(e, item) {
+    // Tab moves focus to the next real tab stop. Close without preventDefault so
+    // that move still happens; leaving the menu open paints it over the page.
+    // Shift+Tab is the same key. <base-select> closes on Tab for the same reason.
+    if (e.key === 'Tab') {
+      this.close();
+      return;
+    }
+
     // Pre-filtered to enabled items, so wrapIndex alone lands on a valid target
     // (no skip loop). A disabled item is not in the list, so its idx of -1 wraps
     // to the first/last enabled item — the same convention menu-nav documents.

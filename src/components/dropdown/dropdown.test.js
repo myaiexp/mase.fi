@@ -96,6 +96,26 @@ describe('base-dropdown', () => {
     expect(el.isOpen).toBe(false);
   });
 
+  // Tab leaves the focused item for the next real tab stop. The menu must close
+  // with it, and the key must not be swallowed or focus never moves. Shift+Tab
+  // is the same key in the other direction.
+  it.each([false, true])('Tab on the focused item closes the menu (shiftKey=%s)', (shiftKey) => {
+    const el = createDropdown({
+      items: [{ value: 'a', label: 'A' }, { value: 'b', label: 'B' }],
+    });
+    getTrigger(el).click();
+    expect(el.isOpen).toBe(true);
+
+    const item = el.querySelector('base-dropdown-item');
+    expect(document.activeElement).toBe(item);
+    const press = new KeyboardEvent('keydown', { key: 'Tab', shiftKey, bubbles: true, cancelable: true });
+    item.dispatchEvent(press);
+
+    expect(el.isOpen).toBe(false);
+    expect(el.shadowRoot.querySelector('[part="menu"]').hidden).toBe(true);
+    expect(press.defaultPrevented).toBe(false);
+  });
+
   it('ArrowDown moves focus to next item', () => {
     const el = createDropdown({
       items: [

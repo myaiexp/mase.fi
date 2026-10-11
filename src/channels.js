@@ -32,6 +32,20 @@ function setTopicMeta(id) {
   meta.appendChild(modeSpan);
 }
 
+// Archive rows land after navigate() wrote the topic line. feed.js dispatches
+// this rather than importing the router (that import would be a cycle).
+function onFeedArchive() {
+  if (currentId) setTopicMeta(currentId);
+}
+
+function watchFeedArchive() {
+  const feed = document.getElementById('feed');
+  if (!feed) return;
+  // initChannels may run again (tests, a second boot). Don't stack listeners.
+  feed.removeEventListener('feed:archive', onFeedArchive);
+  feed.addEventListener('feed:archive', onFeedArchive);
+}
+
 export function navigate(id, { fromHash = false } = {}) {
   const known = channelById(id);
   if (!known) id = 'home';
@@ -76,6 +90,7 @@ export function initChannels(data) {
   _data = data;
   buildRegistry(data);
   window.addEventListener('hashchange', () => navigate(parseHash(), { fromHash: true }));
+  watchFeedArchive();
 }
 
 /** Drive the initial render based on location.hash. Call after the sidebar/tabbar are in the DOM. */

@@ -223,9 +223,13 @@ function onWindowExhausted($feed, state, sentinel) {
     if (windowState.get($feed) !== state) return;
     state.loadingArchive = false;
     state.archiveSettled = true;
+    const before = state.entries.length;
     state.entries = entriesFor(channelId, data);
     if (state.shown < state.entries.length) revealOlder($feed, state, sentinel);
     else dropSentinel(state, sentinel);
+    // navigate() already wrote the topic count from the hot window. The feed
+    // can't import channels.js, so announce a merge that actually added rows.
+    if (state.entries.length > before) $feed.dispatchEvent(new CustomEvent('feed:archive'));
   }).catch((err) => {
     // A render bug past the merge: retire the sentinel so every later
     // intersection does not rethrow, and leave a trace.
