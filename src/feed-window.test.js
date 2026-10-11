@@ -160,16 +160,23 @@ describe('renderFeed chip navigation', () => {
   });
 });
 
-// jsdom has no layout, so we cannot assert pixel heights. We CAN pin the
-// call order that makes those heights correct: layoutRow must run on the
-// prepended rows before revealOlder reads scrollHeight for compensation.
+// jsdom has no layout. scrollHeight stays at BASE until layoutRow runs, then
+// grows by ROW_GROWTH per prepended row — the growth revealOlder must add to
+// scrollTop, and only after those calls. A frozen scrollHeight makes the delta
+// 0, so dropping the addition, doubling it, or reading the pre-layout height
+// still passes an order-only check.
 describe('revealOlder lays out before scroll compensation', () => {
   let order;
   let localRender;
+  let scrollTop;
+  const BASE_HEIGHT = 1000;
+  const ROW_GROWTH = 17;
 
   beforeEach(async () => {
     vi.resetModules();
     order = [];
+    scrollTop = 0;
+    let height = BASE_HEIGHT;
     const feed = installFeedDom();
 
     vi.doMock('./feed-layout.js', () => ({
@@ -178,12 +185,14 @@ describe('revealOlder lays out before scroll compensation', () => {
         order.push('measure');
         return { msgWidth: 80, font: '13px monospace' };
       },
-      layoutRow: () => { order.push('layout'); },
+      layoutRow: () => {
+        order.push('layout');
+        height += ROW_GROWTH;
+      },
     }));
 
     ({ renderFeed: localRender } = await import('./feed.js'));
 
-    let scrollTop = 0;
     Object.defineProperty(feed, 'scrollTop', {
       configurable: true,
       get: () => scrollTop,
@@ -191,7 +200,7 @@ describe('revealOlder lays out before scroll compensation', () => {
     });
     Object.defineProperty(feed, 'scrollHeight', {
       configurable: true,
-      get: () => 1000,
+      get: () => height,
     });
   });
 
@@ -199,16 +208,20 @@ describe('revealOlder lays out before scroll compensation', () => {
     vi.doUnmock('./feed-layout.js');
   });
 
-  it('calls layoutRow on prepended rows before adjusting scrollTop', () => {
+  it('adds exactly the post-layout scrollHeight growth, after layoutRow', () => {
     localRender('activity', makeData(450), { immediate: true, navigate: () => {} });
+    const before = scrollTop;
     const start = order.length;
     ioInstances.at(-1).fire();
     const reveal = order.slice(start);
     const firstLayout = reveal.indexOf('layout');
     const firstScroll = reveal.indexOf('scroll');
+    const layouts = reveal.filter((step) => step === 'layout').length;
     expect(firstLayout).toBeGreaterThanOrEqual(0);
     expect(firstScroll).toBeGreaterThanOrEqual(0);
     expect(firstLayout).toBeLessThan(firstScroll);
+    expect(layouts).toBeGreaterThan(0);
+    expect(scrollTop).toBe(before + layouts * ROW_GROWTH);
   });
 });
 

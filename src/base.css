@@ -640,6 +640,9 @@ base-modal {
 }
 
 /* ===== Toast / Notification ===== */
+/* BaseToast (src/components/toast/toast.js) stamps these classes and must not
+   restate position, z-index, padding, border, or type color inline. info is the
+   default variant; the component maps any other type onto .toast-info. */
 
 .toast-container {
   position: fixed;
@@ -650,6 +653,11 @@ base-modal {
   gap: var(--space-2);
   z-index: 200;
   pointer-events: none;
+  /* Only `right` is set, so the box is shrink-to-fit and a long message grows
+     leftward off a phone. The cap stays on the container, not .toast: helm's
+     own notifier shares the .toast class and already bounds #toast-container. */
+  max-width: min(420px, calc(100vw - 2rem));
+  overflow-wrap: anywhere;
 }
 
 .toast {
@@ -665,6 +673,7 @@ base-modal {
 .toast-success { border-color: color-mix(in srgb, var(--green) 40%, transparent); color: var(--green); }
 .toast-error   { border-color: color-mix(in srgb, var(--red) 40%, transparent); color: var(--red); }
 .toast-warning { border-color: color-mix(in srgb, var(--orange) 40%, transparent); color: var(--orange); }
+.toast-info    { border-color: color-mix(in srgb, var(--blue) 40%, transparent); color: var(--blue); }
 
 @keyframes toast-in {
   from { opacity: 0; transform: translateY(8px); }

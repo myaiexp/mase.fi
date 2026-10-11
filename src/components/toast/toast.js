@@ -1,26 +1,13 @@
-// BaseToast — singleton toast notification service
-const TYPE_COLORS = {
-  success: 'var(--green)',
-  error: 'var(--red)',
-  info: 'var(--blue)',
-};
+// BaseToast — singleton toast notification service. Look is base.css's .toast* classes.
+const TOAST_TYPES = new Set(['success', 'error', 'warning', 'info']);
 
 let container = null;
 
 function getContainer() {
   if (container && document.body.contains(container)) return container;
   container = document.createElement('div');
+  container.className = 'toast-container';
   container.setAttribute('data-toast-container', '');
-  Object.assign(container.style, {
-    position: 'fixed',
-    top: '1rem',
-    right: '1rem',
-    zIndex: '10000',
-    display: 'flex',
-    flexDirection: 'column',
-    gap: '0.5rem',
-    pointerEvents: 'none',
-  });
   document.body.appendChild(container);
   return container;
 }
@@ -28,23 +15,12 @@ function getContainer() {
 export class BaseToast {
   static show(message, type = 'info', duration = 5000) {
     const toast = document.createElement('div');
-    const borderColor = TYPE_COLORS[type] || TYPE_COLORS.info;
-    Object.assign(toast.style, {
-      padding: '8px 12px',
-      fontFamily: 'var(--font-mono, monospace)',
-      fontSize: '13px',
-      color: 'var(--text, #fafafa)',
-      background: 'var(--bg-raised, #27272a)',
-      borderLeft: '3px solid',
-      borderColor,
-      pointerEvents: 'auto',
-      opacity: '1',
-      transition: 'opacity 0.3s',
-      // The container is fixed to the top-right corner with no bound of its own,
-      // so an unconstrained message grows leftward straight off a phone viewport.
-      maxWidth: 'min(420px, calc(100vw - 2rem))',
-      overflowWrap: 'anywhere',
-    });
+    const variant = TOAST_TYPES.has(type) ? type : 'info';
+    toast.className = `toast toast-${variant}`;
+    // Entrance animation is .toast's toast-in. This fade is only the timed dismiss;
+    // position, padding, border and type color stay in base.css.
+    toast.style.opacity = '1';
+    toast.style.transition = 'opacity 0.3s';
     toast.textContent = message;
 
     const c = getContainer();
