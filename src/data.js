@@ -47,7 +47,7 @@ function emptyData(demos) {
  *
  * The real /updates.json carries a different shape — see docs/content-pipeline.md — so we map here.
  *  - entry.category → category
- *  - entry.project → channel / projectSlug / projectChannel (slug, or channel only when slug is absent)
+ *  - entry.project → channel / projectSlug / projectChannel (a non-empty string slug, otherwise channel)
  *  - entry.text || entry.summary → text
  *  - project.heat is computed from last-30d entry count, normalized 0..1
  *  - project.tag, project.links don't exist live — we synthesize: tag = "" (dropped chip), links = [project.url]

@@ -56,6 +56,17 @@ describe('renderHeroLine', () => {
     expect(a.getAttribute('href')).toBe('/demos/explorer/');
   });
 
+  it('escapes a quote in the demo slug so the href cannot break out', () => {
+    const slug = '"><script>alert(1)</script>';
+    const data = { projects: [{ channel: slug, heat: 0.4, links: [] }], demos: [slug] };
+    renderHeroLine(slug, data);
+    const a = heroEl().querySelector('.demo-link');
+    expect(heroEl().querySelector('script')).toBeNull();
+    expect(a.getAttribute('href')).toBe(`/demos/${slug}/`);
+    expect(heroEl().innerHTML).toContain('&quot;');
+    expect(heroEl().innerHTML).not.toContain(`href="/demos/${slug}/"`);
+  });
+
   it('escapes a malicious project link in the hero line', () => {
     const data = {
       projects: [{ channel: 'explorer', heat: 0.8, links: [{ href: '"><script>alert(1)</script>', label: '<b>x</b>' }] }],

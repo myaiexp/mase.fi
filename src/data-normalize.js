@@ -14,12 +14,17 @@ export function isRawProject(p) {
 }
 
 /**
- * A project's routing slug: `slug`, falling back to `channel`, lowercased.
- * Entries reference a project by this value, matched case-insensitively.
+ * A project's routing slug: a non-empty string `slug`, otherwise `channel`,
+ * lowercased. Entries reference a project by this value, matched
+ * case-insensitively.
  */
 export function projectSlug(p) {
-  const slug = p.slug || p.channel;
-  return typeof slug === 'string' ? slug.toLowerCase() : '';
+  // A truthy non-string slug (1, true) must not win `||`: the typeof check
+  // would then return '' and buildSlugToChannel would drop the project, so
+  // its entries miss the channel and fall through to the category route.
+  const slug = typeof p.slug === 'string' ? p.slug : '';
+  const raw = slug || p.channel;
+  return typeof raw === 'string' ? raw.toLowerCase() : '';
 }
 
 /**

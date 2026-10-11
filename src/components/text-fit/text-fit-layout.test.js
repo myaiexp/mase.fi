@@ -31,7 +31,6 @@ describe('justifyLines', () => {
   });
 
   it('returns lines with wordSpacing for non-last lines', () => {
-    // ~50 chars at 8px/char = 400px, maxWidth 200 -> 2+ lines
     const result = justifyLines(prep('one two three four five six seven eight nine ten eleven twelve'), 200, 0);
     expect(result.length).toBeGreaterThan(1);
     // First line should have wordSpacing

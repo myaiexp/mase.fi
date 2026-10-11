@@ -105,6 +105,23 @@ describe('renderPinned — project', () => {
     expect(a.textContent).toContain('try demo');
   });
 
+  it('escapes a quote in the demo slug so the href cannot break out', () => {
+    const slug = '"><script>alert(1)</script>';
+    const data = projectData(
+      { channel: slug, heat: 0.5, description: 'd', links: [] },
+      [],
+      [slug],
+    );
+    renderPinned(slug, data);
+    // Same shape as the link-escape test above: the payload round-trips as the
+    // attribute value, and a raw quote would have closed href= and spawned a script.
+    const a = pinnedEl().querySelector('.demo-link');
+    expect(pinnedEl().querySelector('script')).toBeNull();
+    expect(a.getAttribute('href')).toBe(`/demos/${slug}/`);
+    expect(pinnedEl().innerHTML).toContain('&quot;');
+    expect(pinnedEl().innerHTML).not.toContain(`href="/demos/${slug}/"`);
+  });
+
   it('omits the demo chip when the channel has no demo', () => {
     renderPinned('explorer', projectData({ channel: 'explorer', heat: 0.5, description: 'd', links: [] }));
     expect(pinnedEl().querySelector('.demo-link')).toBeNull();

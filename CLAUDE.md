@@ -16,7 +16,7 @@
 
 - **Store:** `/var/lib/mase-fi/updates.json` (outside the webroot), served by nginx `alias` and fetched as `/updates.json`
 - **Hot window + archive:** one fetch holds all non-log entries + the last 90 days of `log`s; older logs lazy-load from `/updates-archive.json` on `#activity` scroll-up (`loadArchive` in `data-archive.js`)
-- **Categories → channels:** `daily` → `#home`, `log` → `#activity`, `feature` → per-project channel
+- **Categories → channels:** a resolved `daily` renders on `#home` and that project channel; `log` only on `#activity`; a `feature` only on the resolved project channel (dropped otherwise)
 - Full pipeline (shape, stats, writers, lock, showcase generator, daily summaries, client archive semantics): `docs/content-pipeline.md`
 
 ## Demo Convention
@@ -42,8 +42,8 @@ Shared web components library built from `src/components/` via Vite library mode
 
 - **Build:** `pnpm build:components` → `dist/base-components.js` (IIFE)
 - **URL:** `https://mase.fi/base-components.js`
-- Full per-component API (props/attrs/behavior for `<base-text-fit>`, `<base-context-menu>`, etc.): `docs/base-components.md`
-- **Cross-origin caching:** `base.css` and `base-components.js` are served to other apps. Unversioned URLs get `max-age=0, stale-while-revalidate=7d` (a push reaches consumers with no consumer redeploy); any `?v=` makes them `immutable`. Consumers link them unversioned — no deploy-hash `?v=`, no service-worker `cacheFirst`; an SRI pin is allowed but goes stale on every mase.fi push (deploy ntfys stale pins). `/fonts/` is the content-hashed exception. Full contract: `docs/shared-assets.md`
+- Full per-component API (props, attrs, behavior): `docs/base-components.md`
+- **Cross-origin caching:** `base.css`, `base-components.js`, and `/fonts/` use `$shared_cc` (`$status:$arg_v`). 200/206/304 with no `?v=` get `public, max-age=0, stale-while-revalidate=7d`; those statuses with `?v=` are immutable for a year; every other status is `no-store`. Consumers link the CSS and JS unversioned — no deploy-hash `?v=`, no service-worker `cacheFirst`; an SRI pin is allowed but goes stale on every mase.fi push (deploy ntfys stale pins). `/fonts/` is the content-hashed exception on that same map. Full contract: `docs/shared-assets.md`
 
 ## Deploy
 

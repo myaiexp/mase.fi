@@ -4,10 +4,13 @@
 
 ## Cache headers
 
-nginx (`$shared_cc` map in `conf.d/cache-control-map.conf`) picks the header from the request URL:
+nginx (`$shared_cc` in `conf.d/cache-control-map.conf`) keys on `$status:$arg_v`, not the URL alone. `add_header … always` would otherwise attach the success policy to error bodies. Only 200, 206, and 304 are cacheable; every other status, including a 5xx, is `no-store`. The map comment records why: on 2026-09-18 a rate-limit 503 on an immutable URL was cached for a year.
 
-- **Unversioned** (`https://mase.fi/base.css`): `max-age=0, stale-while-revalidate=7d` + ETag. The browser paints from its copy and revalidates in the background, so a mase.fi push reaches a returning visitor on their next load with **no consumer redeploy**. Plain `no-cache` used to put a ~300 ms 304 through Cloudflare in every page's critical path.
-- **Any `?v=` present**: `immutable, max-age=1y`.
+- **200 / 206 / 304, no `?v=`** (`https://mase.fi/base.css`): `public, max-age=0, stale-while-revalidate=604800`, plus nginx's ETag. The browser paints from its copy and revalidates in the background, so a mase.fi push reaches a returning visitor on their next load with **no consumer redeploy**. Plain `no-cache` used to put a ~300 ms 304 through Cloudflare in every page's critical path.
+- **200 / 206 / 304 with any `?v=`**: `public, max-age=31536000, immutable`.
+- **Any other status**: `no-store`.
+
+`location = /base.css`, `location = /base-components.js`, and `location ^~ /fonts/` all send `$shared_cc`. `/fonts/` does not use `$asset_cc` (that map's unversioned branch is `no-cache, must-revalidate`). A font `?v=` is status-gated by this same map.
 
 ## Consumer rules
 
@@ -17,4 +20,4 @@ nginx (`$shared_cc` map in `conf.d/cache-control-map.conf`) picks the header fro
 
 ## The `/fonts/` exception
 
-`base.css` references `jetbrains-mono.woff2?v=<content hash>`, so the file is immutable and a font change is a new URL. `fonts.json` + `~/Projects/helm/scripts/webfonts` regenerate `src/fonts/` (then paste the new hash into `base.css`); the build copies `src/fonts/` into `dist/fonts/`, and nginx's `location ^~ /fonts/` adds the CORS header fonts need cross-origin (`base.css` itself only needs it for SRI).
+`base.css` references `jetbrains-mono.woff2?v=<content hash>`, so a font change is a new URL. `fonts.json` + `~/Projects/helm/scripts/webfonts` regenerate `src/fonts/` (then paste the new hash into `base.css`); the build copies `src/fonts/` into `dist/fonts/`, and nginx's `location ^~ /fonts/` adds the CORS header fonts need cross-origin (`base.css` itself only needs it for SRI). Cache-Control there is `$shared_cc`, not `$asset_cc`.

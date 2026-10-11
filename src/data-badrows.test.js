@@ -43,6 +43,25 @@ describe('fetchData with malformed rows', () => {
     expect(entriesFor('helm', data).map((e) => e.text)).toEqual(['kept']);
   });
 
+  // A truthy non-string slug is not a routing key; the string channel still is.
+  it('routes via channel when slug is present but not a string', async () => {
+    stubFetch({
+      projects: [{ name: 'Helm', channel: 'helm', slug: 1 }],
+      entries: [
+        { category: 'feature', project: 'helm', date: '2026-01-01', text: 'shipped' },
+        { category: 'daily', project: 'helm', date: '2026-01-02', summary: 'day' },
+      ],
+    });
+    const data = await fetchData();
+    expect(data.projects.map((p) => p.slug)).toEqual(['helm']);
+    expect(data.entries.map((e) => [e.category, e.channel])).toEqual([
+      ['feature', 'helm'],
+      ['daily', 'helm'],
+    ]);
+    expect(entriesFor('helm', data).map((e) => e.text)).toEqual(['shipped', 'day']);
+    expect(entriesFor('home', data).map((e) => e.text)).toEqual(['day']);
+  });
+
   it('does not warn when every row is well-formed', async () => {
     const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
     stubFetch({ projects: [{ name: 'Helm', channel: 'helm' }], entries: [good] });

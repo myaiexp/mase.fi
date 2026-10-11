@@ -165,6 +165,17 @@ describe('global shortcuts (window keydown, non-input target)', () => {
     expect(channels.navigate).not.toHaveBeenCalled();
   });
 
+  // The first g's timer must not cancel a window the second g restarted.
+  it('a second g restarts the 900ms window: h 200ms later still navigates home', () => {
+    vi.useFakeTimers();
+    press(document.body, 'g');
+    vi.advanceTimersByTime(800);
+    press(document.body, 'g');
+    vi.advanceTimersByTime(200);
+    press(document.body, 'h');
+    expect(channels.navigate).toHaveBeenCalledWith('home');
+  });
+
   it('g then h typed into a textarea neither navigates nor steals focus', () => {
     const area = document.createElement('textarea');
     document.body.appendChild(area);

@@ -183,8 +183,16 @@ export function initCommand(data) {
     }
   });
 
-  // Global: "/" to focus, "?" for help, "g h" / "g a" quick jumps
+  // Global: "/" to focus, "?" for help, "g h" / "g a" quick jumps.
+  // One timer owns the g window. Re-arming g or resolving the chord clears it,
+  // so an earlier timeout cannot null `leader` inside a later window.
   let leader = null;
+  let leaderTimer = 0;
+  const clearLeader = () => {
+    leader = null;
+    clearTimeout(leaderTimer);
+    leaderTimer = 0;
+  };
   window.addEventListener('keydown', e => {
     if (e.target === $cmdInput) return;
     if (e.target instanceof Element && e.target.matches('input, textarea')) return;
@@ -202,11 +210,16 @@ export function initCommand(data) {
       updateMode();
       return;
     }
-    if (e.key === 'g') { leader = 'g'; setTimeout(() => { leader = null; }, 900); return; }
+    if (e.key === 'g') {
+      clearTimeout(leaderTimer);
+      leader = 'g';
+      leaderTimer = setTimeout(clearLeader, 900);
+      return;
+    }
     if (leader === 'g') {
       if (e.key === 'h') navigate('home');
       else if (e.key === 'a') navigate('activity');
-      leader = null;
+      clearLeader();
     }
   });
 }
