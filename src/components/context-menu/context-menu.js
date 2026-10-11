@@ -144,12 +144,15 @@ class BaseContextMenu extends HTMLElement {
     this.#menu.hidden = false;
 
     const rect = this.#menu.getBoundingClientRect();
-    if (rect.right > window.innerWidth) {
-      this.#menu.style.left = (x - rect.width) + 'px';
-    }
-    if (rect.bottom > window.innerHeight) {
-      this.#menu.style.top = (y - rect.height) + 'px';
-    }
+    let left = rect.right > window.innerWidth ? x - rect.width : x;
+    let top = rect.bottom > window.innerHeight ? y - rect.height : y;
+    // A flip near the opposite edge lands negative (x - width on a narrow
+    // screen). Pin into the viewport; a menu larger than the viewport stays
+    // at 0 rather than clamping to a negative upper bound.
+    left = Math.max(0, Math.min(left, window.innerWidth - rect.width));
+    top = Math.max(0, Math.min(top, window.innerHeight - rect.height));
+    this.#menu.style.left = left + 'px';
+    this.#menu.style.top = top + 'px';
 
     this.#addDocListeners();
   }

@@ -263,6 +263,49 @@ describe('base-context-menu', () => {
     menu.getBoundingClientRect = origGetRect;
   });
 
+  // A flip on a narrow viewport lands past the near edge (x < width, and
+  // x + width still overflows). The menu must pin to 0, not hang off negative.
+  it('clamps a flipped menu that would hang off the near edge', () => {
+    const cm = createMenu();
+    const prevW = window.innerWidth;
+    const prevH = window.innerHeight;
+    Object.defineProperty(window, 'innerWidth', { value: 390, configurable: true });
+    Object.defineProperty(window, 'innerHeight', { value: 100, configurable: true });
+
+    const menu = cm.shadowRoot.querySelector('[part="menu"]');
+    menu.getBoundingClientRect = () => ({
+      left: 200, right: 420, top: 40, bottom: 120, width: 220, height: 80,
+    });
+
+    cm.show(200, 40, [{ label: 'A', action: () => {} }]);
+
+    // 200 - 220 = -20 and 40 - 80 = -40 without a second clamp.
+    expect(menu.style.left).toBe('0px');
+    expect(menu.style.top).toBe('0px');
+
+    Object.defineProperty(window, 'innerWidth', { value: prevW, configurable: true });
+    Object.defineProperty(window, 'innerHeight', { value: prevH, configurable: true });
+  });
+
+  // innerWidth - width is negative here. Clamping into [0, innerWidth - width]
+  // with the wrong bound order yields that negative upper bound, not 0.
+  it('pins a menu wider than the viewport to the left edge', () => {
+    const cm = createMenu();
+    const prevW = window.innerWidth;
+    Object.defineProperty(window, 'innerWidth', { value: 100, configurable: true });
+
+    const menu = cm.shadowRoot.querySelector('[part="menu"]');
+    menu.getBoundingClientRect = () => ({
+      left: 50, right: 270, top: 10, bottom: 40, width: 220, height: 30,
+    });
+
+    cm.show(50, 10, [{ label: 'A', action: () => {} }]);
+
+    expect(menu.style.left).toBe('0px');
+
+    Object.defineProperty(window, 'innerWidth', { value: prevW, configurable: true });
+  });
+
   // 14. Clicking an item calls its action and closes menu
   it('clicking an item calls its action and closes menu', () => {
     const cm = createMenu();

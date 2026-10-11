@@ -114,9 +114,9 @@ than inventing structure:
 1. **Completed the gap ramp** — added `.gap-5` (16px) and `.gap-6` (24px) so the
    full 6-step ramp is expressible as a utility. Purely additive; no existing rule
    changed.
-2. **Snapped the last raw-px gap** — `.loading { gap: 6px }` → `var(--space-2)`
-   (4px). 6px was off the ramp and violated this card's own "no raw px for gap"
-   rule; 4px is the correct spinner→label intra-control seam (same as `.btn`).
+2. **Gaps sit on the ramp** — `.loading` and `.status` / `<base-badge>` use
+   `var(--space-2)` for the spinner→label and dot→label seams. `.loading` used
+   to be a raw `6px`, off the ramp; 4px is the intra-control seam (same as `.btn`).
 
 No `.field` / `.row` / `.section` / `.stack` layout primitives were added: the
 spec doesn't define them, generic class names in a globally-served sheet are
@@ -131,8 +131,11 @@ anti-pattern. The card gives the *rules and the vocabulary* (`--space-*` +
   feels too tight and 8px too loose, the problem is layout *structure* (too many
   elements at one level), not the scale — restructure, don't invent 6px.
 - **No raw px for gap / padding / margin.** Always a `--space-*` token (or a
-  `.gap-*` utility). A raw value is drift the moment a token would do — the ramp
-  now covers all six rungs, so there's no gap it can't express.
+  `.gap-*` utility). The ramp covers all six rungs, so there's no gap it can't
+  express. The exception is chip padding with no rung between 4 and 8:
+  `.label { padding: 0 5px }`, and `.status` / `.tag` / `<base-badge>`
+  `padding: 0 6px` — the 16px badge geometry in the badges prototype. Don't
+  copy those values anywhere else. The 6px status dot is a size, not spacing.
 - **Prefer `gap` over `margin`.** Rhythm lives on the parent. Margins pile up,
   collapse unpredictably, and strand a trailing edge on the last child. The only
   sanctioned margins are the intra-field label/helper seams the inputs card ships.

@@ -20,7 +20,7 @@ const styles = shadowStyles(`
   span {
     display: inline-flex;
     align-items: center;
-    gap: 4px;
+    gap: var(--space-2, 4px);
     height: 16px;
     padding: 0 6px;
     font-family: var(--font-mono, monospace);

@@ -537,6 +537,68 @@ describe('base-select', () => {
     expect(opts[1].classList.contains('active')).toBe(false); // Banana NOT jumped to
   });
 
+  // Insert `ch` the way a keystroke does: replace the current selection, or
+  // insert at the caret when the selection is collapsed.
+  function insertText(input, ch) {
+    input.setRangeText(ch, input.selectionStart, input.selectionEnd, 'end');
+    input.dispatchEvent(new Event('input', { bubbles: true }));
+  }
+
+  it('first typed character replaces the selected label instead of joining it', () => {
+    const el = createSelect({ searchable: true, value: 'a', options: [
+      { value: 'a', label: 'Apple' },
+      { value: 'b', label: 'Banana' },
+    ] });
+    const input = getTrigger(el);
+    expect(input.value).toBe('Apple');
+
+    input.dispatchEvent(new Event('focus'));
+    expect(el.isOpen).toBe(true);
+    insertText(input, 'b');
+
+    expect(input.value).toBe('b');
+    const visible = getOptions(el).filter(o => o.style.display !== 'none');
+    expect(visible.map(o => o.dataset.label)).toEqual(['Banana']);
+  });
+
+  it('clicking into the selected label still filters on the one character typed', () => {
+    const el = createSelect({ searchable: true, value: 'a', options: [
+      { value: 'a', label: 'Apple' },
+      { value: 'b', label: 'Banana' },
+    ] });
+    const input = getTrigger(el);
+
+    // Focus opens, then the click's default action drops the caret into the label.
+    input.dispatchEvent(new MouseEvent('mousedown', { bubbles: true, cancelable: true }));
+    input.dispatchEvent(new Event('focus'));
+    const mid = Math.floor(input.value.length / 2);
+    input.setSelectionRange(mid, mid);
+    input.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    insertText(input, 'b');
+
+    expect(input.value).toBe('b');
+    const visible = getOptions(el).filter(o => o.style.display !== 'none');
+    expect(visible.map(o => o.dataset.label)).toEqual(['Banana']);
+  });
+
+  it('a second open() does not wipe an in-progress query', () => {
+    const el = createSelect({ searchable: true, value: 'a', options: [
+      { value: 'a', label: 'Apple' },
+      { value: 'b', label: 'Banana' },
+    ] });
+    el.open();
+    const input = getTrigger(el);
+    expect(input.value).toBe('');
+
+    input.value = 'ban';
+    input.dispatchEvent(new Event('input', { bubbles: true }));
+    el.open();
+
+    expect(input.value).toBe('ban');
+    const visible = getOptions(el).filter(o => o.style.display !== 'none');
+    expect(visible.map(o => o.dataset.label)).toEqual(['Banana']);
+  });
+
   it('typing filters options', () => {
     const el = createSelect({ searchable: true, options: [
       { value: 'a', label: 'Apple' },

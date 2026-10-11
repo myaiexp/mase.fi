@@ -83,7 +83,10 @@ class BaseSelect extends HTMLElement {
 
   open() {
     if (this.hasAttribute('disabled')) return;
+    const opening = !this.#open;
     this.#open = true;
+    // Label text is not a search query. close() writes the label back.
+    if (opening && this.#searchable && this.#trigger) this.#trigger.value = '';
 
     applyMenuFlip(this, this._menu);
 
@@ -103,10 +106,8 @@ class BaseSelect extends HTMLElement {
     this.#typeahead.reset();
     removeOverlayListeners(this);
 
-    // Searchable: cancelling reverts the trigger to the selected option's label
-    // AND clears the filter, so the abandoned query leaves no trace — a fresh
-    // open shows every option, not the stale filtered subset (which could even
-    // hide the selected option the input now displays).
+    // open() cleared the label so the query starts empty; write it back and
+    // reset the filter so the next open is the full list, not a stale subset.
     if (this.#searchable) {
       this.#syncTriggerText();
       resetFilter(this);
@@ -126,7 +127,6 @@ class BaseSelect extends HTMLElement {
       const input = document.createElement('input');
       input.setAttribute('type', 'text');
       input.setAttribute('part', 'trigger');
-      input.setAttribute('placeholder', this.getAttribute('placeholder') ?? '');
       // A filter input must never be an autofill target. Password managers
       // (Bitwarden et al.) traverse open shadow roots, attach inline-menu
       // observers to this persistent text field, and thrash field-heavy pages.
