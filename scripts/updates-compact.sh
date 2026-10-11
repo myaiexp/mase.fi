@@ -1,11 +1,18 @@
 #!/usr/bin/env bash
 # Compaction transform for updates.json: strip commits[], archive old logs.
 #
-# Sourced by mase-fi-compact-updates after updates-write.sh (compact_and_install
-# installs with its write_updates_json). Compaction writes two files — the hot
-# updates.json and updates-archive.json — so it runs compact_and_install under
-# run_under_updates_lock rather than with_updates_lock's single-candidate
-# read-modify-write.
+# Sourced by mase-fi-compact-updates and mase-fi-purge-private after
+# updates-write.sh (compact_and_install installs with its write_updates_json).
+# Compaction writes two files — the hot updates.json and updates-archive.json —
+# so it runs compact_and_install under run_under_updates_lock rather than
+# with_updates_lock's single-candidate read-modify-write.
+
+# hot_cutoff <today YYYY-MM-DD> <days>
+# First day that stays in the hot file. Both callers share this so a purge and
+# the nightly compact age logs on the same Helsinki date.
+hot_cutoff() {
+  TZ="Europe/Helsinki" date -d "${1:?hot_cutoff: today} - ${2:?hot_cutoff: days} days" +%Y-%m-%d
+}
 
 # compact_updates_json <hot_src> <archive_src> <hot_dst> <archive_dst> <cutoff>
 #
