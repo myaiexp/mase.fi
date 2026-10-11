@@ -5,7 +5,7 @@
 // suite, the ntfy alerts (compact, on_exit, token handling) in the -alerts suite.
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { join } from 'node:path';
-import { writeFileSync, readFileSync } from 'node:fs';
+import { chmodSync, readFileSync, writeFileSync } from 'node:fs';
 import { makeTempDir, cleanup, writeJson, readJson, runScript, todayHelsinki, writeClaudeStub, readClaudeArgv } from './test-helpers.js';
 
 // Each run spawns the whole script (jq, curl, the compactor, the stubs): ~2s alone on
@@ -162,6 +162,20 @@ describe('mase-fi-daily-summary — fallback + skip paths', () => {
     expect(dailies().map((e) => e.summary)).toEqual(['already summarized']);
     // Skip still compacts: the unused commits[] copy is stripped (finding #8804).
     expect(dailies()[0].commits).toBeUndefined();
+  });
+
+  it('purges private rows once even when today is already summarized', () => {
+    seed([
+      { date: TODAY, project: 'beta', category: 'daily', summary: 'already summarized' },
+      log('beta', 'c1'),
+    ]);
+    const calls = join(dir, 'purge-calls');
+    const stub = join(dir, 'purge-stub');
+    writeFileSync(stub, `#!/usr/bin/env bash\nprintf 'called\\n' >> ${JSON.stringify(calls)}\nexit 0\n`);
+    chmodSync(stub, 0o755);
+    const r = run({ PURGE_BIN: stub });
+    expect(r.stdout).toMatch(/already exist/i);
+    expect(readFileSync(calls, 'utf8')).toBe('called\n');
   });
 
   it('skips when there are no log entries for today', () => {

@@ -17,7 +17,7 @@
 - **Store:** `/var/lib/mase-fi/updates.json` (outside the webroot), served by nginx `alias` and fetched as `/updates.json`
 - **Hot window + archive:** one fetch holds all non-log entries + the last 90 days of `log`s; older logs lazy-load from `/updates-archive.json` on `#activity` scroll-up (`loadArchive` in `data-archive.js`)
 - **Categories → channels:** a resolved `daily` renders on `#home` and that project channel; `log` only on `#activity`; a `feature` only on the resolved project channel (dropped otherwise)
-- Full pipeline (shape, stats, writers, lock, showcase generator, daily summaries, client archive semantics): `docs/content-pipeline.md`
+- Full pipeline (shape, stats, writers, lock, public channel list, daily summaries, client archive semantics): `docs/content-pipeline.md`
 
 ## Demo Convention
 

@@ -7,7 +7,10 @@ import { existsSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { runScript, scriptEnv } from './test-helpers.js';
 
-const LIVE_VARS = ['UPDATES_FILE', 'ARCHIVE_FILE', 'CLAUDE_BIN', 'SHOWCASE_API', 'NTFY_URL', 'NTFY_TOKEN', 'HELM_ENV'];
+const LIVE_VARS = [
+  'UPDATES_FILE', 'ARCHIVE_FILE', 'CLAUDE_BIN', 'SHOWCASE_API', 'PRIVATE_API',
+  'BACKUP_DIR', 'PURGE_BIN', 'NTFY_URL', 'NTFY_TOKEN', 'HELM_ENV',
+];
 // A name that resolves to no script: if the guard ever regresses, bash fails on the
 // missing file instead of a real pipeline script running against the live store.
 const NO_SCRIPT = 'no-such-script-for-harness-test';
@@ -37,6 +40,10 @@ describe('scriptEnv', () => {
   it('points every live endpoint at a dead or throwaway target when the test omits it', () => {
     const e = env();
     expect(e.SHOWCASE_API).toBe('http://127.0.0.1:1/');
+    expect(e.PRIVATE_API).toBe('http://127.0.0.1:1/');
+    expect(e.BACKUP_DIR.startsWith(tmpdir())).toBe(true);
+    expect(e.BACKUP_DIR).not.toContain('/var/lib/mase-fi');
+    expect(spawnSync(e.PURGE_BIN, [], { encoding: 'utf8' }).status).toBe(0);
     expect(e.NTFY_URL).toBe('http://127.0.0.1:1/');
     expect(e.NTFY_TOKEN).toBe('');
     expect(existsSync(e.HELM_ENV)).toBe(false);
@@ -55,6 +62,9 @@ describe('scriptEnv', () => {
   it('host env values never leak through: only the test decides these', () => {
     process.env.CLAUDE_BIN = '/home/mase/.local/bin/claude';
     process.env.SHOWCASE_API = 'http://localhost:9754/api/projects/showcase';
+    process.env.PRIVATE_API = 'http://localhost:9754/api/projects/private';
+    process.env.BACKUP_DIR = '/var/lib/mase-fi/backups';
+    process.env.PURGE_BIN = '/home/mase/Projects/mase.fi/scripts/mase-fi-purge-private';
     process.env.NTFY_URL = 'https://ntfy.mase.fi/kelo';
     process.env.NTFY_TOKEN = 'live-token';
     process.env.HELM_ENV = '/home/mase/Projects/helm/.env';
@@ -62,6 +72,9 @@ describe('scriptEnv', () => {
     const e = env();
     expect(e.CLAUDE_BIN).not.toBe('/home/mase/.local/bin/claude');
     expect(e.SHOWCASE_API).toBe('http://127.0.0.1:1/');
+    expect(e.PRIVATE_API).toBe('http://127.0.0.1:1/');
+    expect(e.BACKUP_DIR).not.toBe('/var/lib/mase-fi/backups');
+    expect(e.PURGE_BIN).not.toBe('/home/mase/Projects/mase.fi/scripts/mase-fi-purge-private');
     expect(e.NTFY_URL).toBe('http://127.0.0.1:1/');
     expect(e.NTFY_TOKEN).toBe('');
     expect(e.HELM_ENV).not.toBe('/home/mase/Projects/helm/.env');

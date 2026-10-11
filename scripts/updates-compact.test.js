@@ -153,3 +153,14 @@ describe('compact_updates_json — refuses an archive it cannot parse (finding #
     });
   }
 });
+
+describe('hot_cutoff', () => {
+  it('is today minus the retention window, in Helsinki', () => {
+    const r = spawnSync('bash', ['-c', `
+      source "${join(SCRIPTS_DIR, 'updates-compact.sh')}"
+      hot_cutoff "$1" "$2"
+    `, '--', '2026-10-11', '90'], { encoding: 'utf8' });
+    expect(r.status).toBe(0);
+    expect(r.stdout.trim()).toBe('2026-07-13');
+  });
+});

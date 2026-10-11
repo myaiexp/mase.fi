@@ -13,7 +13,7 @@ ARCHIVE_FILE="${ARCHIVE_FILE:-$(dirname "$UPDATES_FILE")/updates-archive.json}"
 # sparkbar stay in-window.
 LOG_HOT_DAYS="${LOG_HOT_DAYS:-90}"
 TODAY="${TODAY:-$(TZ="Europe/Helsinki" date +%Y-%m-%d)}"
-CUTOFF="$(TZ="Europe/Helsinki" date -d "${TODAY} - ${LOG_HOT_DAYS} days" +%Y-%m-%d)"
+CUTOFF="$(hot_cutoff "$TODAY" "$LOG_HOT_DAYS")"
 
 if [[ ! -f "$UPDATES_FILE" ]]; then
   echo "No updates.json at $UPDATES_FILE" >&2

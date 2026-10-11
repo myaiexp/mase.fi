@@ -1,0 +1,152 @@
+#!/usr/bin/env bash
+# Drop private projects' rows from the public feed (hot file and archive).
+set -euo pipefail
+
+SCRIPT_DIR="$(dirname "$(readlink -f "$0")")"
+# Lock + install, then the same compact the nightly retention run uses so
+# all-history stats stay true after a row is deleted.
+source "$SCRIPT_DIR/updates-write.sh"
+source "$SCRIPT_DIR/updates-compact.sh"
+
+UPDATES_FILE="${UPDATES_FILE:-$UPDATES_FILE_DEFAULT}"
+ARCHIVE_FILE="${ARCHIVE_FILE:-$(dirname "$UPDATES_FILE")/updates-archive.json}"
+LOG_HOT_DAYS="${LOG_HOT_DAYS:-90}"
+TODAY="${TODAY:-$(TZ="Europe/Helsinki" date +%Y-%m-%d)}"
+PRIVATE_API="${PRIVATE_API:-http://localhost:9754/api/projects/private}"
+BACKUP_DIR="${BACKUP_DIR:-/var/lib/mase-fi/backups}"
+
+# A name matches when its lowercased form is in the private set. Non-strings
+# never match, so a malformed project field is kept rather than dropped.
+LOW='def low($v): if ($v | type) == "string" then $v | ascii_downcase else "" end;
+     def listed($v): ($names | index(low($v))) != null;'
+
+body="$(curl -fsS --max-time 30 "$PRIVATE_API" 2>/dev/null)" || {
+  echo "private API unreachable — nothing written" >&2
+  exit 1
+}
+if ! printf '%s' "$body" | jq -e '.private | type == "array"' >/dev/null 2>&1; then
+  echo "private API reply has no private array — nothing written" >&2
+  exit 1
+fi
+names="$(printf '%s' "$body" | jq -c '[.private[].name | select(type == "string" and length > 0) | ascii_downcase] | unique')"
+
+# Newest 20 pre-purge copies per live file. The stamp is UTC and sorts lexically.
+prune_pre_purge() {
+  local base="$1"
+  local -a sorted=()
+  local i
+  mapfile -t sorted < <(find "$BACKUP_DIR" -maxdepth 1 -name "${base}.pre-purge.*.json" -printf '%f\n' | sort -r)
+  if ((${#sorted[@]} > 20)); then
+    for ((i = 20; i < ${#sorted[@]}; i++)); do
+      rm -f "$BACKUP_DIR/${sorted[$i]}"
+    done
+  fi
+}
+
+backup_live() {
+  local src="$1" dest
+  [[ -f "$src" ]] || return 0
+  dest="$BACKUP_DIR/$(basename "$src").pre-purge.$(date -u +%Y%m%dT%H%M%SZ).json"
+  cp "$src" "$dest"
+  chmod 600 "$dest"
+  prune_pre_purge "$(basename "$src")"
+}
+
+# Runs under the updates lock. Prints either "nothing to purge" or
+# "purged N row(s) for: a, b". Archive is installed before hot; a failed
+# archive install leaves the hot file untouched.
+purge_locked() {
+  local names="$1"
+  local tmp hot_f arch_f hot_out arch_out orig_arch removed hit cutoff
+  tmp="$(mktemp -d)"
+  trap 'rm -rf "$tmp"' RETURN
+  hot_f="$tmp/hot.json"
+  arch_f="$tmp/arch.json"
+  hot_out="$tmp/hot-out.json"
+  arch_out="$tmp/arch-out.json"
+
+  jq --argjson names "$names" "$LOW
+    .entries |= map(select(listed(.project) | not))
+    | .projects = ((.projects // []) | map(select((listed(.slug) or listed(.channel)) | not)))
+  " "$UPDATES_FILE" > "$hot_f" || return 1
+
+  if [[ -f "$ARCHIVE_FILE" ]]; then
+    if ! jq -e 'type == "object" and ((.entries | type) == "array")' "$ARCHIVE_FILE" >/dev/null 2>&1; then
+      echo "purge: $ARCHIVE_FILE is not a valid {entries:[...]} archive — nothing written" >&2
+      return 1
+    fi
+    orig_arch="$ARCHIVE_FILE"
+    jq --argjson names "$names" "$LOW
+      .entries |= map(select(listed(.project) | not))
+    " "$orig_arch" > "$arch_f" || return 1
+  else
+    orig_arch="$tmp/orig-arch.json"
+    printf '%s\n' '{"entries":[]}' > "$orig_arch"
+    cp "$orig_arch" "$arch_f"
+  fi
+
+  removed="$(jq -n --slurpfile hot "$UPDATES_FILE" --slurpfile hf "$hot_f" --slurpfile arch "$orig_arch" --slurpfile af "$arch_f" '
+    (($hot[0].entries | length) - ($hf[0].entries | length))
+    + ((($hot[0].projects // []) | length) - (($hf[0].projects // []) | length))
+    + (($arch[0].entries | length) - ($af[0].entries | length))
+  ')" || return 1
+  if ((removed < 1)); then
+    echo "nothing to purge"
+    return 0
+  fi
+
+  hit="$(jq -nr --argjson names "$names" --slurpfile hot "$UPDATES_FILE" --slurpfile arch "$orig_arch" '
+    def low($v): if ($v | type) == "string" then $v | ascii_downcase else "" end;
+    [ $hot[0].entries[]?.project, $hot[0].projects[]?.slug, $hot[0].projects[]?.channel,
+      $arch[0].entries[]?.project ] | map(low(.)) as $present
+    | [$names[] | select(. as $n | ($present | index($n)) != null)] | sort | join(", ")
+  ')" || return 1
+
+  mkdir -p "$BACKUP_DIR"
+  chmod 700 "$BACKUP_DIR"
+  backup_live "$UPDATES_FILE"
+  backup_live "$ARCHIVE_FILE"
+
+  cutoff="$(hot_cutoff "$TODAY" "$LOG_HOT_DAYS")"
+  if ! compact_updates_json "$hot_f" "$arch_f" "$hot_out" "$arch_out" "$cutoff"; then
+    echo "purge: compact failed — nothing installed" >&2
+    return 1
+  fi
+  # Missing archive: compact's output is the file we create. An archive that
+  # cannot be written is a failure, not a hot-only rewrite.
+  if ! write_updates_json "$arch_out" "$ARCHIVE_FILE"; then
+    echo "purge: archive install failed ($ARCHIVE_FILE) — $UPDATES_FILE left untouched" >&2
+    return 1
+  fi
+  if ! write_updates_json "$hot_out" "$UPDATES_FILE"; then
+    echo "purge: archive updated but hot install failed ($UPDATES_FILE) — removed rows are gone from the archive and still in the hot file until the next run" >&2
+    return 1
+  fi
+  echo "purged ${removed} row(s) for: ${hit}"
+}
+
+# Read-only. A private name mentioned in some other project's summary or text
+# is reported, never deleted. A report failure does not fail the purge.
+mention_report() {
+  local names="$1"
+  local -a files=("$UPDATES_FILE")
+  [[ -f "$ARCHIVE_FILE" ]] && files+=("$ARCHIVE_FILE")
+  jq -nr --argjson names "$names" '
+    def re_escape:
+      reduce split("")[] as $c ("";
+        . + if ($c | test("[\\\\.^$*+?()\\[\\]{}|]")) then "\\" + $c else $c end);
+    [ inputs | .entries[]? as $e
+      | select(any($names[]; . as $n
+          | ($e | [(.summary // ""), (.text // "")] | join("\n"))
+          | test("(?<![A-Za-z0-9_-])" + ($n | re_escape) + "(?![A-Za-z0-9_-])"; "i")))
+      | "still mentioned: \($e.project) \($e.date) (\($e.category))" ]
+    | unique | .[]
+  ' "${files[@]}"
+}
+
+rc=0
+run_under_updates_lock "$UPDATES_FILE" "not purged" purge_locked "$names" || rc=$?
+if [[ "$rc" -ne 0 ]]; then
+  exit "$rc"
+fi
+mention_report "$names" || echo "purge: mention report failed — rows already removed" >&2

@@ -1,8 +1,9 @@
 #!/usr/bin/env bash
 # Shared lock + install for mase.fi's updates.json store, and the feed-embargo gate.
 #
-# Sourced by the four mase.fi writers — mase-fi-update, mase-fi-daily-summary,
-# mase-fi-projects, mase-fi-compact-updates. run_under_updates_lock owns the
+# Sourced by the mase.fi writers — mase-fi-update, mase-fi-daily-summary,
+# mase-fi-projects, mase-fi-compact-updates, mase-fi-purge-private.
+# run_under_updates_lock owns the
 # lock steps (open, flock, in-lock is_updates_json gate) and is the only place
 # they are written; with_updates_lock adds the single-file read-modify-write on top;
 # write_updates_json is the final validate + install step. Compaction's

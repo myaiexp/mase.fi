@@ -1,6 +1,7 @@
 // Shared harness for the content-pipeline script tests.
 // Runs the REAL scripts against a throwaway updates.json fixture via their env
-// overrides (UPDATES_FILE / SHOWCASE_API / SHOWCASE_EXTRA / CLAUDE_BIN / HELM_BIN / NTFY_URL), so the
+// overrides (UPDATES_FILE / SHOWCASE_API / PRIVATE_API / BACKUP_DIR / PURGE_BIN /
+// SHOWCASE_EXTRA / CLAUDE_BIN / HELM_BIN / NTFY_URL), so the
 // tests exercise the actual jq programs end-to-end (golden-file style) rather
 // than reimplementing them.
 import process from 'node:process';
@@ -40,6 +41,9 @@ const hermeticDefaults = {
   HELM_BIN: () => writeHelmStub(tmpdir(), { name: `mase-fi-test-helm-${process.pid}` }),
   CLAUDE_BIN: () => writeFailingStub(tmpdir(), `mase-fi-test-claude-${process.pid}`),
   SHOWCASE_API: () => UNREACHABLE,
+  PRIVATE_API: () => UNREACHABLE,
+  BACKUP_DIR: () => join(tmpdir(), `mase-fi-test-${process.pid}-purge-backups`),
+  PURGE_BIN: () => writeOkStub(tmpdir(), `mase-fi-test-purge-${process.pid}`),
   NTFY_URL: () => UNREACHABLE,
   NTFY_TOKEN: () => '',
   // ntfy_send falls back to helm's .env for a token; a missing file means none.
@@ -87,6 +91,13 @@ export function runScript(name, args = [], env = {}) {
 function writeFailingStub(dir, name) {
   const path = join(dir, name);
   writeFileSync(path, `#!/usr/bin/env bash\necho "${name}: unstubbed call from a test" >&2\nexit 1\n`);
+  chmodSync(path, 0o755);
+  return path;
+}
+
+function writeOkStub(dir, name) {
+  const path = join(dir, name);
+  writeFileSync(path, '#!/usr/bin/env bash\nexit 0\n');
   chmodSync(path, 0o755);
   return path;
 }
