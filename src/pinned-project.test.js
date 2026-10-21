@@ -69,6 +69,21 @@ describe('renderPinned — project', () => {
     expect(pinnedEl().innerHTML).not.toContain('in feed');
   });
 
+  it('uses the project name when the description is empty', () => {
+    renderPinned('explorer', projectData({
+      channel: 'explorer', heat: 0.5, description: '', name: 'Helm', links: [],
+    }));
+    expect(pinnedEl().querySelector('.pin-tagline').textContent).toBe('Helm');
+  });
+
+  it('escapes a name standing in for an empty description', () => {
+    renderPinned('explorer', projectData({
+      channel: 'explorer', heat: 0.5, description: '', name: '<script>', links: [],
+    }));
+    expect(pinnedEl().querySelector('.pin-tagline script')).toBeNull();
+    expect(pinnedEl().querySelector('.pin-tagline').textContent).toBe('<script>');
+  });
+
   it('labels a mid-heat project as steady', () => {
     renderPinned('explorer', projectData({ channel: 'explorer', heat: 0.5, description: 'd', links: [] }));
     const html = pinnedEl().innerHTML;

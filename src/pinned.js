@@ -101,7 +101,7 @@ function pinnedProject(p, data) {
     meta: [['heat', (p.heat * 100 | 0) + '%'], ['commits', String(commits)]],
     right: status.cardBadge,
     art,
-    tagline: escapeHtml(p.description),
+    tagline: escapeHtml(p.description || p.name || p.channel),
     rows: [
       ['activity', commits + ' commits \xb7 heat ' + (p.heat * 100 | 0) + '%'],
       ['status', status.cardLine, 'accent'],
