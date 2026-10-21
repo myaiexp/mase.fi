@@ -157,8 +157,10 @@ body {
 }
 
 /* ===== Layout primitives — the scroll contract =====
-   Inside .app-shell, body scroll is dead. Every surface (tab, view, panel,
-   modal body) picks exactly ONE architecture:
+   Inside .app-shell, body scroll is dead, so the mobile URL bar stays and
+   there is no pull-to-refresh. A page that wants those does not use
+   .app-shell. Every surface (tab, view, panel, modal body) picks exactly
+   ONE architecture:
 
    page-scroll — content-driven pages (the default). The surface root IS the
      single scroll region: put .scroll-region on it, .bar-sticky on bars that
