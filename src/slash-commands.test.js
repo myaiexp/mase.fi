@@ -116,6 +116,10 @@ describe('buildCommands', () => {
     expect(run('date')).toBe('server time \xb7 Wed 24 Jun 2026 \xb7 14:32:05');
   });
 
+  it('clear with no hooks prints nothing and does not throw', () => {
+    expect(buildCommands().find((c) => c.name === 'clear').run()).toBeNull();
+  });
+
   it('clear invokes both clearSearch and clearNotices and prints nothing', () => {
     const clearSearch = vi.fn();
     const clearNotices = vi.fn();
