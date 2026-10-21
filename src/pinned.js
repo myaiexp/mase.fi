@@ -10,7 +10,7 @@ import { escapeHtml } from './html.js';
 function heatStatus(heat) {
   if (heat > 0.6) return { cardBadge: '● shipping', cardLine: 'actively shipping', mobileLabel: 'shipping' };
   if (heat > 0.3) return { cardBadge: '● steady', cardLine: 'steady', mobileLabel: 'steady' };
-  return { cardBadge: '○ idle', cardLine: 'maintenance only', mobileLabel: 'idle' };
+  return { cardBadge: '○ idle', cardLine: 'idle', mobileLabel: 'idle' };
 }
 
 // "try demo" anchor when this channel has a published demo (demos/<channel>/).

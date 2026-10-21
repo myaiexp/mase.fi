@@ -74,11 +74,12 @@ describe('renderPinned — project', () => {
     expect(html).toContain('<dd class="accent">steady</dd>'); // status text
   });
 
-  it('labels a cold project as idle / maintenance only', () => {
+  it('labels a cold project as idle on the badge, the card line and nowhere else', () => {
     renderPinned('explorer', projectData({ channel: 'explorer', heat: 0.1, description: 'd', links: [] }));
     const html = pinnedEl().innerHTML;
-    expect(html).toContain('○ idle');               // heat <= 0.3 label
-    expect(html).toContain('maintenance only');     // status text
+    expect(html).toContain('○ idle');               // heat <= 0.3 badge
+    expect(html).toContain('<dd class="accent">idle</dd>');
+    expect(html).not.toContain('maintenance');
   });
 
   it('escapes a malicious project description (no script injected)', () => {
