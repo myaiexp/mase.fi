@@ -70,7 +70,8 @@ describe('renderPinned — home', () => {
     renderPinned('home', data);
     const html = pinnedEl().innerHTML;
     expect(html).toContain('2 active');   // projects.length
-    expect(html).toContain('2 in feed');  // logStats().totalCommits
+    expect(html).toContain('2 ·');        // commit total, not claimed to be in this feed
+    expect(html).not.toContain('in feed');
     expect(html).toContain('2026-03-20'); // last-push date slice
     expect(html).toContain('porssi');     // last-push project (newest log entry)
   });
@@ -79,7 +80,8 @@ describe('renderPinned — home', () => {
     renderPinned('home', { projects: [], entries: [], stats: {} });
     const html = pinnedEl().innerHTML;
     expect(html).toContain('0 active');
-    expect(html).toContain('0 in feed');
+    expect(html).toContain('0 ·');
+    expect(html).not.toContain('in feed');
     expect(html).toContain('<dt>last push</dt><dd>—</dd>');
   });
 

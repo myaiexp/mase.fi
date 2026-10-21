@@ -46,7 +46,8 @@ describe('renderPinned — project', () => {
     const html = pinnedEl().innerHTML;
     expect(html).toContain('a terminal file explorer');
     expect(html).toContain('80%');                  // heat → (0.8*100|0)
-    expect(html).toContain('2 commits in feed');    // only the two 'explorer' logs
+    expect(html).toContain('2 commits · heat');     // count is real; the rows are on #activity
+    expect(html).not.toContain('in feed');
     expect(html).toContain('● shipping');           // heat > 0.6 label
     expect(html).toContain('actively shipping');    // heat > 0.6 status text
     expect(html).toContain('href="https://mase.fi/explorer"');
@@ -64,7 +65,8 @@ describe('renderPinned — project', () => {
     const data = projectData(project, [logEntry({ channel: 'explorer' })]);
     data.stats = { commitsByProject: { explorer: 42 } };
     renderPinned('explorer', data);
-    expect(pinnedEl().innerHTML).toContain('42 commits in feed');
+    expect(pinnedEl().innerHTML).toContain('42 commits · heat');
+    expect(pinnedEl().innerHTML).not.toContain('in feed');
   });
 
   it('labels a mid-heat project as steady', () => {

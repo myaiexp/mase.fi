@@ -84,7 +84,7 @@ function pinnedHome(data) {
     tagline: '<b>mase</b> — software, in progress. this is the always-on log: what i shipped, what i broke, what i thought was worth writing down.',
     rows: [
       ['projects', data.projects.length + ' active', 'accent'],
-      ['commits', totalCommits + ' in feed \xb7 ' + spark],
+      ['commits', totalCommits + ' \xb7 ' + spark],
       ['last push', lastStr],
       ['links', HOME_LINKS.map(linkHtml).join(''), 'links'],
     ],
@@ -103,7 +103,7 @@ function pinnedProject(p, data) {
     art,
     tagline: escapeHtml(p.description),
     rows: [
-      ['activity', commits + ' commits in feed \xb7 heat ' + (p.heat * 100 | 0) + '%'],
+      ['activity', commits + ' commits \xb7 heat ' + (p.heat * 100 | 0) + '%'],
       ['status', status.cardLine, 'accent'],
       ['links', linksHtml, 'links'],
     ],
