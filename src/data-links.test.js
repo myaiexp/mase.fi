@@ -25,9 +25,30 @@ describe('fetchData project links', () => {
     ]);
   });
 
-  it('keeps a bare https host as the label', async () => {
+  it('labels a mase.fi link by its last path segment, not the host', async () => {
     expect(await linksFor('https://mase.fi/explorer')).toEqual([
-      { label: 'mase.fi', href: 'https://mase.fi/explorer' },
+      { label: 'explorer', href: 'https://mase.fi/explorer' },
+    ]);
+    expect(await linksFor('https://www.mase.fi/explorer/')).toEqual([
+      { label: 'explorer', href: 'https://www.mase.fi/explorer/' },
+    ]);
+    expect(await linksFor('https://mase.fi/porssi.html')).toEqual([
+      { label: 'porssi', href: 'https://mase.fi/porssi.html' },
+    ]);
+  });
+
+  it('labels a db.mase.fi app by its last path segment', async () => {
+    expect(await linksFor('https://db.mase.fi/apps/forge')).toEqual([
+      { label: 'forge', href: 'https://db.mase.fi/apps/forge' },
+    ]);
+  });
+
+  it('keeps the host when a mase.fi link has no path', async () => {
+    expect(await linksFor('https://mase.fi/')).toEqual([
+      { label: 'mase.fi', href: 'https://mase.fi/' },
+    ]);
+    expect(await linksFor('https://db.mase.fi')).toEqual([
+      { label: 'db.mase.fi', href: 'https://db.mase.fi' },
     ]);
   });
 
