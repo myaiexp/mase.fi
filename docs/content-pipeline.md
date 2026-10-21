@@ -57,7 +57,7 @@ Where a row shows (`normalizeEntry` stores `channel`; `entriesFor` selects):
 | `log` | `#activity` only |
 | `feature` | the resolved project channel; dropped when the slug matches nothing |
 
-`entry.project` is matched case-insensitively against one key per project: `project.slug` lowercased when that field is a non-empty string, otherwise `project.channel` lowercased (`projectSlug` / `buildSlugToChannel` in `src/data-normalize.js`). When both are set and they differ (`scripts/showcase-extra.json`: `porssi`/`spot-price`, `fortunemill`/`fortunemill-solver`, `iseps`/`iseps-solver`), the channel name is not a match key. An entry stamped with that channel name does not resolve: a `feature` is dropped by `normalizeEntry`, and a `daily` lands on `#home` via the category fallback rather than the project channel.
+`entry.project` is matched case-insensitively (`projectSlug` / `buildSlugToChannel` in `src/data-normalize.js`). The primary key is `project.slug` lowercased when that field is a non-empty string, otherwise `project.channel` lowercased. When both are set and they differ (`scripts/showcase-extra.json`: `porssi`/`spot-price`, `fortunemill`/`fortunemill-solver`, `iseps`/`iseps-solver`), the channel name is a second key, so an entry stamped with the channel name resolves to that project. The alias is not added when another project's slug already owns that string — the slug owner wins. A `feature` whose project matches nothing is dropped by `normalizeEntry`; a `daily` in that case lands on `#home`.
 
 ### Log entries — helm `deploy` Step 3 and the VPS-copy timer
 

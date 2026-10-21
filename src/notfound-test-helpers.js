@@ -43,7 +43,13 @@ export function mountDom() {
     csegs.append(s);
   }
   const box = el('section', 'countbox', { hidden: true });
-  box.append(el('span', 'cnum', { textContent: '5' }), csegs, el('button', 'gobtn'), el('button', 'staybtn'));
+  box.append(
+    el('span', 'clabel', { className: 'clabel', textContent: 'redirecting in' }),
+    el('span', 'cnum', { textContent: '5' }),
+    csegs,
+    el('button', 'gobtn'),
+    el('button', 'staybtn'),
+  );
   const big = document.createElement('a');
   big.className = 'big';
   document.body.append(

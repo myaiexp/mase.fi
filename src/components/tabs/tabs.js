@@ -44,6 +44,17 @@ const tabsStyles = shadowStyles([
   '}',
 ].join('\n'));
 
+// Panels need a stable id for aria-controls. An author-set id wins; otherwise
+// one is assigned once and kept, so a tablist rebuild does not retarget AT.
+let tabPanelSeq = 0;
+function ensurePanelId(tabEl) {
+  if (!tabEl.id) {
+    tabPanelSeq += 1;
+    tabEl.id = `base-tab-panel-${tabPanelSeq}`;
+  }
+  return tabEl.id;
+}
+
 const tabsTemplate = document.createElement('template');
 tabsTemplate.innerHTML = [
   '<div role="tablist"></div>',
@@ -112,11 +123,16 @@ class BaseTabs extends HTMLElement {
     // Rebuild tab buttons
     this.#tablist.innerHTML = '';
     children.forEach((tabEl, idx) => {
+      const panelId = ensurePanelId(tabEl);
       const btn = document.createElement('button');
+      btn.id = `${panelId}-tab`;
       btn.textContent = tabEl.getAttribute('label') || '';
       btn.setAttribute('role', 'tab');
       btn.setAttribute('aria-selected', 'false');
+      btn.setAttribute('aria-controls', panelId);
       btn.setAttribute('tabindex', '-1');
+      tabEl.setAttribute('role', 'tabpanel');
+      tabEl.setAttribute('aria-labelledby', btn.id);
       if (tabEl.hasAttribute('disabled')) {
         btn.disabled = true;
         btn.setAttribute('aria-disabled', 'true');

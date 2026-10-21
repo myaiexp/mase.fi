@@ -46,7 +46,8 @@ describe('renderPinned — project', () => {
     const html = pinnedEl().innerHTML;
     expect(html).toContain('a terminal file explorer');
     expect(html).toContain('80%');                  // heat → (0.8*100|0)
-    expect(html).toContain('2 commits in feed');    // only the two 'explorer' logs
+    expect(html).toContain('2 commits · heat');     // count is real; the rows are on #activity
+    expect(html).not.toContain('in feed');
     expect(html).toContain('● shipping');           // heat > 0.6 label
     expect(html).toContain('actively shipping');    // heat > 0.6 status text
     expect(html).toContain('href="https://mase.fi/explorer"');
@@ -64,7 +65,23 @@ describe('renderPinned — project', () => {
     const data = projectData(project, [logEntry({ channel: 'explorer' })]);
     data.stats = { commitsByProject: { explorer: 42 } };
     renderPinned('explorer', data);
-    expect(pinnedEl().innerHTML).toContain('42 commits in feed');
+    expect(pinnedEl().innerHTML).toContain('42 commits · heat');
+    expect(pinnedEl().innerHTML).not.toContain('in feed');
+  });
+
+  it('uses the project name when the description is empty', () => {
+    renderPinned('explorer', projectData({
+      channel: 'explorer', heat: 0.5, description: '', name: 'Helm', links: [],
+    }));
+    expect(pinnedEl().querySelector('.pin-tagline').textContent).toBe('Helm');
+  });
+
+  it('escapes a name standing in for an empty description', () => {
+    renderPinned('explorer', projectData({
+      channel: 'explorer', heat: 0.5, description: '', name: '<script>', links: [],
+    }));
+    expect(pinnedEl().querySelector('.pin-tagline script')).toBeNull();
+    expect(pinnedEl().querySelector('.pin-tagline').textContent).toBe('<script>');
   });
 
   it('labels a mid-heat project as steady', () => {
@@ -74,11 +91,12 @@ describe('renderPinned — project', () => {
     expect(html).toContain('<dd class="accent">steady</dd>'); // status text
   });
 
-  it('labels a cold project as idle / maintenance only', () => {
+  it('labels a cold project as idle on the badge, the card line and nowhere else', () => {
     renderPinned('explorer', projectData({ channel: 'explorer', heat: 0.1, description: 'd', links: [] }));
     const html = pinnedEl().innerHTML;
-    expect(html).toContain('○ idle');               // heat <= 0.3 label
-    expect(html).toContain('maintenance only');     // status text
+    expect(html).toContain('○ idle');               // heat <= 0.3 badge
+    expect(html).toContain('<dd class="accent">idle</dd>');
+    expect(html).not.toContain('maintenance');
   });
 
   it('escapes a malicious project description (no script injected)', () => {

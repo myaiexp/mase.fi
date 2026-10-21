@@ -36,12 +36,22 @@ export function entrySlug(project) {
   return (project || '').toLowerCase();
 }
 
-/** Build the entry-slug → channel lookup over (raw or normalized) projects. */
+/** Build the entry-slug → channel lookup over (raw or normalized) projects.
+ *  The slug is the primary key. When channel differs, it is a second key,
+ *  unless some project's slug already owns that string — the slug owner wins
+ *  and the alias is skipped rather than stealing the other channel. */
 export function buildSlugToChannel(projects) {
   const slugToChannel = new Map();
-  for (const p of projects || []) {
+  const list = projects || [];
+  for (const p of list) {
     const slug = projectSlug(p);
     if (slug) slugToChannel.set(slug, p.channel);
+  }
+  for (const p of list) {
+    const channelKey = typeof p.channel === 'string' ? p.channel.toLowerCase() : '';
+    if (channelKey && !slugToChannel.has(channelKey)) {
+      slugToChannel.set(channelKey, p.channel);
+    }
   }
   return slugToChannel;
 }

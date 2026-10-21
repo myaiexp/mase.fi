@@ -47,7 +47,10 @@ export function buildRegistry(data) {
   _channels = Object.freeze([
     { id: 'home', group: 'system', label: 'home', topic: 'daily logbook \xb7 appended nightly \xb7 autoscroll on' },
     ...data.projects.map(p => ({
-      id: p.channel, group: 'projects', label: p.channel, topic: p.description, project: p,
+      id: p.channel, group: 'projects', label: p.channel,
+      // A blank showcase tagline would leave the topic bar empty after the
+      // separator. The name, then the channel, is still a heading.
+      topic: p.description || p.name || p.channel, project: p,
     })),
     { id: 'activity', group: 'system', label: 'activity', topic: 'raw commit stream across all projects' },
   ]);

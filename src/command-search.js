@@ -40,8 +40,10 @@ function clearMarks(root) {
 }
 
 /** Highlight `needle` (already lowercased) across the feed's rows; dim non-matches.
- *  Empty needle clears all marks and un-dims every row. */
+ *  Empty needle clears all marks and un-dims every row. Returns how many rows
+ *  contained the needle, 0 when the needle is empty. */
 export function applySearch(feedEl, needle) {
+  let matches = 0;
   feedEl.querySelectorAll('.feed-row').forEach(row => {
     const msg = row.querySelector('.msg');
     if (!msg) return;
@@ -52,6 +54,7 @@ export function applySearch(feedEl, needle) {
     }
     const raw = (row.dataset.raw || '').toLowerCase();
     if (raw.includes(needle)) {
+      matches += 1;
       highlightTextNodes(msg, needle);
       row.classList.remove('search-dim');
     } else {
@@ -65,4 +68,5 @@ export function applySearch(feedEl, needle) {
     s.textContent = '.feed-row.search-dim { opacity: 0.28; }';
     document.head.appendChild(s);
   }
+  return matches;
 }

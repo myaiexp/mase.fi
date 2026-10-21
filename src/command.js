@@ -14,7 +14,7 @@ let autocomplete = null; // created in initCommand
 // Run a feed search and remember the term so feed:relayout can re-apply it.
 function search(term) {
   searchTerm = term.toLowerCase();
-  applySearch($feed, searchTerm);
+  return applySearch($feed, searchTerm);
 }
 
 // DOM refs — resolved lazily at init time. $cmdComplete is the #cmd-complete
@@ -46,8 +46,12 @@ function updateMode() {
     autocomplete.hide();
     if (v.trim()) {
       $cmd.classList.add('mode-search');
-      $cmdHint.innerHTML = `<kbd>esc</kbd> clear`;
-      search(v.trim());
+      const matches = search(v.trim());
+      // A dimmed feed with only "esc clear" reads as a broken channel when the
+      // needle is a typo. Say so next to the same hint.
+      $cmdHint.innerHTML = matches
+        ? `<kbd>esc</kbd> clear`
+        : `no matches · <kbd>esc</kbd> clear`;
     } else {
       $cmdHint.innerHTML = '';
       search('');

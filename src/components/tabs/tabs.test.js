@@ -198,3 +198,37 @@ describe('base-tabs', () => {
     expect(buttons[1].getAttribute('aria-selected')).toBe('false');
   });
 });
+
+describe('base-tabs ARIA panel wiring', () => {
+  it('gives each panel role=tabpanel and points the tab and the panel at each other', () => {
+    const { tabs, tabEls } = createTabs([
+      { label: 'Alpha' },
+      { label: 'Beta' },
+    ]);
+    const buttons = [...tabs.shadowRoot.querySelectorAll('[role="tab"]')];
+    expect(buttons).toHaveLength(2);
+    buttons.forEach((btn, i) => {
+      const panelId = btn.getAttribute('aria-controls');
+      expect(panelId).toBeTruthy();
+      expect(tabEls[i].id).toBe(panelId);
+      expect(tabEls[i].getAttribute('role')).toBe('tabpanel');
+      expect(tabEls[i].getAttribute('aria-labelledby')).toBe(btn.id);
+    });
+    expect(new Set(buttons.map((b) => b.id)).size).toBe(2);
+  });
+
+  it('keeps an author-set panel id and the same button id across a rebuild', () => {
+    const { tabs, tabEls } = createTabs([{ label: 'Alpha' }, { label: 'Beta' }]);
+    tabEls[0].id = 'custom-panel';
+    tabs._updateTabs();
+    const btn = tabs.shadowRoot.querySelector('[role="tab"]');
+    expect(tabEls[0].id).toBe('custom-panel');
+    expect(btn.getAttribute('aria-controls')).toBe('custom-panel');
+    expect(tabEls[0].getAttribute('aria-labelledby')).toBe(btn.id);
+    const buttonId = btn.id;
+    tabs._updateTabs();
+    const again = tabs.shadowRoot.querySelector('[role="tab"]');
+    expect(again.id).toBe(buttonId);
+    expect(tabEls[0].getAttribute('aria-labelledby')).toBe(buttonId);
+  });
+});

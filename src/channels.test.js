@@ -240,6 +240,18 @@ describe('initChannels', () => {
     expect(channels.channelById('a').project).toBeTruthy();
   });
 
+  it('fills a blank topic from the name, then the channel', () => {
+    initCapturing({
+      projects: [
+        { channel: 'helm', description: '', name: 'Helm' },
+        { channel: 'bare', description: '' },
+      ],
+      entries: [],
+    });
+    expect(channels.channelById('helm').topic).toBe('Helm');
+    expect(channels.channelById('bare').topic).toBe('bare');
+  });
+
   it('re-init replaces the registry, dropping stale channels', () => {
     initCapturing({ projects: [{ channel: 'a', description: 'da' }], entries: [] });
     expect(channels.channelById('a')).toBeTruthy();

@@ -10,7 +10,7 @@ import { escapeHtml } from './html.js';
 function heatStatus(heat) {
   if (heat > 0.6) return { cardBadge: '● shipping', cardLine: 'actively shipping', mobileLabel: 'shipping' };
   if (heat > 0.3) return { cardBadge: '● steady', cardLine: 'steady', mobileLabel: 'steady' };
-  return { cardBadge: '○ idle', cardLine: 'maintenance only', mobileLabel: 'idle' };
+  return { cardBadge: '○ idle', cardLine: 'idle', mobileLabel: 'idle' };
 }
 
 // "try demo" anchor when this channel has a published demo (demos/<channel>/).
@@ -84,7 +84,7 @@ function pinnedHome(data) {
     tagline: '<b>mase</b> — software, in progress. this is the always-on log: what i shipped, what i broke, what i thought was worth writing down.',
     rows: [
       ['projects', data.projects.length + ' active', 'accent'],
-      ['commits', totalCommits + ' in feed \xb7 ' + spark],
+      ['commits', totalCommits + ' \xb7 ' + spark],
       ['last push', lastStr],
       ['links', HOME_LINKS.map(linkHtml).join(''), 'links'],
     ],
@@ -101,9 +101,9 @@ function pinnedProject(p, data) {
     meta: [['heat', (p.heat * 100 | 0) + '%'], ['commits', String(commits)]],
     right: status.cardBadge,
     art,
-    tagline: escapeHtml(p.description),
+    tagline: escapeHtml(p.description || p.name || p.channel),
     rows: [
-      ['activity', commits + ' commits in feed \xb7 heat ' + (p.heat * 100 | 0) + '%'],
+      ['activity', commits + ' commits \xb7 heat ' + (p.heat * 100 | 0) + '%'],
       ['status', status.cardLine, 'accent'],
       ['links', linksHtml, 'links'],
     ],

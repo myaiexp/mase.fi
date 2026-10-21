@@ -38,6 +38,22 @@ describe('applySearch', () => {
     command.initCommand({});
   });
 
+  it('says no matches beside the clear hint when no row contains the query', () => {
+    type('zzz');
+    const hint = document.getElementById('cmd-hint').textContent;
+    expect(hint).toContain('no matches');
+    expect(hint).toContain('esc');
+    expect(hint).toContain('clear');
+  });
+
+  it('does not say no matches when a row contains the query', () => {
+    type('world');
+    const hint = document.getElementById('cmd-hint').textContent;
+    expect(hint).not.toContain('no matches');
+    expect(hint).toContain('esc');
+    expect(hint).toContain('clear');
+  });
+
   it('lowercases the typed query, marks matching rows and dims non-matching ones', () => {
     type('WORLD');
     const rows = [...document.querySelectorAll('.feed-row')];

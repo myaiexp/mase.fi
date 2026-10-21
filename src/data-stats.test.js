@@ -41,7 +41,7 @@ describe('logStats totalCommits', () => {
 
   it('adds stats.archivedLogs to the in-memory log count for the all-history total', () => {
     // After a retention cut the hot file holds only recent logs; the pinned
-    // "N in feed" figure must keep the all-history total (finding #8804),
+    // The home card's commit total must keep the all-history count (finding #8804),
     // including logs prepended since the last compact.
     const data = {
       entries: [entry('log', 'activity'), entry('log', 'activity')],
