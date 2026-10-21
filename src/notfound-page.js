@@ -202,8 +202,10 @@ export function startCountdown(plan, suggEl) {
   $('gobtn').addEventListener('click', go, on);
   if (prefersReducedMotion()) {
     // An involuntary navigation is a motion problem too: buttons only, no timer.
-    $('cnum').textContent = '—';
-    for (const s of $('csegs').children) s.classList.remove('on');
+    // The static "redirecting in" label would promise a countdown that never starts.
+    $('clabel').textContent = 'go now or stay';
+    $('cnum').hidden = true;
+    $('csegs').hidden = true;
     $('staybtn').addEventListener('click', () => { box.hidden = true; }, on);
     return;
   }

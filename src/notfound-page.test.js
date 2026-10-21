@@ -205,7 +205,9 @@ describe('startCountdown', () => {
     stubReducedMotion(true);
     vi.useFakeTimers();
     startCountdown(PLAN, null);
-    expect(document.getElementById('cnum').textContent).toBe('—');
+    expect(document.getElementById('clabel').textContent).toBe('go now or stay');
+    expect(document.getElementById('cnum').hidden).toBe(true);
+    expect(document.getElementById('csegs').hidden).toBe(true);
     expect(document.getElementById('drain').hidden).toBe(true);
     expect(document.getElementById('countbox').hidden).toBe(false);
     vi.advanceTimersByTime(5000);
