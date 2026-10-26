@@ -239,6 +239,24 @@ textarea { resize: none; }
   color: var(--accent);
 }
 
+/* ===== Search match =====
+   Text a search or filter box found. One look, two ways in: register Ranges as the
+   `search-match` custom highlight (no DOM change — for content that re-renders or gets
+   copied), or wrap the match in <mark>. A stronger --accent tint than ::selection with
+   the text kept --fg-1, so a selection inside a match still reads apart.
+   Two rules, never one selector list: a browser that can't parse ::highlight() drops
+   every selector in a list that holds it, <mark> included.
+   Spec: docs/design-cards/search-match/. */
+
+::highlight(search-match) {
+  background-color: color-mix(in srgb, var(--accent) 40%, transparent);
+  color: var(--fg-1);
+}
+mark {
+  background-color: color-mix(in srgb, var(--accent) 40%, transparent);
+  color: var(--fg-1);
+}
+
 /* ===== Scrollbar ===== */
 
 ::-webkit-scrollbar { width: 6px; }

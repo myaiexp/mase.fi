@@ -106,11 +106,11 @@
   border-bottom-color: var(--ch-accent);
 }
 
+/* base.css's search-match recipe (docs/design-cards/search-match/), restated because
+   the homepage doesn't load base.css. */
 .feed-row mark {
-  background: color-mix(in oklab, var(--accent) 35%, transparent);
-  color: #000;
-  border-radius: 2px;
-  padding: 0 1px;
+  background-color: color-mix(in srgb, var(--accent) 40%, transparent);
+  color: var(--text);
 }
 
 /* modem-jitter states */
