@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 // Unit tests for formatUptime(ms) — the pure 'Xd HHh MMm' formatter behind the
-// sidebar uptime ticker. formatUptime is module-private, so it is exercised
-// through its only caller initTickers(): with Date.now() frozen, passing
+// sidebar uptime ticker. It is exercised through initTickers(), so these tests
+// also pin the ticker's wiring: with Date.now() frozen, passing
 // bootTime = NOW - ms makes the synchronous first tick write formatUptime(ms)
 // into #uptime. Edge cases pinned: 0ms, sub-minute, exactly 1 day, multi-day,
 // padding, and very large values.

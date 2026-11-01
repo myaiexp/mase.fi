@@ -225,7 +225,7 @@ describe('fetchData routing', () => {
     const data = await fetchData();
     expect(data.entries).toEqual([]);
     expect(data.projects).toEqual([]);
-    expect(data.meta.nick).toBe('mase');
+    expect(data.meta.server).toBe('irc.mase.fi');
   });
 
   it('folds raw.stats onto the returned data object (hasArchive from stats.archive)', async () => {

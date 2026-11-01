@@ -22,6 +22,7 @@ export default defineConfig({
         lines: 97, functions: 96, statements: 96, branches: 88,
         // The feed renderer/windowing and the search + slash-command input path.
         'src/feed.js': { lines: 98, functions: 100, statements: 97, branches: 93 },
+        'src/feed-rows.js': { lines: 98, functions: 100, statements: 97, branches: 93 },
         'src/command.js': { lines: 98, functions: 93, statements: 94, branches: 86 },
         'src/slash-commands.js': { lines: 100, functions: 100, statements: 100, branches: 100 },
         // Off-origin rejection and URL-scheme filtering: every branch is a safety rule.
