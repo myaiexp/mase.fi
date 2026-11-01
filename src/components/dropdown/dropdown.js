@@ -3,7 +3,7 @@
 import { addOverlayListeners, removeOverlayListeners } from '../shared/overlay-utils.js';
 import { applyMenuFlip } from '../shared/menu-flip.js';
 import { wrapIndex } from '../shared/menu-nav.js';
-import { MENU_ITEM_CSS, MENU_SURFACE_CSS } from '../shared/menu-styles.js';
+import { MENU_DISABLED_CSS, MENU_DIVIDER_CSS, MENU_ITEM_CSS, MENU_SURFACE_CSS } from '../shared/menu-styles.js';
 import { mountShadow } from '../shared/mount-shadow.js';
 import { shadowStyles } from '../shared/shadow-styles.js';
 
@@ -19,9 +19,7 @@ const itemStyles = shadowStyles(`
   span.danger {
     color: var(--red, #ef4444);
   }
-  span.disabled {
-    opacity: 0.4;
-    cursor: default;
+  span.disabled {${MENU_DISABLED_CSS}
   }
   :host(:focus) span:not(.disabled),
   span:not(.disabled):hover {
@@ -74,10 +72,7 @@ customElements.define('base-dropdown-item', BaseDropdownItem);
 
 const dividerStyles = shadowStyles(`
   :host { display: block; }
-  hr {
-    border: none;
-    border-top: 1px solid var(--border-color, #27272a);
-    margin: 4px 0;
+  hr {${MENU_DIVIDER_CSS}
   }
 `);
 

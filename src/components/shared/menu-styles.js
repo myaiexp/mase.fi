@@ -13,10 +13,9 @@ export const MENU_SURFACE_CSS = `
     box-shadow: 0 4px 12px rgba(0,0,0,0.4);`;
 
 // The base styling for a single clickable menu row, shared by base-dropdown's
-// <span> and base-context-menu's .item. Both rendered identically except for a
-// historical font-size drift (12 vs 13px); unifying here keeps them in lockstep.
-// Interpolate after the selector — e.g. `.item {${MENU_ITEM_CSS}\n}`. Each
-// component layers its own state rules (.danger, .disabled, .highlighted) on top.
+// <span>, base-context-menu's .item and base-select's .option. Interpolate after
+// the selector — e.g. `.item {${MENU_ITEM_CSS}\n}`. Each component layers its own
+// state rules (.danger, .highlighted, .selected) on top.
 export const MENU_ITEM_CSS = `
     display: block;
     padding: 4px 12px;
@@ -28,3 +27,16 @@ export const MENU_ITEM_CSS = `
     border-radius: 0;
     white-space: nowrap;
     user-select: none;`;
+
+// A disabled menu row, on top of MENU_ITEM_CSS. Interpolate into each component's
+// disabled-row rule; hover/highlight suppression stays there because the selectors
+// differ.
+export const MENU_DISABLED_CSS = `
+    opacity: 0.4;
+    cursor: default;`;
+
+// The <hr> between menu rows. Interpolate after the selector: `hr {${MENU_DIVIDER_CSS}\n}`.
+export const MENU_DIVIDER_CSS = `
+    border: none;
+    border-top: 1px solid var(--border-color, #27272a);
+    margin: 4px 0;`;
