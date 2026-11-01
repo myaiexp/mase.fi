@@ -113,6 +113,9 @@
   color: var(--text);
 }
 
+/* A row the active search does not match. */
+.feed-row.search-dim { opacity: 0.28; }
+
 /* modem-jitter states */
 .feed-row.jitter .msg,
 .feed-row.jitter .nick,

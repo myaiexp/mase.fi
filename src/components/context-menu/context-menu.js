@@ -3,6 +3,7 @@
 import { MENU_ITEM_CSS, MENU_SURFACE_CSS } from '../shared/menu-styles.js';
 import { nextEnabledIndex } from '../shared/menu-nav.js';
 import { addOverlayListeners, removeOverlayListeners } from '../shared/overlay-utils.js';
+import { mountShadow } from '../shared/mount-shadow.js';
 import { shadowStyles } from '../shared/shadow-styles.js';
 
 const contextMenuStyles = shadowStyles(`
@@ -67,9 +68,7 @@ class BaseContextMenu extends HTMLElement {
 
   constructor() {
     super();
-    this.attachShadow({ mode: 'open' });
-    contextMenuStyles.adopt(this.shadowRoot);
-    this.shadowRoot.appendChild(contextMenuTemplate.content.cloneNode(true));
+    mountShadow(this, contextMenuStyles, contextMenuTemplate);
     this.#menu = this.shadowRoot.querySelector('[part="menu"]');
   }
 

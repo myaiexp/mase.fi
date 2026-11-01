@@ -2,7 +2,9 @@
 // applySearch on rows shaped like renderFeed's output: the real layoutRow builds
 // .line spans holding .proj-pill elements and bare body text nodes.
 // pretext is mocked so each test chooses where the lines break.
-import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach, onTestFinished, vi } from 'vitest';
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
 
 vi.mock('@chenglou/pretext/rich-inline', () => ({
   prepareRichInline: vi.fn(() => ({})),
@@ -42,7 +44,6 @@ function addRow({ raw, project = '', feature = false, lines }) {
 }
 
 beforeEach(() => {
-  document.getElementById('search-dim-style')?.remove();
   document.body.replaceChildren();
   feed = document.createElement('div');
   document.body.append(feed);
@@ -124,9 +125,21 @@ describe('applySearch on laid-out feed rows', () => {
     expect(dimmed(noRaw)).toBe(true);
   });
 
-  it('injects the dim style once', () => {
+  it('adds no stylesheet of its own to the page', () => {
     applySearch(feed, 'a');
-    applySearch(feed, 'b');
-    expect(document.querySelectorAll('#search-dim-style')).toHaveLength(1);
+    expect(document.querySelector('style')).toBeNull();
+  });
+});
+
+describe('.search-dim styling', () => {
+  it('comes from feed.css', () => {
+    const style = document.createElement('style');
+    style.textContent = readFileSync(join(import.meta.dirname, 'styles/feed.css'), 'utf8');
+    document.head.append(style);
+    onTestFinished(() => style.remove());
+    const row = document.createElement('div');
+    row.className = 'feed-row search-dim';
+    document.body.append(row);
+    expect(getComputedStyle(row).opacity).toBe('0.28');
   });
 });

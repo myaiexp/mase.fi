@@ -61,12 +61,5 @@ export function applySearch(feedEl, needle) {
       row.classList.add('search-dim');
     }
   });
-  // Inject dim style once
-  if (!document.getElementById('search-dim-style')) {
-    const s = document.createElement('style');
-    s.id = 'search-dim-style';
-    s.textContent = '.feed-row.search-dim { opacity: 0.28; }';
-    document.head.appendChild(s);
-  }
   return matches;
 }

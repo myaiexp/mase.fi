@@ -1,5 +1,6 @@
 // <base-modal> — centered overlay dialog with slots, focus trap, and Escape/backdrop dismiss
 
+import { mountShadow } from '../shared/mount-shadow.js';
 import { shadowStyles } from '../shared/shadow-styles.js';
 
 const modalStyles = shadowStyles(`
@@ -134,9 +135,7 @@ class BaseModal extends HTMLElement {
 
   constructor() {
     super();
-    this.attachShadow({ mode: 'open' });
-    modalStyles.adopt(this.shadowRoot);
-    this.shadowRoot.appendChild(modalTemplate.content.cloneNode(true));
+    mountShadow(this, modalStyles, modalTemplate);
 
     // Close button inside shadow root
     this.shadowRoot.querySelector('[data-close]').addEventListener('click', () => this.close());

@@ -7,7 +7,6 @@
 // The DOM nodes initCommand resolves by id. cmd-input is the only <input>.
 export function setupDom() {
   document.body.replaceChildren();
-  document.getElementById('search-dim-style')?.remove(); // applySearch injects this once
   for (const id of ['cmd', 'cmd-input', 'cmd-prompt', 'cmd-hint', 'cmd-complete', 'feed']) {
     const el = document.createElement(id === 'cmd-input' ? 'input' : 'div');
     el.id = id;

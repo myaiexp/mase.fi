@@ -4,6 +4,7 @@ import { addOverlayListeners, removeOverlayListeners } from '../shared/overlay-u
 import { applyMenuFlip } from '../shared/menu-flip.js';
 import { wrapIndex } from '../shared/menu-nav.js';
 import { MENU_ITEM_CSS, MENU_SURFACE_CSS } from '../shared/menu-styles.js';
+import { mountShadow } from '../shared/mount-shadow.js';
 import { shadowStyles } from '../shared/shadow-styles.js';
 
 // ─── base-dropdown-item ──────────────────────────────────────────────────────
@@ -38,9 +39,7 @@ class BaseDropdownItem extends HTMLElement {
 
   constructor() {
     super();
-    this.attachShadow({ mode: 'open' });
-    itemStyles.adopt(this.shadowRoot);
-    this.shadowRoot.appendChild(itemTemplate.content.cloneNode(true));
+    mountShadow(this, itemStyles, itemTemplate);
     this.#span = this.shadowRoot.querySelector('span');
   }
 
@@ -88,9 +87,7 @@ dividerTemplate.innerHTML = '<hr>';
 class BaseDropdownDivider extends HTMLElement {
   constructor() {
     super();
-    this.attachShadow({ mode: 'open' });
-    dividerStyles.adopt(this.shadowRoot);
-    this.shadowRoot.appendChild(dividerTemplate.content.cloneNode(true));
+    mountShadow(this, dividerStyles, dividerTemplate);
   }
 }
 
@@ -143,9 +140,7 @@ class BaseDropdown extends HTMLElement {
 
   constructor() {
     super();
-    this.attachShadow({ mode: 'open' });
-    dropdownStyles.adopt(this.shadowRoot);
-    this.shadowRoot.appendChild(dropdownTemplate.content.cloneNode(true));
+    mountShadow(this, dropdownStyles, dropdownTemplate);
     this.#menu = this.shadowRoot.querySelector('[part="menu"]');
   }
 
