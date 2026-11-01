@@ -1,81 +1,60 @@
 // @vitest-environment jsdom
-// Unit tests for formatUptime(ms) — the pure 'Xd HHh MMm' formatter behind the
-// sidebar uptime ticker. It is exercised through initTickers(), so these tests
-// also pin the ticker's wiring: with Date.now() frozen, passing
-// bootTime = NOW - ms makes the synchronous first tick write formatUptime(ms)
-// into #uptime. Edge cases pinned: 0ms, sub-minute, exactly 1 day, multi-day,
-// padding, and very large values.
+// Unit tests for initTickers's wiring: the synchronous first tick, the 1.2s
+// interval, and what each tick writes into #uptime and #ping. The formatter's
+// own cases are in uptime.test.js.
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { initTickers } from './tickers.js';
 
-// Frozen wall clock so Date.now() - bootTime equals exactly the ms under test,
-// independent of real time elapsed during the synchronous initTickers() call.
 const NOW = new Date('2026-06-13T12:00:00Z').getTime();
+const TICK_MS = 1200;
+
+const text = (id) => document.getElementById(id).textContent;
 
 beforeEach(() => {
   vi.useFakeTimers();
   vi.setSystemTime(NOW);
-});
-
-afterEach(() => {
-  vi.clearAllTimers(); // drop the 1.2s interval initTickers registers
-  vi.useRealTimers();
-});
-
-// Render the uptime string formatUptime(ms) produces, via initTickers's first tick.
-function uptimeFor(ms) {
   document.body.replaceChildren();
   for (const id of ['uptime', 'ping']) {
     const el = document.createElement('span');
     el.id = id;
     document.body.appendChild(el);
   }
-  initTickers(NOW - ms);
-  return document.getElementById('uptime').textContent;
-}
+});
 
-describe('formatUptime (via initTickers uptime ticker)', () => {
-  it('formats exactly 0ms as all-zero with padded h/m', () => {
-    expect(uptimeFor(0)).toBe('0d 00h 00m');
+afterEach(() => {
+  vi.clearAllTimers(); // drop the 1.2s interval initTickers registers
+  vi.useRealTimers();
+  vi.restoreAllMocks();
+});
+
+describe('initTickers', () => {
+  it('writes both readouts on the synchronous first tick', () => {
+    vi.spyOn(Math, 'random').mockReturnValue(0);
+    initTickers(NOW - 18_420_000); // 5h 7m
+
+    expect(text('uptime')).toBe('0d 05h 07m');
+    expect(text('ping')).toBe('11ms');
   });
 
-  it('floors sub-second values to zero', () => {
-    expect(uptimeFor(500)).toBe('0d 00h 00m');
-  });
+  it('re-renders both readouts every 1.2s, and not between ticks', () => {
+    const random = vi.spyOn(Math, 'random').mockReturnValue(0);
+    // Start two ticks short of a minute, so only the second tick rolls #uptime over.
+    initTickers(NOW - (60_000 - 2 * TICK_MS));
+    expect(text('uptime')).toBe('0d 00h 00m');
+    expect(text('ping')).toBe('11ms');
 
-  it('shows 0 minutes for sub-minute durations (30s)', () => {
-    expect(uptimeFor(30_000)).toBe('0d 00h 00m');
-  });
+    random.mockReturnValue(0.99);
+    vi.advanceTimersByTime(TICK_MS - 1);
+    expect(text('ping')).toBe('11ms');
+    vi.advanceTimersByTime(1);
+    expect(text('ping')).toBe('17ms');
+    expect(text('uptime')).toBe('0d 00h 00m');
 
-  it('does not roll over to 1 minute just under 60s', () => {
-    expect(uptimeFor(59_999)).toBe('0d 00h 00m');
-  });
-
-  it('counts exactly one minute at 60s', () => {
-    expect(uptimeFor(60_000)).toBe('0d 00h 01m');
-  });
-
-  it('zero-pads single-digit hours and minutes (5h 7m)', () => {
-    // 5*3600 + 7*60 = 18420 seconds
-    expect(uptimeFor(18_420_000)).toBe('0d 05h 07m');
-  });
-
-  it('formats exactly 1 day as 1d 00h 00m', () => {
-    expect(uptimeFor(86_400_000)).toBe('1d 00h 00m');
-  });
-
-  it('formats multi-day durations (2d 3h 4m)', () => {
-    // 2*86400 + 3*3600 + 4*60 = 183840 seconds
-    expect(uptimeFor(183_840_000)).toBe('2d 03h 04m');
-  });
-
-  it('handles very large 3-digit day counts (999d 23h 59m)', () => {
-    // 999*86400 + 23*3600 + 59*60 = 86399940 seconds
-    expect(uptimeFor(86_399_940_000)).toBe('999d 23h 59m');
-  });
-
-  it('handles very large day counts without padding the day field', () => {
-    // 10000 days exactly
-    expect(uptimeFor(864_000_000_000)).toBe('10000d 00h 00m');
+    random.mockReturnValue(0);
+    vi.advanceTimersByTime(TICK_MS - 1);
+    expect(text('ping')).toBe('17ms');
+    vi.advanceTimersByTime(1);
+    expect(text('ping')).toBe('11ms');
+    expect(text('uptime')).toBe('0d 00h 01m');
   });
 });
