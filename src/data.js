@@ -28,7 +28,7 @@ function withPendingDemos(data, demoFields) {
 // the two fetchData branches cannot drift apart.
 function emptyData(demos) {
   return {
-    meta: { nick: 'mase', server: 'irc.mase.fi', bootTime: Date.now() },
+    meta: { server: 'irc.mase.fi', bootTime: Date.now() },
     projects: [],
     entries: [],
     demos,
@@ -50,7 +50,7 @@ function emptyData(demos) {
  *  - entry.project → channel / projectSlug / projectChannel (a non-empty string slug, otherwise channel)
  *  - entry.text || entry.summary → text
  *  - project.heat is computed from last-30d entry count, normalized 0..1
- *  - project.tag, project.links don't exist live — we synthesize: tag = "" (dropped chip), links = [project.url]
+ *  - project.links is synthesized from the raw project.url (http(s) or same-origin only)
  *  - demos: channel slugs with a published demo (from /demos/manifest.json via fetchDemos),
  *    always present (possibly []), so no consumer guards against its absence.
  *  - malformed rows (isRawEntry / isRawProject) are skipped and counted in one warning.
@@ -161,8 +161,6 @@ function normalizeProjects(rawProjects, counts, lastActivity) {
       channel: p.channel,
       slug,
       description: p.desc || '',
-      tag: '', // not present in live data; renderers should drop the "stack" chip
-      url: p.url || '',
       links,
       heat,
       lastActivity: lastActivity.get(slug) || 0,
