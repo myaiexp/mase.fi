@@ -1,6 +1,6 @@
 # Content pipeline
 
-The homepage's datastore is one JSON file plus an optional log archive. Four scripts in this repo, plus helm's `deploy`, read-modify-write it.
+The homepage's datastore is one JSON file plus an optional log archive. Five scripts in this repo (`mase-fi-update`, `mase-fi-daily-summary`, `mase-fi-projects`, `mase-fi-compact-updates`, `mase-fi-purge-private`), plus helm's `deploy`, read-modify-write it.
 
 ## Store
 
@@ -17,12 +17,12 @@ Local `pnpm dev` reads `/updates.json` from Vite's `public/` dir. There is no `p
 
 ## Shared writer — `scripts/updates-write.sh`
 
-All four mase.fi writers (`mase-fi-update`, `mase-fi-daily-summary`, `mase-fi-projects`, `mase-fi-compact-updates`) source this file. It owns the safety contract:
+All five mase.fi writers (`mase-fi-update`, `mase-fi-daily-summary`, `mase-fi-projects`, `mase-fi-compact-updates`, `mase-fi-purge-private`) source this file. It owns the safety contract:
 
 - **Lock:** `/tmp/mase-updates-json.lock` (`UPDATES_LOCK` override for tests). Well-known `/tmp` path so `sudo -u mase` (no `XDG_RUNTIME_DIR`) and a session `deploy` still serialize against each other.
 - **`ensure_updates_lock`:** opens the path with `O_NOFOLLOW|O_APPEND|O_CREAT` (Python; bash redirects cannot set `O_NOFOLLOW`), refuses a symlink or a file owned by someone else. Finding #8125 / commit `c2a5c8d`.
 - **`run_under_updates_lock <target> <error-label> <fn> [args...]`:** the only copy of the lock steps — `ensure_updates_lock`, `flock -w 30` on fd 9 with `9>>` (`O_APPEND`, never `O_TRUNC`), and the in-lock `is_updates_json` gate on `<target>` (exactly one JSON object with an `entries` array — `jq empty` passed 0-byte files) — then runs `fn args…` and returns its status. Lock unusable, busy >30s, or target malformed → returns 1 with `… — <error-label>` on stderr and `fn` is never called. Every writer's locked section goes through here, so the timeout, open flags, and gate cannot drift.
-- **`with_updates_lock <target> <error-label> <transform-fn>`:** the single-file read-modify-write on top of `run_under_updates_lock`: mktemp/rm of the candidate plus `write_updates_json`. The transform is a bash function `fn src dest` that writes a JSON candidate to `dest` (return 2 = skip, no write). `mase-fi-update`, `mase-fi-daily-summary`, and `mase-fi-projects` use it.
+- **`with_updates_lock <target> <error-label> <transform-fn>`:** the single-file read-modify-write on top of `run_under_updates_lock`: mktemp/rm of the candidate plus `write_updates_json`. The transform is a bash function `fn src dest` that writes a JSON candidate to `dest` (return 2 = skip, no write). `mase-fi-update`, `mase-fi-daily-summary`, and `mase-fi-projects` use it; `mase-fi-compact-updates` and `mase-fi-purge-private` write two files, so they call `run_under_updates_lock` directly.
 - **`write_updates_json <candidate> <target>`:** `is_updates_json` the candidate, then install: sibling `mktemp` + `mv` when the target dir is writable (atomic rename); in-place `cp` when it isn't (production's `/var/lib/mase-fi` is mase-writable, so it takes the rename path). Invalid candidate → non-zero, target untouched.
 
 ### Compaction — `scripts/updates-compact.sh` + `scripts/mase-fi-compact-updates`
