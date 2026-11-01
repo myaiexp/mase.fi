@@ -20,6 +20,17 @@ describe('sameOriginPath', () => {
     expect(sameOriginPath('/\\evil.com/x', ORIGIN)).toBeNull();
     expect(sameOriginPath('\\\\evil.com', ORIGIN)).toBeNull();
   });
+  it('rejects a same-origin parse whose path would re-resolve as scheme-relative', () => {
+    expect(sameOriginPath('/.//evil.com', ORIGIN)).toBeNull();
+    expect(sameOriginPath('/..//evil.com', ORIGIN)).toBeNull();
+    expect(sameOriginPath('/a/../..//evil.com', ORIGIN)).toBeNull();
+    expect(sameOriginPath('/.\\/evil.com', ORIGIN)).toBeNull();
+    expect(sameOriginPath('https://mase.fi//evil.com', ORIGIN)).toBeNull();
+    expect(sameOriginPath('/.//mase.fi/x', ORIGIN)).toBeNull();
+  });
+  it('keeps an empty segment past the start of the path', () => {
+    expect(sameOriginPath('/a//b', ORIGIN)).toBe('/a//b');
+  });
   it('rejects absolute off-origin URLs and empty/non-string input', () => {
     expect(sameOriginPath('https://evil.com/x', ORIGIN)).toBeNull();
     expect(sameOriginPath('javascript:alert(1)', ORIGIN)).toBeNull();

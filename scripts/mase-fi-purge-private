@@ -14,11 +14,22 @@ LOG_HOT_DAYS="${LOG_HOT_DAYS:-90}"
 TODAY="${TODAY:-$(TZ="Europe/Helsinki" date +%Y-%m-%d)}"
 PRIVATE_API="${PRIVATE_API:-http://localhost:9754/api/projects/private}"
 BACKUP_DIR="${BACKUP_DIR:-/var/lib/mase-fi/backups}"
+PRE_PURGE_KEEP_DAYS=30
 
 # A name matches when its lowercased form is in the private set. Non-strings
 # never match, so a malformed project field is kept rather than dropped.
 LOW='def low($v): if ($v | type) == "string" then $v | ascii_downcase else "" end;
      def listed($v): ($names | index(low($v))) != null;'
+
+# A pre-purge copy still holds the rows the purge removed, so it gets an age
+# limit as well as prune_pre_purge's count limit. This runs on every invocation,
+# ahead of the API call: most nightly runs purge nothing, and tying expiry to a
+# new copy would keep the last copies for as long as no project goes private.
+expire_pre_purge() {
+  [[ -d "$BACKUP_DIR" ]] || return 0
+  find "$BACKUP_DIR" -maxdepth 1 -type f -name '*.pre-purge.*.json' -mtime "+$PRE_PURGE_KEEP_DAYS" -delete
+}
+expire_pre_purge || echo "purge: could not expire old pre-purge copies in $BACKUP_DIR" >&2
 
 body="$(curl -fsS --max-time 30 "$PRIVATE_API" 2>/dev/null)" || {
   echo "private API unreachable — nothing written" >&2

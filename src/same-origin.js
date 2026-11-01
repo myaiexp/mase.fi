@@ -3,14 +3,17 @@
 // Resolve `raw` against `origin` and return pathname+search only when the
 // result stays on that origin. Prefix-blacklisting `//` is not enough:
 // WHATWG's relative-slash state treats `\` like `/`, so `/\evil.com` (and
-// `//evil.com`, `\\evil.com`) parse as an off-origin URL. Empty/non-string
-// input is rejected rather than collapsing to `/`. Never throws.
+// `//evil.com`, `\\evil.com`) parse as an off-origin URL. A dot segment gets
+// past the origin check instead: `/.//evil.com` parses on-origin with pathname
+// `//evil.com`, which leaves the origin once used as a URL, so a parsed pathname
+// (slashes already normalized) must not start with `//`. Empty/non-string input
+// is rejected rather than collapsing to `/`. Never throws.
 export function sameOriginPath(raw, origin) {
   if (typeof raw !== 'string' || raw.length === 0) return null;
   try {
     const base = new URL(origin);
     const u = new URL(raw, origin);
-    if (u.origin !== base.origin) return null;
+    if (u.origin !== base.origin || u.pathname.startsWith('//')) return null;
     return u.pathname + u.search;
   } catch {
     return null;

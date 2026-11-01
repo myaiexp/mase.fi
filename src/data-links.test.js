@@ -52,6 +52,13 @@ describe('fetchData project links', () => {
     ]);
   });
 
+  it.each(['/.//evil.com', '/..//evil.com', '/a/../..//evil.com'])(
+    'drops %s, whose path normalizes to a scheme-relative href',
+    async (url) => {
+      expect(await linksFor(url)).toEqual([]);
+    },
+  );
+
   it('drops a javascript: URL (parses cleanly but is not http/https)', async () => {
     expect(await linksFor('javascript:alert(1)')).toEqual([]);
   });

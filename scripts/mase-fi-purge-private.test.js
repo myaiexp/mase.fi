@@ -1,8 +1,8 @@
 // Golden-file tests for mase-fi-purge-private: private rows leave both feed
-// files, nothing is written when the private list is unusable, and a backup
-// exists only after a real removal.
+// files, nothing is written when the private list is unusable, a backup exists
+// only after a real removal, and old backups expire on every run.
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import { chmodSync, existsSync, mkdirSync, readdirSync, renameSync, statSync, writeFileSync } from 'node:fs';
+import { chmodSync, existsSync, mkdirSync, readdirSync, renameSync, statSync, utimesSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { makeTempDir, cleanup, writeJson, readJson, runScript } from './test-helpers.js';
 
@@ -43,6 +43,16 @@ function readOnly(path) {
   chmodSync(path, 0o444);
   chmodSync(parent, 0o555);
   locked.push(parent);
+}
+
+// A pre-purge copy whose mtime says it was written `days` ago.
+function agedCopy(name, days) {
+  mkdirSync(backup, { recursive: true });
+  const path = join(backup, name);
+  writeFileSync(path, '{}\n');
+  const then = Date.now() / 1000 - days * 86400;
+  utimesSync(path, then, then);
+  return path;
 }
 
 const KEPT_LOG = { date: '2026-10-01', category: 'log', project: 'beta', text: 'kept log' };
@@ -127,6 +137,65 @@ describe('mase-fi-purge-private', () => {
     const archCopies = readdirSync(backup).filter((n) => n.startsWith('updates-archive.json.pre-purge.'));
     expect(archCopies).toHaveLength(1);
     expect(statSync(join(backup, archCopies[0])).mode & 0o777).toBe(0o600);
+  });
+
+  describe('pre-purge copy expiry', () => {
+    const OLD_HOT = 'updates.json.pre-purge.20260901T000000Z.json';
+    const OLD_ARCH = 'updates-archive.json.pre-purge.20260901T000000Z.json';
+    const RECENT = 'updates.json.pre-purge.20261001T000000Z.json';
+    const UNRELATED = 'operator-note.json';
+
+    function seedCopies() {
+      return {
+        oldHot: agedCopy(OLD_HOT, 32),
+        oldArch: agedCopy(OLD_ARCH, 32),
+        recent: agedCopy(RECENT, 29),
+        unrelated: agedCopy(UNRELATED, 400),
+      };
+    }
+    function expectExpired({ oldHot, oldArch, recent, unrelated }) {
+      expect(existsSync(oldHot)).toBe(false);
+      expect(existsSync(oldArch)).toBe(false);
+      expect(existsSync(recent)).toBe(true);
+      expect(existsSync(unrelated)).toBe(true);
+    }
+
+    it('removes copies past the age limit on a run that purges', () => {
+      seedFull();
+      const paths = seedCopies();
+      const r = run({ PRIVATE_API: setApi({ private: [{ name: 'acme' }] }) });
+      expect(r.status).toBe(0);
+      expectExpired(paths);
+      expect(readdirSync(backup).filter((n) => n.startsWith('updates.json.pre-purge.'))).toHaveLength(2);
+    });
+
+    it('removes them on a run with nothing to purge, the usual nightly case', () => {
+      writeJson(file, { projects: [BETA_PROJECT], entries: [KEPT_LOG] });
+      const paths = seedCopies();
+      const r = run({ PRIVATE_API: setApi({ private: [{ name: 'acme' }] }) });
+      expect(r.status).toBe(0);
+      expect(r.stdout).toBe('nothing to purge\n');
+      expectExpired(paths);
+    });
+
+    it('removes them even when the private list cannot be read', () => {
+      writeJson(file, { projects: [BETA_PROJECT], entries: [KEPT_LOG] });
+      const paths = seedCopies();
+      const r = run({ PRIVATE_API: 'http://127.0.0.1:1/private' });
+      expect(r.status).toBe(1);
+      expectExpired(paths);
+    });
+
+    it('warns and carries on when a copy cannot be removed', () => {
+      writeJson(file, { projects: [BETA_PROJECT], entries: [KEPT_LOG] });
+      const oldHot = agedCopy(OLD_HOT, 32);
+      chmodSync(backup, 0o555);
+      locked.push(backup);
+      const r = run({ PRIVATE_API: setApi({ private: [] }) });
+      expect(r.status).toBe(0);
+      expect(r.stderr).toMatch(/could not expire/);
+      expect(existsSync(oldHot)).toBe(true);
+    });
   });
 
   it.each([
