@@ -11,6 +11,15 @@ const $ = (id) => document.getElementById(id);
 const isPreview = () => location.pathname === '/404.html';
 const PATH_CLAMP = 160;
 
+function el(tag, props, ...children) {
+  const node = Object.assign(document.createElement(tag), props);
+  node.append(...children);
+  return node;
+}
+
+// A function, not a shared node: a node can only sit in one place in the DOM.
+const homeLink = (textContent = 'mase.fi') => el('a', { href: '/', textContent });
+
 export function effectivePath() {
   if (isPreview()) {
     const p = new URLSearchParams(location.search).get('p');
@@ -84,31 +93,18 @@ function renderTyped(path, headLen) {
 }
 
 function setHints(desktop, mobile) {
-  const hints = $('fhints');
-  hints.textContent = '';
-  const mk = (cls, parts) => {
-    const s = document.createElement('span');
-    s.className = cls;
-    for (const p of parts) {
-      if (typeof p === 'string') s.append(p);
-      else s.append(Object.assign(document.createElement('a'), p));
-    }
-    hints.append(s);
-  };
-  mk('hint-d', desktop);
-  mk('hint-m', mobile);
+  $('fhints').replaceChildren(
+    el('span', { className: 'hint-d' }, ...desktop),
+    el('span', { className: 'hint-m' }, ...mobile),
+  );
 }
 
 function suggestionLink(plan) {
-  const a = document.createElement('a');
-  a.className = 'big';
-  a.href = safeHref(plan.target);
-  const arr = Object.assign(document.createElement('span'), { className: 'arr', textContent: '→' });
-  const targetSpan = Object.assign(document.createElement('span'), { className: 'bu', textContent: plan.targetLabel });
-  a.append(arr, targetSpan);
-  if (plan.targetCaption) {
-    a.append(Object.assign(document.createElement('span'), { className: 'bname', textContent: plan.targetCaption }));
-  }
+  const a = el('a', { className: 'big', href: safeHref(plan.target) },
+    el('span', { className: 'arr', textContent: '→' }),
+    el('span', { className: 'bu', textContent: plan.targetLabel }),
+  );
+  if (plan.targetCaption) a.append(el('span', { className: 'bname', textContent: plan.targetCaption }));
   return a;
 }
 
@@ -117,18 +113,16 @@ export function renderConfident(path, plan) {
     renderTyped(path, plan.target.length);
     const tailNote = $('tailnote');
     tailNote.hidden = false;
-    tailNote.append('the tail ');
-    tailNote.append(Object.assign(document.createElement('b'), { textContent: plan.tail }));
-    tailNote.append(' matched nothing · the head resolves');
+    tailNote.append('the tail ', el('b', { textContent: plan.tail }), ' matched nothing · the head resolves');
   }
   const sugg = $('sugg');
   sugg.textContent = '';
-  sugg.append(Object.assign(document.createElement('div'), { className: 'label', textContent: 'did you mean' }));
+  sugg.append(el('div', { className: 'label', textContent: 'did you mean' }));
   const link = suggestionLink(plan);
   sugg.append(link);
   setHints(
-    ['esc or any key to stay · enter to go now · ', { href: '/', textContent: 'mase.fi' }, ' for the full directory'],
-    [{ href: '/', textContent: 'mase.fi' }, ' · tap anywhere to stay'],
+    ['esc or any key to stay · enter to go now · ', homeLink(), ' for the full directory'],
+    [homeLink(), ' · tap anywhere to stay'],
   );
   startCountdown(plan, link);
 }
@@ -136,27 +130,19 @@ export function renderConfident(path, plan) {
 export function renderFuzzy(path, candidates) {
   const sugg = $('sugg');
   sugg.textContent = '';
-  sugg.append(Object.assign(document.createElement('div'), { className: 'label', textContent: 'closest matches' }));
-  const list = Object.assign(document.createElement('div'), { className: 'cands' });
+  sugg.append(el('div', { className: 'label', textContent: 'closest matches' }));
+  const list = el('div', { className: 'cands' });
   candidates.forEach((c, i) => {
-    const a = document.createElement('a');
-    a.className = i === 0 ? 'cand first' : 'cand';
-    a.href = safeHref(c.route.href);
-    a.append(Object.assign(document.createElement('span'), { className: 'croute', textContent: '→ ' + c.route.label }));
-    if (c.route.caption) a.append(Object.assign(document.createElement('span'), { className: 'cname', textContent: c.route.caption }));
-    a.append(Object.assign(document.createElement('span'), { className: 'creason', textContent: reasonFor(c) }));
+    const a = el('a', { className: i === 0 ? 'cand first' : 'cand', href: safeHref(c.route.href) },
+      el('span', { className: 'croute', textContent: '→ ' + c.route.label }),
+    );
+    if (c.route.caption) a.append(el('span', { className: 'cname', textContent: c.route.caption }));
+    a.append(el('span', { className: 'creason', textContent: reasonFor(c) }));
     list.append(a);
   });
   sugg.append(list);
-  const foot = Object.assign(document.createElement('div'), { className: 'cfoot' });
-  foot.append('no auto-redirect — pick one, or ');
-  foot.append(Object.assign(document.createElement('a'), { href: '/', textContent: 'browse everything' }));
-  foot.append('.');
-  sugg.append(foot);
-  setHints(
-    [`1–${candidates.length} to jump · h for home`],
-    [{ href: '/', textContent: 'mase.fi' }, ' for the full directory'],
-  );
+  sugg.append(el('div', { className: 'cfoot' }, 'no auto-redirect — pick one, or ', homeLink('browse everything'), '.'));
+  setHints([`1–${candidates.length} to jump · h for home`], [homeLink(), ' for the full directory']);
   document.addEventListener('keydown', (e) => {
     if (e.metaKey || e.ctrlKey || e.altKey) return;
     const n = Number(e.key);
@@ -174,7 +160,7 @@ export function renderNone(projectCount) {
     targetCaption: 'the full directory' + (projectCount ? ` — ${projectCount} active projects` : ''),
   });
   sugg.append(link);
-  setHints(['enter for home'], [{ href: '/', textContent: 'mase.fi' }, ' for the full directory']);
+  setHints(['enter for home'], [homeLink(), ' for the full directory']);
   document.addEventListener('keydown', (e) => {
     if (e.key === 'Enter') location.href = '/';
   });
@@ -218,12 +204,14 @@ export function startCountdown(plan, suggEl) {
     box.hidden = true;
     const note = $('cancelnote');
     note.hidden = false;
-    note.append(Object.assign(document.createElement('span'), { className: 'x', textContent: '✕ ' }));
-    note.append('redirect cancelled — staying put. ');
-    note.append(Object.assign(document.createElement('a'), { href: safeHref(plan.target), textContent: plan.targetLabel }));
-    note.append(' · ');
-    note.append(Object.assign(document.createElement('a'), { href: '/', textContent: 'mase.fi' }));
-    setHints([{ href: '/', textContent: 'mase.fi' }, ' for the full directory'], [{ href: '/', textContent: 'mase.fi' }]);
+    note.append(
+      el('span', { className: 'x', textContent: '✕ ' }),
+      'redirect cancelled — staying put. ',
+      el('a', { href: safeHref(plan.target), textContent: plan.targetLabel }),
+      ' · ',
+      homeLink(),
+    );
+    setHints([homeLink(), ' for the full directory'], [homeLink()]);
   };
   // Interacting with the redirect target must never count as "stay".
   const onAny = (e) => {

@@ -5,6 +5,7 @@ import {
   fuzzyCandidates, decide, reasonFor, EXTRA_ROUTES,
   isSafeRedirect,
 } from './notfound.js';
+import { sameOriginPath } from './same-origin.js';
 
 // Shape mirrors the live /updates.json .projects entries.
 const UPDATES = {
@@ -193,8 +194,19 @@ describe('isSafeRedirect', () => {
     expect(isSafeRedirect('/explorer', undefined)).toBe(false);
   });
   it('refuses a non-string target', () => {
-    for (const target of [null, undefined, 42, {}, ['/explorer']]) {
+    for (const target of [null, undefined, 42, {}, ['/explorer'], ['https://diet.mase.fi']]) {
       expect(isSafeRedirect(target, ORIGIN)).toBe(false);
     }
+  });
+  // On production the origin's own host is mase.fi, so the host allowance would
+  // re-admit whatever sameOriginPath refuses unless it stands aside for the origin.
+  it('keeps sameOriginPath\'s refusals on the mase.fi origin itself', () => {
+    for (const target of ['/.//evil.com', '/..//evil.com', '/.\\/evil.com', 'https://mase.fi//evil.com']) {
+      expect(sameOriginPath(target, ORIGIN)).toBeNull();
+      expect(isSafeRedirect(target, ORIGIN)).toBe(false);
+    }
+  });
+  it('allows the other scheme of the mase.fi host, which is a different origin', () => {
+    expect(isSafeRedirect('http://mase.fi/explorer', ORIGIN)).toBe(true);
   });
 });

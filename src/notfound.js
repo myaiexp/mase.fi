@@ -1,6 +1,7 @@
 // Pure matching logic for the smart 404 page: prefixes, junk guard, fuzzy routes
 // The DOM/probe half lives in notfound-page.js; this file stays side-effect free
 // so the ladder is unit-testable.
+import { sameOriginPath } from './same-origin.js';
 
 // Top-level webroot dirs that are real destinations but not showcase projects,
 // so updates.json never lists them. Verify against /var/www/html when touching.
@@ -147,16 +148,18 @@ export function reasonFor(cand) {
   return 'fuzzy';
 }
 
-// Navigation-sink guard for the 404 auto-redirect. Same-origin paths are
-// fine; so are http(s) URLs on mase.fi / *.mase.fi (buildRoutes' "moved to
-// a subdomain" targets). Everything else — scheme-relative, backslash,
-// javascript:, foreign hosts, `mase.fi.evil.com` — is refused.
+// Navigation-sink guard for the 404 auto-redirect. sameOriginPath owns the rule
+// for targets on this origin; beyond it, http(s) URLs on mase.fi / *.mase.fi are
+// fine (buildRoutes' "moved to a subdomain" targets). Everything else —
+// scheme-relative, backslash, javascript:, foreign hosts, `mase.fi.evil.com` —
+// is refused. The host check has to skip this origin: in production its hostname
+// is mase.fi, so it would otherwise re-admit whatever sameOriginPath refused.
 export function isSafeRedirect(target, origin) {
-  if (typeof target !== 'string' || target.length === 0) return false;
+  if (typeof target !== 'string') return false;
+  if (sameOriginPath(target, origin) !== null) return true;
   try {
-    const base = new URL(origin);
     const u = new URL(target, origin);
-    if (u.origin === base.origin) return true;
+    if (u.origin === new URL(origin).origin) return false;
     if (u.protocol !== 'http:' && u.protocol !== 'https:') return false;
     return u.hostname === 'mase.fi' || u.hostname.endsWith('.mase.fi');
   } catch {

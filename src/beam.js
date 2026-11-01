@@ -87,19 +87,12 @@ export function paintChar(span, original, dest) {
   rec.bucket = bucket;
 }
 
-/** Mount the beam effect over an `.ascii` element. Returns a cleanup fn. */
-export function mountBeam(asciiEl, logoText) {
-  if (activeCleanup) activeCleanup();
-  if (prefersReducedMotion()) {
-    asciiEl.textContent = logoText;
-    return null;
-  }
+// The logo's monospace grid and its pixel size, or null when the host cannot be
+// measured.
+function measureCharGrid(asciiEl, logoText) {
   // Skip on hidden hosts (e.g. mobile `.pin-grid > .ascii { display: none }`)
   // — measuring 0×0 produces a NaN beam track.
-  if (asciiEl.offsetParent === null) {
-    asciiEl.textContent = logoText;
-    return null;
-  }
+  if (asciiEl.offsetParent === null) return null;
 
   const cs = getComputedStyle(asciiEl);
   const fontShorthand = cs.font || `${cs.fontSize} ${cs.fontFamily}`;
@@ -108,20 +101,18 @@ export function mountBeam(asciiEl, logoText) {
   const rows = logoText.split('\n');
   const longest = rows.reduce((a, b) => a.length > b.length ? a : b, '');
   const longestPrepared = prepareWithSegments(longest, fontShorthand, { whiteSpace: 'pre-wrap' });
-  const longestWidth = measureNaturalWidth(longestPrepared);
-  const charWidth = longest.length > 0 ? longestWidth / longest.length : 0;
+  const width = measureNaturalWidth(longestPrepared);
+  const charWidth = longest.length > 0 ? width / longest.length : 0;
+  if (!(charWidth > 0)) return null;
 
-  if (!(charWidth > 0)) {
-    asciiEl.textContent = logoText;
-    return null;
-  }
+  return { rows, charWidth, lineHeight, width, height: rows.length * lineHeight };
+}
 
-  const totalWidth = longestWidth;
-  const totalHeight = rows.length * lineHeight;
-
+// Replace the host's text with one absolutely placed span per glyph + the beam.
+function buildBeamDom(asciiEl, { rows, charWidth, lineHeight, width, height }) {
   asciiEl.classList.add('beam-host');
-  asciiEl.style.width = totalWidth + 'px';
-  asciiEl.style.height = totalHeight + 'px';
+  asciiEl.style.width = width + 'px';
+  asciiEl.style.height = height + 'px';
   asciiEl.textContent = '';
 
   const chars = []; // {el, original, x}
@@ -140,15 +131,30 @@ export function mountBeam(asciiEl, logoText) {
 
   const beam = document.createElement('div');
   beam.className = 'ascii-beam';
-  beam.style.height = totalHeight + 'px';
+  beam.style.height = height + 'px';
   asciiEl.appendChild(beam);
+  return { chars, beam };
+}
+
+/** Mount the beam effect over an `.ascii` element. Returns a cleanup fn. */
+export function mountBeam(asciiEl, logoText) {
+  if (activeCleanup) activeCleanup();
+
+  const grid = prefersReducedMotion() ? null : measureCharGrid(asciiEl, logoText);
+  if (!grid) {
+    asciiEl.textContent = logoText;
+    return null;
+  }
+
+  const { chars, beam } = buildBeamDom(asciiEl, grid);
 
   // Beam x-range: starts off-screen left, ends past right edge.
   const X0 = -CHARGE_R;
-  const X1 = totalWidth + BEAM_R + DECAY_R;
+  const X1 = grid.width + BEAM_R + DECAY_R;
 
   let raf = 0;
   let nextPhaseTimer = 0;
+  const listeners = new AbortController();
 
   function placeBeam(x, intensity) {
     beam.style.transform = `translateX(${x}px)`;
@@ -169,6 +175,17 @@ export function mountBeam(asciiEl, logoText) {
       lastPaint.set(c.el, { bucket: 0, decayStep: undefined });
     }
     beam.style.opacity = '0';
+  }
+
+  function cleanup() {
+    if (raf) cancelAnimationFrame(raf);
+    if (nextPhaseTimer) clearTimeout(nextPhaseTimer);
+    listeners.abort();
+    asciiEl.classList.remove('beam-host');
+    asciiEl.style.width = '';
+    asciiEl.style.height = '';
+    asciiEl.textContent = logoText;
+    activeCleanup = null;
   }
 
   function play(phase) {
@@ -212,20 +229,9 @@ export function mountBeam(asciiEl, logoText) {
     restorePristine();
     play('sweep');
   }
-  asciiEl.addEventListener('click', trigger);
 
+  asciiEl.addEventListener('click', trigger, { signal: listeners.signal });
   nextPhaseTimer = setTimeout(() => play('sweep'), FIRST_DELAY_MS);
-
-  function cleanup() {
-    if (raf) cancelAnimationFrame(raf);
-    if (nextPhaseTimer) clearTimeout(nextPhaseTimer);
-    asciiEl.removeEventListener('click', trigger);
-    asciiEl.classList.remove('beam-host');
-    asciiEl.style.width = '';
-    asciiEl.style.height = '';
-    asciiEl.textContent = logoText;
-    activeCleanup = null;
-  }
   activeCleanup = cleanup;
   return cleanup;
 }
