@@ -8,23 +8,23 @@
 // Registry state is module-private: consumers read it through getChannels() /
 // channelById() rather than holding a live export binding. buildRegistry
 // rebuilds it by plain reassignment, so no external module can splice it.
-let _channels = [];
+let channels = [];
 // A Map, not a {} literal: ids arrive straight from the URL hash, and a plain
 // object would resolve inherited keys (#/constructor, #/__proto__) as channels.
-let _byId = new Map();
+let byId = new Map();
 
 /** The ordered channel list [home, ...projects, activity]. Frozen — read-only to callers. */
 export function getChannels() {
-  return _channels;
+  return channels;
 }
 
 /** Look up a channel by id, or undefined when it isn't in the registry. */
 export function channelById(id) {
-  return _byId.get(id);
+  return byId.get(id);
 }
 
 export function chHeat(id) {
-  const c = _byId.get(id);
+  const c = byId.get(id);
   if (c?.project) return c.project.heat;
   if (id === 'home') return 1.0;
   if (id === 'activity') return 0.85;
@@ -44,7 +44,7 @@ export function chAccent(id) {
 export function buildRegistry(data) {
   // Reassign wholesale — consumers read through getChannels()/channelById(), so
   // there are no live references to keep alive and no in-place surgery needed.
-  _channels = Object.freeze([
+  channels = Object.freeze([
     { id: 'home', group: 'system', label: 'home', topic: 'daily logbook \xb7 appended nightly \xb7 autoscroll on' },
     ...data.projects.map(p => ({
       id: p.channel, group: 'projects', label: p.channel,
@@ -54,5 +54,5 @@ export function buildRegistry(data) {
     })),
     { id: 'activity', group: 'system', label: 'activity', topic: 'raw commit stream across all projects' },
   ]);
-  _byId = new Map(_channels.map(c => [c.id, c]));
+  byId = new Map(channels.map(c => [c.id, c]));
 }

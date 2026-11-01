@@ -4,22 +4,20 @@ import { entriesFor } from './data.js';
 import { entryNow, parseEntryDate } from './dates.js';
 import { buildCommands } from './slash-commands.js';
 import { applySearch } from './command-search.js';
-import { markHelp } from './command-aria.js';
 import { createAutocomplete } from './command-complete.js';
 
+// Module state — everything below is set by initCommand, except searchTerm.
+let data = null;
+let commands = [];
+let autocomplete = null;
 let searchTerm = '';
-let _commands = [];
-let autocomplete = null; // created in initCommand
+let $cmd, $cmdInput, $cmdPrompt, $cmdHint, $feed;
 
 // Run a feed search and remember the term so feed:relayout can re-apply it.
 function search(term) {
   searchTerm = term.toLowerCase();
   return applySearch($feed, searchTerm);
 }
-
-// DOM refs — resolved lazily at init time. $cmdComplete is the #cmd-complete
-// popup; its rows use the cc- ("command-complete") CSS/ARIA vocabulary.
-let $cmd, $cmdInput, $cmdPrompt, $cmdHint, $cmdComplete, $feed;
 
 function updateMode() {
   const v = $cmdInput.value;
@@ -36,10 +34,7 @@ function updateMode() {
   } else if (v.startsWith('?')) {
     $cmd.classList.add('mode-help');
     $cmdPrompt.textContent = '?';
-    // Clear leftover slash matches before showing help on the same node —
-    // otherwise isOpen() stays true and Enter/Tab still choose a channel.
-    autocomplete.hide();
-    renderHelp();
+    autocomplete.showHelp();
     $cmdHint.innerHTML = '';
   } else {
     $cmdPrompt.textContent = '>';
@@ -57,18 +52,6 @@ function updateMode() {
       search('');
     }
   }
-}
-
-function renderHelp() {
-  $cmdComplete.innerHTML = `
-    <div class="cc-head"><span>help</span></div>
-    <div class="cc-item"><div class="cc-ch">/&lt;chan&gt;</div><div class="cc-desc">jump to a channel (fuzzy)</div><div class="cc-last">↵</div></div>
-    <div class="cc-item"><div class="cc-ch">text</div><div class="cc-desc">highlight matching lines in this channel</div><div class="cc-last">esc</div></div>
-    <div class="cc-item"><div class="cc-ch">?</div><div class="cc-desc">show this help</div><div class="cc-last"></div></div>
-    <div class="cc-item"><div class="cc-ch">g-h / g-a</div><div class="cc-desc">go home · go activity</div><div class="cc-last">2 keys</div></div>
-  `;
-  $cmdComplete.hidden = false;
-  markHelp($cmdInput, $cmdComplete);
 }
 
 function onChooseMatch(m) {
@@ -117,7 +100,7 @@ function runCommand(cmd) {
 // Not project.lastActivity (an epoch-ms timestamp used for recency sort) —
 // this walks entriesFor, which for project channels also excludes log entries.
 function formatRelativeActivity(id) {
-  const es = entriesFor(id, _data);
+  const es = entriesFor(id, data);
   if (!es.length) return '—';
   const t = parseEntryDate(es[es.length - 1].date);
   const mins = Math.max(0, Math.round((entryNow() - t) / 60000));
@@ -126,30 +109,26 @@ function formatRelativeActivity(id) {
   return Math.round(mins / 1440) + 'd';
 }
 
-// Module-level data ref set at init time
-let _data = null;
-
 /** Wire the command input with mode switching, autocomplete popup, search, and global shortcuts. */
-export function initCommand(data) {
-  _data = data;
+export function initCommand(loadedData) {
+  data = loadedData;
 
   $cmd       = document.getElementById('cmd');
   $cmdInput  = document.getElementById('cmd-input');
   $cmdPrompt = document.getElementById('cmd-prompt');
   $cmdHint   = document.getElementById('cmd-hint');
-  $cmdComplete     = document.getElementById('cmd-complete');
   $feed      = document.getElementById('feed');
 
   autocomplete = createAutocomplete({
-    getCommands: () => _commands,
+    getCommands: () => commands,
     formatRelativeActivity,
     onChoose: onChooseMatch,
   });
-  autocomplete.bind($cmdInput, $cmdComplete);
+  autocomplete.bind($cmdInput, document.getElementById('cmd-complete'));
 
   // Build the slash-command registry, wiring the side-effect hooks commands
   // need (search reset + notice teardown) without slash-commands.js touching the DOM.
-  _commands = buildCommands({
+  commands = buildCommands({
     data,
     clearSearch: () => { $cmdInput.value = ''; search(''); },
     clearNotices,
