@@ -1,5 +1,6 @@
 // <base-tabs> + <base-tab> — accessible tab panel component with keyboard navigation
 import { nextEnabledIndex } from '../shared/menu-nav.js';
+import { mountShadow } from '../shared/mount-shadow.js';
 import { shadowStyles } from '../shared/shadow-styles.js';
 import { upgradeProperties } from '../shared/upgrade-properties.js';
 
@@ -78,9 +79,7 @@ class BaseTabs extends HTMLElement {
 
   constructor() {
     super();
-    this.attachShadow({ mode: 'open' });
-    tabsStyles.adopt(this.shadowRoot);
-    this.shadowRoot.appendChild(tabsTemplate.content.cloneNode(true));
+    mountShadow(this, tabsStyles, tabsTemplate);
     this.#tablist = this.shadowRoot.querySelector('[role="tablist"]');
 
     this.#tablist.addEventListener('keydown', (e) => this.#onKeydown(e));

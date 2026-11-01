@@ -3,6 +3,7 @@
 import { addOverlayListeners, removeOverlayListeners } from '../shared/overlay-utils.js';
 import { applyMenuFlip } from '../shared/menu-flip.js';
 import { wrapIndex } from '../shared/menu-nav.js';
+import { mountShadow } from '../shared/mount-shadow.js';
 import { selectStyles } from './select-styles.js';
 import { buildMenu, markSelected, filterMenu, resetFilter } from './select-menu.js';
 import { createLetterJump } from './letter-jump.js';
@@ -30,9 +31,7 @@ class BaseSelect extends HTMLElement {
 
   constructor() {
     super();
-    this.attachShadow({ mode: 'open', delegatesFocus: true });
-    selectStyles.adopt(this.shadowRoot);
-    this.shadowRoot.appendChild(selectTemplate.content.cloneNode(true));
+    mountShadow(this, selectStyles, selectTemplate, { mode: 'open', delegatesFocus: true });
     this._menu = this.shadowRoot.querySelector('[part="menu"]');
     this.#triggerWrap = this.shadowRoot.querySelector('[part="trigger-wrap"]');
   }

@@ -3,6 +3,7 @@
 // rendering; the pure layout algorithms live in text-fit-layout.js.
 
 import { DEFAULT_FONT, doPrepare, justifyLines, truncate, wrapOptimal } from './text-fit-layout.js';
+import { mountShadow } from '../shared/mount-shadow.js';
 import { shadowStyles } from '../shared/shadow-styles.js';
 
 const styles = shadowStyles([
@@ -34,9 +35,7 @@ class BaseTextFit extends HTMLElement {
 
   constructor() {
     super();
-    this.attachShadow({ mode: 'open' });
-    styles.adopt(this.shadowRoot);
-    this.shadowRoot.appendChild(template.content.cloneNode(true));
+    mountShadow(this, styles, template);
     this.#textEl = this.shadowRoot.querySelector('#text');
   }
 

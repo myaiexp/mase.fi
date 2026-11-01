@@ -1,5 +1,6 @@
 // <base-badge> — status/tag chip per design system (Recipes A & B)
 
+import { mountShadow } from '../shared/mount-shadow.js';
 import { shadowStyles } from '../shared/shadow-styles.js';
 
 const STATUS_VARIANTS = {
@@ -57,9 +58,7 @@ class BaseBadge extends HTMLElement {
 
   constructor() {
     super();
-    this.attachShadow({ mode: 'open' });
-    styles.adopt(this.shadowRoot);
-    this.shadowRoot.appendChild(template.content.cloneNode(true));
+    mountShadow(this, styles, template);
     this.#span = this.shadowRoot.querySelector('span');
   }
 
