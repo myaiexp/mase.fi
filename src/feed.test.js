@@ -1,6 +1,6 @@
-// Unit tests for feed.js pure helpers: nickColor + dayLabel.
+// Unit tests for feed-rows.js pure helpers: nickColor + dayLabel.
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import { nickColor, dayLabel } from './feed.js';
+import { nickColor, dayLabel } from './feed-rows.js';
 
 describe('nickColor', () => {
   it('returns the special-cased color for git', () => {

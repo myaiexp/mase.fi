@@ -31,7 +31,7 @@ Apps requiring login support `?demo` query param (per-app, not centrally).
 - **Accent:** `#e8a308` (golden-orange)
 - **Text:** `#fafafa` (off-white), dim `#a1a1aa`, muted `#52525b`
 - **Terminal colors:** green `#22c55e`, red `#ef4444`, cyan `#06b6d4`
-- **Nick colors:** `git` (cyan) and `mase` (accent) are pinned; every other nick hashes into a 7-colour warm palette (`nickColor` in `feed.js`)
+- **Nick colors:** `git` (cyan) and `mase` (accent) are pinned; every other nick hashes into a 7-colour warm palette (`nickColor` in `feed-rows.js`)
 - **Effects:** Boot line-reveal animation (`boot.js`), modem-decode jitter scramble on the newest feed rows (`jitter.js`), the `#home` ASCII-logo beam (`beam.js`), hand-rolled CRT scanline sweep for channel switches (`playSwitchTransition` in `transition.js`; content swaps about a third of the way into the sweep, reduced-motion bypasses it), blinking cursor
 - **Design cards:** `docs/design-cards/` is the live spec for `base.css` (tokens, type-family, type-scale, spacing, elevation, themes, inputs, buttons, badges, iconography, flagged, search-match) — each card is a `spec.md` and/or `prototype.html`. Token/type changes in `base.css` track the cards.
 - Historical design/impl plans: `docs/plans/`

@@ -1,8 +1,9 @@
 // Feed rendering — day separators, IRC-style rows, windowed with lazy scroll-up
 import { entriesFor, loadArchive } from './data.js';
-import { dayOf, entryNow, timeOf } from './dates.js';
+import { dayOf } from './dates.js';
 import { playJitter, clearJitter } from './jitter.js';
 import { relayoutAll, relayoutRow, layoutRow, measureFeedMetrics } from './feed-layout.js';
+import { buildRows } from './feed-rows.js';
 
 const MAX_JITTER = 14;
 // Rows materialized on first paint / revealed per scroll-up batch. Windowing
@@ -20,91 +21,11 @@ const WINDOW_SIZE = 200;
 const chipNavWired = new WeakSet();
 const resizeObservers = new WeakMap();
 // Per-feed windowing state: the full ascending entry list for the current
-// channel, how many newest rows are materialized, the channel id, the live
-// top-sentinel IntersectionObserver, and whether this render's archive load is
-// in flight / settled. Reset wholesale on every renderFeed.
+// channel, how many newest rows are materialized (always the last `shown` of
+// that list, which onWindowExhausted restores after a merge), the channel id, the
+// live top-sentinel IntersectionObserver, and whether this render's archive load
+// is in flight / settled. Reset wholesale on every renderFeed.
 const windowState = new WeakMap();
-
-const NICK_COLORS = { git: '#06b6d4', mase: '#e8a308' };
-
-export function nickColor(nick) {
-  if (Object.hasOwn(NICK_COLORS, nick)) return NICK_COLORS[nick];
-  const palette = ['#e8a308', '#ffbe2a', '#f59e0b', '#eab308', '#a16207', '#fcd34d', '#fbbf24'];
-  let h = 0;
-  for (const c of nick) h = ((h << 5) - h + c.charCodeAt(0)) | 0;
-  return palette[Math.abs(h) % palette.length];
-}
-
-export function dayLabel(date) {
-  const d = dayOf(date);
-  // Writers' "today" (entryNow), not the viewer's UTC day — see dates.js.
-  const now = entryNow();
-  const today = dayOf(new Date(now).toISOString());
-  const yest = dayOf(new Date(now - 86400000).toISOString());
-  if (d === today) return 'today \xb7 ' + d;
-  if (d === yest) return 'yesterday \xb7 ' + d;
-  return d;
-}
-
-function populateRow(row, e, channelId) {
-  const time = timeOf(e.date);
-  const nickC = nickColor(e.nick);
-
-  const ts = document.createElement('div');
-  ts.className = 'ts';
-  ts.textContent = time;
-
-  const nick = document.createElement('div');
-  nick.className = 'nick';
-  nick.style.setProperty('--nick-color', nickC);
-  nick.textContent = e.nick;
-
-  const msg = document.createElement('div');
-  msg.className = 'msg';
-
-  row.replaceChildren(ts, nick, msg);
-  row.dataset.raw = e.text;
-  if (channelId === 'activity' && e.projectSlug) {
-    row.dataset.projectSlug = e.projectSlug;
-    // Mapped chips are real links into the sidebar's channel list; unmapped
-    // chips (slugs without a sidebar channel) render as labels. feed-layout
-    // reads this to pick the right styling and click affordance.
-    if (e.projectChannel) row.dataset.targetChannel = e.projectChannel;
-  }
-}
-
-// A day-separator header element for the given ISO date.
-function dayHeader(date) {
-  const day = document.createElement('div');
-  day.className = 'feed-day';
-  const ruleA = document.createElement('span'); ruleA.className = 'd-rule'; ruleA.textContent = '──';
-  const lbl   = document.createElement('span'); lbl.className = 'd-label'; lbl.textContent = dayLabel(date);
-  const ruleB = document.createElement('span'); ruleB.className = 'd-rule-after';
-  day.appendChild(ruleA); day.appendChild(lbl); day.appendChild(ruleB);
-  return day;
-}
-
-// Build day-separated feed rows for `entries` (ascending) into a fragment. A
-// day header is emitted whenever the calendar day changes within the batch.
-// Returns the fragment plus row descriptors (for jitter / targeted relayout).
-function buildRows(entries, channelId) {
-  const frag = document.createDocumentFragment();
-  const rowEls = [];
-  let lastDay = null;
-  for (const e of entries) {
-    const d = dayOf(e.date);
-    if (d !== lastDay) {
-      frag.appendChild(dayHeader(e.date));
-      lastDay = d;
-    }
-    const row = document.createElement('div');
-    row.className = 'feed-row cat-' + e.category;
-    populateRow(row, e, channelId);
-    frag.appendChild(row);
-    rowEls.push({ row, entry: e });
-  }
-  return { frag, rowEls };
-}
 
 /** Render the feed for the given channel. Replaces #feed content. */
 export function renderFeed(id, data, { immediate = false, navigate } = {}) {
@@ -223,8 +144,10 @@ function onWindowExhausted($feed, state, sentinel) {
     if (windowState.get($feed) !== state) return;
     state.loadingArchive = false;
     state.archiveSettled = true;
-    const before = state.entries.length;
+    const previous = state.entries;
+    const before = previous.length;
     state.entries = entriesFor(channelId, data);
+    if (!sameTail(previous, state.entries, state.shown)) rebuildWindow($feed, state, sentinel);
     if (state.shown < state.entries.length) revealOlder($feed, state, sentinel);
     else dropSentinel(state, sentinel);
     // navigate() already wrote the topic count from the hot window. The feed
@@ -236,6 +159,31 @@ function onWindowExhausted($feed, state, sentinel) {
     console.warn('renderFeed: failed to reveal archived rows', err);
     dropSentinel(state, sentinel);
   });
+}
+
+// Whether the newest `shown` rows of two ascending lists are the same objects.
+// entriesFor and the archive merge keep entry identity, so a difference means an
+// archived row sorted among the materialized rows (an EPOCH-dated hot row, or a
+// commit with an old date in the hot file).
+function sameTail(a, b, shown) {
+  for (let i = 1; i <= shown; i++) if (a[a.length - i] !== b[b.length - i]) return false;
+  return true;
+}
+
+// Rebuild the materialized rows as the newest state.shown entries, so revealOlder's
+// index math holds again. A row this pushes out of the window returns in its sorted
+// place on a later reveal. Bottom-anchored because the newest rows stay put; server
+// notices are not rows and stay at the end of the feed.
+function rebuildWindow($feed, state, sentinel) {
+  clearJitter();
+  const fromBottom = $feed.scrollHeight - $feed.scrollTop;
+  const { entries, shown, channelId } = state;
+  const { frag } = buildRows(entries.slice(entries.length - shown), channelId);
+  $feed.querySelectorAll('.feed-row, .feed-day').forEach((el) => el.remove());
+  $feed.insertBefore(frag, sentinel.nextSibling);
+  relayoutAll($feed);
+  $feed.scrollTop = $feed.scrollHeight - fromBottom;
+  $feed.dispatchEvent(new CustomEvent('feed:relayout'));
 }
 
 // No older rows can appear: stop observing the top sentinel and remove it.
