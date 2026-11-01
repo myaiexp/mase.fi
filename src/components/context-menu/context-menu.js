@@ -1,6 +1,6 @@
 // <base-context-menu> — singleton right-click context menu with zone-based registration
 
-import { MENU_ITEM_CSS, MENU_SURFACE_CSS } from '../shared/menu-styles.js';
+import { MENU_DISABLED_CSS, MENU_DIVIDER_CSS, MENU_ITEM_CSS, MENU_SURFACE_CSS } from '../shared/menu-styles.js';
 import { nextEnabledIndex } from '../shared/menu-nav.js';
 import { addOverlayListeners, removeOverlayListeners } from '../shared/overlay-utils.js';
 import { mountShadow } from '../shared/mount-shadow.js';
@@ -25,9 +25,7 @@ const contextMenuStyles = shadowStyles(`
     background: var(--bg-hover, #27272a);
   }
   .item.disabled {
-    color: var(--text-muted, #52525b);
-    opacity: 0.4;
-    cursor: default;
+    color: var(--text-muted, #52525b);${MENU_DISABLED_CSS}
   }
   .item.disabled.highlighted {
     background: transparent;
@@ -39,10 +37,7 @@ const contextMenuStyles = shadowStyles(`
       font-size: 15px;
     }
   }
-  hr {
-    border: none;
-    border-top: 1px solid var(--border-color, #27272a);
-    margin: 4px 0;
+  hr {${MENU_DIVIDER_CSS}
   }
 `);
 

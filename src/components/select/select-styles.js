@@ -1,6 +1,6 @@
 // Shadow DOM stylesheet for <base-select> — trigger, menu surface, options, groups
 
-import { MENU_SURFACE_CSS } from '../shared/menu-styles.js';
+import { MENU_DISABLED_CSS, MENU_ITEM_CSS, MENU_SURFACE_CSS } from '../shared/menu-styles.js';
 import { shadowStyles } from '../shared/shadow-styles.js';
 
 export const selectStyles = shadowStyles(`
@@ -94,14 +94,7 @@ export const selectStyles = shadowStyles(`
   [part="menu"][hidden] {
     display: none;
   }
-  .option {
-    padding: 4px 12px;
-    font-size: 13px;
-    font-family: var(--font-mono, monospace);
-    color: var(--text, #fafafa);
-    cursor: pointer;
-    white-space: nowrap;
-    user-select: none;
+  .option {${MENU_ITEM_CSS}
   }
   .option:hover, .option.active {
     background: var(--bg-hover, #27272a);
@@ -109,9 +102,7 @@ export const selectStyles = shadowStyles(`
   .option.selected {
     color: var(--accent, #3b82f6);
   }
-  .option.disabled {
-    opacity: 0.4;
-    cursor: default;
+  .option.disabled {${MENU_DISABLED_CSS}
   }
   .option.disabled:hover {
     background: transparent;

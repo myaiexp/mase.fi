@@ -1,11 +1,20 @@
-// Autocomplete popup for "/" channel + slash-command matches (cc-* rows).
+// Sole writer of the #cmd-complete popup: "/" channel + slash-command matches and
+// "?" help. "cc" = command-complete, the popup's CSS/ARIA row vocabulary (cc-*).
 // Registry leaf — not channels.js (the hash-routing orchestrator). Same rule
 // as sidebar.js: renderers that only need getChannels/chAccent import registry
 // directly so they don't pull feed/pinned/sidebar/transition as a back-edge.
 import { getChannels, chAccent } from './registry.js';
 import { escapeHtml } from './html.js';
 import { fuzzyScore, highlightFuzzy } from './command-fuzzy.js';
-import { optionAttrs, markListbox, setActive, collapseCombobox } from './command-aria.js';
+import { optionAttrs, markListbox, markHelp, setActive, collapseCombobox } from './command-aria.js';
+
+const HELP_HTML = `
+    <div class="cc-head"><span>help</span></div>
+    <div class="cc-item"><div class="cc-ch">/&lt;chan&gt;</div><div class="cc-desc">jump to a channel (fuzzy)</div><div class="cc-last">↵</div></div>
+    <div class="cc-item"><div class="cc-ch">text</div><div class="cc-desc">highlight matching lines in this channel</div><div class="cc-last">esc</div></div>
+    <div class="cc-item"><div class="cc-ch">?</div><div class="cc-desc">show this help</div><div class="cc-last"></div></div>
+    <div class="cc-item"><div class="cc-ch">g-h / g-a</div><div class="cc-desc">go home · go activity</div><div class="cc-last">2 keys</div></div>
+  `;
 
 /**
  * Build the autocomplete controller. DOM refs are bound later via `bind()`;
@@ -36,17 +45,24 @@ export function createAutocomplete({
     $popup = popup;
   }
 
-  function hide() {
-    // Drop leftover matches so isOpen() is false once this node is no longer a
-    // listbox. Help mode reuses #cmd-complete; Enter/Tab must not choose a
-    // stale channel from the previous "/…" query (or from a hide that only
-    // collapsed the popup).
+  function clearMatches() {
     selection.matches = [];
     selection.idx = 0;
     lastQ = null;
+  }
+
+  function hide() {
+    clearMatches();
     $popup.hidden = true;
     $popup.replaceChildren();
     collapseCombobox($input, $popup);
+  }
+
+  function showHelp() {
+    clearMatches();
+    $popup.innerHTML = HELP_HTML;
+    $popup.hidden = false;
+    markHelp($input, $popup);
   }
 
   function setSelection(idx) {
@@ -129,13 +145,14 @@ export function createAutocomplete({
   }
 
   function isOpen() {
-    return Boolean($popup && !$popup.hidden && selection.matches.length);
+    return selection.matches.length > 0;
   }
 
   return {
     bind,
     render,
     hide,
+    showHelp,
     setSelection,
     moveSelection,
     choose,

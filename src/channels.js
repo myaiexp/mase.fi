@@ -13,14 +13,14 @@ import { setActiveChannel } from './sidebar.js';
 export { getChannels, channelById, chHeat, chAccent };
 
 let currentId = null;
-let _data = null;
+let data = null;
 
 export function getCurrentChannelId() {
   return currentId;
 }
 
 function setTopicMeta(id) {
-  const msgs = entriesFor(id, _data).length;
+  const msgs = entriesFor(id, data).length;
   const meta = document.getElementById('topic-meta');
   const countSpan = document.createElement('span');
   countSpan.textContent = msgs + ' msgs';
@@ -69,14 +69,14 @@ export function navigate(id, { fromHash = false } = {}) {
   // navigate is injected into renderFeed (rather than imported by feed.js) so
   // the feed's chip-click navigation doesn't create a feed → channels back-edge.
   if (prevId == null) {
-    renderHeroLine(id, _data);
-    renderPinned(id, _data);
-    renderFeed(id, _data, { immediate: false, navigate });
+    renderHeroLine(id, data);
+    renderPinned(id, data);
+    renderFeed(id, data, { immediate: false, navigate });
   } else {
     playSwitchTransition(() => {
-      renderHeroLine(id, _data);
-      renderPinned(id, _data);
-      renderFeed(id, _data, { navigate });
+      renderHeroLine(id, data);
+      renderPinned(id, data);
+      renderFeed(id, data, { navigate });
     });
   }
 }
@@ -86,8 +86,8 @@ function parseHash() {
 }
 
 /** Build channel registry from data and wire hashchange. Caller drives the initial navigate. */
-export function initChannels(data) {
-  _data = data;
+export function initChannels(loadedData) {
+  data = loadedData;
   buildRegistry(data);
   window.addEventListener('hashchange', () => navigate(parseHash(), { fromHash: true }));
   watchFeedArchive();
@@ -104,9 +104,9 @@ export function applyInitialChannel() {
  * hero card and hero line only when that channel actually gained a chip.
  */
 export function applyLateDemos(demos) {
-  if (!_data || !Array.isArray(demos)) return;
-  _data.demos = demos;
+  if (!data || !Array.isArray(demos)) return;
+  data.demos = demos;
   if (!currentId || !demos.includes(currentId)) return;
-  renderHeroLine(currentId, _data);
-  renderPinned(currentId, _data);
+  renderHeroLine(currentId, data);
+  renderPinned(currentId, data);
 }
