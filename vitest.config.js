@@ -15,9 +15,12 @@ export default defineConfig({
       // Set a few points under the measured totals so noise doesn't trip it but
       // a real regression does — raise it as coverage grows, never lower it to pass.
       // The global floor alone lets one file rot while the aggregate holds, so the
-      // redirect/link-safety and data-adapter modules carry their own floors. One key
-      // per file: a glob key is checked against its matches' aggregate (vitest ignores
-      // perFile inside a glob entry), which would reopen the same hole.
+      // redirect/link-safety, markup-building, routing and data-adapter modules carry
+      // their own floors. One key per file: a glob key is checked against its matches'
+      // aggregate (vitest ignores perFile inside a glob entry), which would reopen the
+      // same hole. A floor sees unexecuted code only: removing a test whose lines other
+      // tests still run passes it, so deleting an escaping or inherited-key test is not
+      // caught here.
       thresholds: {
         lines: 97, functions: 96, statements: 96, branches: 88,
         // The feed renderer/windowing and the search + slash-command input path.
@@ -25,6 +28,18 @@ export default defineConfig({
         'src/feed-rows.js': { lines: 98, functions: 100, statements: 97, branches: 93 },
         'src/command.js': { lines: 98, functions: 93, statements: 94, branches: 86 },
         'src/slash-commands.js': { lines: 100, functions: 100, statements: 100, branches: 100 },
+        // The other modules that write updates.json fields through innerHTML, and the
+        // escaper and highlighter that make those writes safe.
+        'src/pinned.js': { lines: 98, functions: 100, statements: 98, branches: 89 },
+        'src/sidebar.js': { lines: 100, functions: 100, statements: 100, branches: 100 },
+        'src/command-complete.js': { lines: 96, functions: 93, statements: 94, branches: 92 },
+        'src/command-aria.js': { lines: 92, functions: 100, statements: 93, branches: 80 },
+        'src/command-fuzzy.js': { lines: 100, functions: 100, statements: 100, branches: 100 },
+        'src/html.js': { lines: 100, functions: 100, statements: 100, branches: 100 },
+        // The hash router, and the registry whose Map lookup keeps inherited Object
+        // keys out of the channel namespace.
+        'src/channels.js': { lines: 98, functions: 100, statements: 98, branches: 94 },
+        'src/registry.js': { lines: 100, functions: 100, statements: 100, branches: 100 },
         // Off-origin rejection and URL-scheme filtering: every branch is a safety rule.
         'src/project-link.js': { lines: 100, functions: 100, statements: 100, branches: 100 },
         'src/same-origin.js': { lines: 100, functions: 100, statements: 100, branches: 100 },
