@@ -1,5 +1,5 @@
 // Slash-command registry — easter-egg commands surfaced in the "/" autocomplete.
-import { formatUptime } from './tickers.js';
+import { fakePing, formatUptime } from './uptime.js';
 
 // describeAgent: terse "Browser on OS" label from a userAgent (+ platform
 // fallback). Pure so it can be pinned directly; order matters (Edge/Opera
@@ -71,8 +71,7 @@ export function buildCommands({ data = {}, clearSearch = () => {}, clearNotices 
     desc: 'connection uptime',
     run: () => {
       const boot = data?.meta?.bootTime ?? Date.now();
-      const ping = 11 + Math.floor(Math.random() * 7);
-      return `${data?.meta?.server || 'irc.mase.fi'} \xb7 up ${formatUptime(Date.now() - boot)} \xb7 ping ${ping}ms`;
+      return `${data?.meta?.server || 'irc.mase.fi'} \xb7 up ${formatUptime(Date.now() - boot)} \xb7 ping ${fakePing()}ms`;
     },
   });
 
