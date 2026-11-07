@@ -27,12 +27,15 @@ function mountContainers() {
 }
 
 // Build a data set whose projects each become a 'projects'-group channel with
-// chHeat(channel) === heat. channel id is p0, p1, ... in order.
+// chHeat(channel) === heat. channel id is p0, p1, ... in order. Each gets one
+// routed entry, since the sidebar lists only projects with a loaded entry
+// (sidebar-empty.test.js).
 function dataWithHeats(heats) {
   return {
     projects: heats.map((heat, i) => ({
       name: 'P' + i, channel: 'p' + i, description: 'desc ' + i, heat,
     })),
+    entries: heats.map((_, i) => ({ channel: 'p' + i, category: 'daily', projectChannel: 'p' + i })),
   };
 }
 
@@ -215,7 +218,10 @@ describe('renderChanlist escaping', () => {
 
   beforeEach(() => {
     mountContainers();
-    const data = { projects: [{ name: '', channel: hostile, description: 'd', heat: 0.5 }] };
+    const data = {
+      projects: [{ name: '', channel: hostile, description: 'd', heat: 0.5 }],
+      entries: [{ channel: hostile, category: 'daily', projectChannel: hostile }],
+    };
     initChannels(data);
     renderChanlist(data, () => {});
   });

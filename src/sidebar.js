@@ -19,14 +19,28 @@ function chanRow(c) {
     </div>`;
 }
 
+// A project with no loaded entry would open an empty channel, so the sidebar
+// list leaves it out; the registry keeps it, so the hash and "/" still reach it.
+// Hot-file entries only: a project whose only rows are archived logs stays
+// hidden until a reload after it posts again, which is accepted.
+function projectsWithEntries(entries) {
+  const keys = new Set();
+  for (const e of entries || []) {
+    if (e.projectChannel) keys.add('ch:' + e.projectChannel);
+    if (e.projectSlug) keys.add('slug:' + e.projectSlug);
+  }
+  return (c) => keys.has('ch:' + c.id) || (!!c.project?.slug && keys.has('slug:' + c.project.slug));
+}
+
 /** Render the desktop sidebar (#chanlist) and the mobile tabbar (#tabbar). Wires click → navigate. */
 export function renderChanlist(data, navigate) {
   const $chanlist = document.getElementById('chanlist');
   const $tabbar = document.getElementById('tabbar');
 
   const groups = [['system', 'server'], ['projects', 'projects']];
+  const hasEntries = projectsWithEntries(data.entries);
   const html = groups.map(([key, title]) => {
-    const chans = getChannels().filter(c => c.group === key);
+    const chans = getChannels().filter(c => c.group === key && (key !== 'projects' || hasEntries(c)));
     return `<div class="chan-group">${title}</div>` +
       chans.map(c => chanRow(c)).join('');
   }).join('');
