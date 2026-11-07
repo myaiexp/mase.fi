@@ -4,6 +4,7 @@ import { entriesFor } from './data.js';
 import { entryNow, parseEntryDate } from './dates.js';
 import { buildCommands } from './slash-commands.js';
 import { applySearch } from './command-search.js';
+import { noticeLine } from './sys-notice.js';
 import { createAutocomplete } from './command-complete.js';
 
 // Module state — everything below is set by initCommand, except searchTerm.
@@ -62,23 +63,13 @@ function onChooseMatch(m) {
   $cmdInput.blur();
 }
 
-// Append ephemeral IRC-style server-notice line(s) to the feed. Not .feed-row,
-// so relayoutAll and search (both query .feed-row) skip them; the next channel
-// render wipes them via replaceChildren. textContent only — no injection.
+// Append ephemeral IRC-style server-notice line(s) to the feed; the next
+// channel render wipes them via replaceChildren.
 function notice(lines) {
   const arr = Array.isArray(lines) ? lines : [lines];
   for (const text of arr) {
     if (text == null) continue;
-    const el = document.createElement('div');
-    el.className = 'sys-notice';
-    const pre = document.createElement('span');
-    pre.className = 'sys-prefix';
-    pre.textContent = '-!-';
-    const body = document.createElement('span');
-    body.className = 'sys-body';
-    body.textContent = text;
-    el.append(pre, body);
-    $feed.appendChild(el);
+    $feed.appendChild(noticeLine(text));
   }
   $feed.scrollTop = $feed.scrollHeight;
 }

@@ -4,6 +4,7 @@ import { dayOf } from './dates.js';
 import { playJitter, clearJitter } from './jitter.js';
 import { relayoutAll, relayoutRow, layoutRow, measureFeedMetrics } from './feed-layout.js';
 import { buildRows } from './feed-rows.js';
+import { noticeLine } from './sys-notice.js';
 
 const MAX_JITTER = 14;
 // Rows materialized on first paint / revealed per scroll-up batch. Windowing
@@ -12,6 +13,10 @@ const MAX_JITTER = 14;
 // pass on every switch and every resize. Older rows lazy-load when the top
 // sentinel scrolls into view (see ensureWindow / revealOlder).
 const WINDOW_SIZE = 200;
+
+// One sentence per failure, so a stranger can tell it from an empty day.
+const HOT_FAILED = "couldn't load the log (/updates.json failed), so this pane is empty because of that, not a quiet day. reload to retry.";
+const ARCHIVE_FAILED = "older history didn't load (/updates-archive.json failed); the log goes back further than this. reopen #activity to retry.";
 
 // Per-feed-element wiring state, keyed by the $feed node rather than held in
 // module-level singletons. Keeping the state on the element means a fresh feed
@@ -47,6 +52,7 @@ export function renderFeed(id, data, { immediate = false, navigate } = {}) {
   sentinel.className = 'feed-top-sentinel';
   sentinel.setAttribute('aria-hidden', 'true');
   $feed.replaceChildren(sentinel, frag);
+  if (data.loadFailed) $feed.appendChild(noticeLine(HOT_FAILED, 'load-notice'));
 
   // Pretext lays out each .msg into <span class="line"> children.
   // Must run after rows are in the DOM so .msg has a measurable width.
@@ -150,6 +156,7 @@ function onWindowExhausted($feed, state, sentinel) {
     if (!sameTail(previous, state.entries, state.shown)) rebuildWindow($feed, state, sentinel);
     if (state.shown < state.entries.length) revealOlder($feed, state, sentinel);
     else dropSentinel(state, sentinel);
+    if (data.archiveFailed) prependNotice($feed, ARCHIVE_FAILED);
     // navigate() already wrote the topic count from the hot window. The feed
     // can't import channels.js, so announce a merge that actually added rows.
     if (state.entries.length > before) $feed.dispatchEvent(new CustomEvent('feed:archive'));
@@ -158,7 +165,16 @@ function onWindowExhausted($feed, state, sentinel) {
     // intersection does not rethrow, and leave a trace.
     console.warn('renderFeed: failed to reveal archived rows', err);
     dropSentinel(state, sentinel);
+    if (windowState.get($feed) === state) prependNotice($feed, ARCHIVE_FAILED);
   });
+}
+
+// A notice above the oldest row — where the history stops — with the scroll
+// anchored so the rows in view do not move down under the reader.
+function prependNotice($feed, text) {
+  const prevHeight = $feed.scrollHeight;
+  $feed.prepend(noticeLine(text, 'load-notice'));
+  $feed.scrollTop += $feed.scrollHeight - prevHeight;
 }
 
 // Whether the newest `shown` rows of two ascending lists are the same objects.

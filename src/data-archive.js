@@ -32,8 +32,10 @@ async function fetchAndMerge(data) {
       data.entries = data.entries.concat(extra).sort((a, b) => a.date.localeCompare(b.date));
     }
     data.archiveLoaded = true;
+    data.archiveFailed = false;
   } catch (err) {
     console.warn('loadArchive: failed to load ' + ARCHIVE_URL + '; totals stay on stats.archivedLogs', err);
+    data.archiveFailed = true;
   }
   return data;
 }
@@ -42,9 +44,10 @@ async function fetchAndMerge(data) {
  * Fetch /updates-archive.json and merge its logs into data.entries in place.
  * Never rejects. data.archiveLoaded means "the archive rows are in data.entries":
  * it is set only after a successful merge, because logStats reads it to stop
- * adding stats.archivedLogs to the in-memory count. A failed load
- * warns and leaves it false, so the all-history totals stay intact; whether to
- * try again is the caller's call (the feed asks once per render).
+ * adding stats.archivedLogs to the in-memory count. A failed load warns, sets
+ * data.archiveFailed (the feed says so in the pane) and leaves archiveLoaded
+ * false, so the all-history totals stay intact; whether to try again is the
+ * caller's call (the feed asks once per render).
  * No-op when there is no archive or it was already merged.
  */
 export function loadArchive(data) {

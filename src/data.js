@@ -35,12 +35,16 @@ function emptyData(demos) {
     stats: {},
     hasArchive: false,
     archiveLoaded: false,
+    // loadFailed: /updates.json did not load, so the empty shape is a failure,
+    // not a quiet log. archiveFailed: the last loadArchive attempt failed.
+    loadFailed: false,
+    archiveFailed: false,
   };
 }
 
 /**
  * Fetch + normalize the live updates.json into the canonical shape used by the UI:
- *   { meta, projects, entries, demos, stats, hasArchive, archiveLoaded, pendingDemos? }
+ *   { meta, projects, entries, demos, stats, hasArchive, archiveLoaded, loadFailed, archiveFailed, pendingDemos? }
  *
  * pendingDemos is set only when the manifest lost DEMOS_GRACE_MS. It fulfills
  * with the slug list; demos stays [] until the caller applies it.
@@ -90,7 +94,7 @@ export async function fetchData() {
   } catch (err) {
     console.warn('fetchData: failed to load/normalize updates.json, degrading to empty state', err);
     const demoFields = await demosWithinGrace(demosPromise);
-    return withPendingDemos(emptyData(demoFields.demos), demoFields);
+    return withPendingDemos({ ...emptyData(demoFields.demos), loadFailed: true }, demoFields);
   }
 }
 

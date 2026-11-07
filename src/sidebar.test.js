@@ -27,12 +27,15 @@ function mountContainers() {
 }
 
 // Build a data set whose projects each become a 'projects'-group channel with
-// chHeat(channel) === heat. channel id is p0, p1, ... in order.
+// chHeat(channel) === heat. channel id is p0, p1, ... in order. Each gets one
+// routed entry, since the sidebar lists only projects with a loaded entry
+// (sidebar-empty.test.js).
 function dataWithHeats(heats) {
   return {
     projects: heats.map((heat, i) => ({
       name: 'P' + i, channel: 'p' + i, description: 'desc ' + i, heat,
     })),
+    entries: heats.map((_, i) => ({ channel: 'p' + i, category: 'daily', projectChannel: 'p' + i })),
   };
 }
 
@@ -182,7 +185,7 @@ describe('accessibility attributes', () => {
     const row = document.querySelector('.chan[data-ch="p0"]');
     expect(row.getAttribute('role')).toBe('link');
     expect(row.getAttribute('tabindex')).toBe('0');
-    expect(row.getAttribute('aria-label')).toBe('p0 channel');
+    expect(row.getAttribute('aria-label')).toBe('P0 channel'); // the name, not the id
     // Decorative bits are hidden from the accessibility tree.
     expect(row.querySelector('.hash').getAttribute('aria-hidden')).toBe('true');
     expect(row.querySelector('.heat').getAttribute('aria-hidden')).toBe('true');
@@ -208,14 +211,17 @@ describe('accessibility attributes', () => {
 });
 
 describe('renderChanlist escaping', () => {
-  // Channel ids come straight from project.channel in updates.json, and the
-  // registry reuses the id as the label, so one hostile value reaches data-ch,
-  // aria-label and the visible name on both the sidebar row and the mobile tab.
+  // Channel ids come straight from project.channel in updates.json, and a blank
+  // name falls back to the id, so one hostile value reaches data-ch, aria-label
+  // and the visible name on both the sidebar row and the mobile tab.
   const hostile = 'foo" onclick=alert(1) x="<img src=x onerror=1>';
 
   beforeEach(() => {
     mountContainers();
-    const data = { projects: [{ name: 'X', channel: hostile, description: 'd', heat: 0.5 }] };
+    const data = {
+      projects: [{ name: '', channel: hostile, description: 'd', heat: 0.5 }],
+      entries: [{ channel: hostile, category: 'daily', projectChannel: hostile }],
+    };
     initChannels(data);
     renderChanlist(data, () => {});
   });

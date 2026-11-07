@@ -69,7 +69,9 @@ function pinCard({ meta, right, art, tagline, rows }) {
 }
 
 function pinnedHome(data) {
-  const { totalCommits, buckets, last } = logStats(data, 28);
+  const { totalCommits, buckets, last, logRange } = logStats(data, 28);
+  // The channel's age is when its log starts (YYYY-MM of the #activity range).
+  const since = logRange ? logRange.from.slice(0, 7) : '—';
   const maxV = Math.max(1, ...buckets);
   const spark = sparkbar(buckets, maxV);
   // Every dynamic value (date slices + project) is escapeHtml'd; the accent span
@@ -78,8 +80,10 @@ function pinnedHome(data) {
     ? `${escapeHtml(dayOf(last.date))} \xb7 ${escapeHtml(timeOf(last.date))} \xb7 <span class="accent">${escapeHtml(last.projectSlug || '—')}</span>`
     : '—';
   return pinCard({
-    meta: [['modes', '+ntr'], ['users', '1'], ['since', '2018']],
-    right: '● live',
+    meta: [['modes', '+ntr'], ['users', '1'], ['since', since]],
+    // A failed /updates.json load renders this card from empty data; the feed
+    // says why, and the badge must not claim the log is live.
+    right: data.loadFailed ? '○ offline' : '● live',
     art: LOGO,
     tagline: '<b>mase</b> — software, in progress. this is the always-on log: what i shipped, what i broke, what i thought was worth writing down.',
     rows: [

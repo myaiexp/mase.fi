@@ -19,8 +19,8 @@ export function setChannels(registry, list) {
   registry.getChannels.mockReturnValue(list);
 }
 
-export function ch(id, label = id, topic = `${id} topic`) {
-  return { id, label, topic };
+export function ch(id, label = id, topic = `${id} topic`, name = label) {
+  return { id, label, name, topic };
 }
 
 // Type into the command input and fire the input event initCommand listens for.

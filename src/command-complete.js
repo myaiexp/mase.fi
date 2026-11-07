@@ -81,8 +81,8 @@ export function createAutocomplete({
 
   function renderItem(m, i, q) {
     const sel = i === selection.idx ? 'selected' : '';
-    const hit = highlightFuzzy(m.label, q);
     if (m.kind === 'cmd') {
+      const hit = highlightFuzzy(m.label, q);
       return `
       <div class="cc-item is-cmd ${sel}" data-i="${i}" ${optionAttrs(i, i === selection.idx)}>
         <div class="cc-ch"><span class="slash">/</span>${hit}</div>
@@ -90,9 +90,12 @@ export function createAutocomplete({
         <div class="cc-last">cmd</div>
       </div>`;
     }
+    // A heading that differs from the id shows the id too: it is what the
+    // hash and "/" accept, and it explains a match the name alone doesn't.
+    const idHtml = m.name === m.label ? '' : ` <span class="cc-id">${highlightFuzzy(m.label, q)}</span>`;
     return `
     <div class="cc-item ${sel}" data-ch="${escapeHtml(m.id)}" data-i="${i}" ${optionAttrs(i, i === selection.idx)} style="--ch-accent:${chAccent(m.id)}">
-      <div class="cc-ch"><span class="hash">#</span>${hit}</div>
+      <div class="cc-ch"><span class="hash">#</span>${highlightFuzzy(m.name, q)}${idHtml}</div>
       <div class="cc-desc">${escapeHtml(m.topic)}</div>
       <div class="cc-last">${formatRelativeActivity(m.id)}</div>
     </div>`;
@@ -101,7 +104,12 @@ export function createAutocomplete({
   function render(q) {
     q = q.toLowerCase();
     const chMatches = getChannels()
-      .map(c => ({ kind: 'channel', id: c.id, label: c.label, topic: c.topic, score: fuzzyScore(c.label, q) }))
+      // Scored by the visible name and the id, so "/diet-app" and "/ruoka" both
+      // reach a channel headed Ruoka.
+      .map(c => ({
+        kind: 'channel', id: c.id, label: c.label, name: c.name, topic: c.topic,
+        score: Math.max(fuzzyScore(c.name, q), fuzzyScore(c.label, q)),
+      }))
       .filter(x => q === '' || x.score > 0);
     // Commands stay hidden on a bare "/" — easter eggs, surfaced only on a
     // genuine name *prefix*. Prefix (not fuzzy subsequence): "/o" must not
