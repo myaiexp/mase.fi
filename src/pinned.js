@@ -81,7 +81,9 @@ function pinnedHome(data) {
     : '—';
   return pinCard({
     meta: [['modes', '+ntr'], ['users', '1'], ['since', since]],
-    right: '● live',
+    // A failed /updates.json load renders this card from empty data; the feed
+    // says why, and the badge must not claim the log is live.
+    right: data.loadFailed ? '○ offline' : '● live',
     art: LOGO,
     tagline: '<b>mase</b> — software, in progress. this is the always-on log: what i shipped, what i broke, what i thought was worth writing down.',
     rows: [
