@@ -85,6 +85,21 @@ describe('renderPinned — home', () => {
     expect(html).toContain('<dt>last push</dt><dd>—</dd>');
   });
 
+  // "since" reads as the channel's age, so it is the log's first month — the same
+  // range #activity draws — never a hardcoded year.
+  it('dates "since" from the log start, the wider of stats.logFirst and memory', () => {
+    const since = () => pinnedEl().querySelector('.ch-meta:nth-child(3)').textContent;
+    renderPinned('home', {
+      stats: { logFirst: '2026-03-05' }, projects: [],
+      entries: [logEntry({ date: '2026-08-01T08:00', projectSlug: 'x' })],
+    });
+    expect(since()).toBe('since2026-03');
+    renderPinned('home', { stats: {}, projects: [], entries: [logEntry({ date: '2026-08-01T08:00', projectSlug: 'x' })] });
+    expect(since()).toBe('since2026-08');
+    renderPinned('home', { projects: [], entries: [], stats: {} });
+    expect(since()).toBe('since—');
+  });
+
   it('escapes the last-push project name instead of injecting it', () => {
     const data = {
       stats: {},
