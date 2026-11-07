@@ -10,11 +10,11 @@ function chanRow(c) {
     `<b class="${i < on ? 'on' : ''}"></b>`).join('');
   // role=link + tabindex makes these div rows keyboard-operable navigation
   // targets (they change the hash route); aria-label gives a clean name since
-  // the visible content is "# <label>" plus decorative heat bars.
+  // the visible content is "# <name>" plus decorative heat bars.
   return `
-    <div class="chan" data-ch="${escapeHtml(c.id)}" role="link" tabindex="0" aria-label="${escapeHtml(c.label)} channel" style="--ch-accent:${chAccent(c.id)}">
+    <div class="chan" data-ch="${escapeHtml(c.id)}" role="link" tabindex="0" aria-label="${escapeHtml(c.name)} channel" style="--ch-accent:${chAccent(c.id)}">
       <span class="hash" aria-hidden="true">#</span>
-      <span class="name">${escapeHtml(c.label)}</span>
+      <span class="name">${escapeHtml(c.name)}</span>
       <span class="heat" title="activity" aria-hidden="true">${bars}</span>
     </div>`;
 }
@@ -38,9 +38,9 @@ export function renderChanlist(data, navigate) {
     ...data.projects.slice(0, 4).map(p => channelById(p.channel)),
   ].filter(Boolean);
   $tabbar.innerHTML = primary.map(c => `
-    <button class="tab" data-ch="${escapeHtml(c.id)}" aria-label="${escapeHtml(c.label)} channel" style="--ch-accent:${chAccent(c.id)}">
+    <button class="tab" data-ch="${escapeHtml(c.id)}" aria-label="${escapeHtml(c.name)} channel" style="--ch-accent:${chAccent(c.id)}">
       <span class="tab-hash" aria-hidden="true">#</span>
-      <span class="tab-name">${escapeHtml(c.label)}</span>
+      <span class="tab-name">${escapeHtml(c.name)}</span>
       <span class="tab-dot" aria-hidden="true"></span>
     </button>
   `).join('');

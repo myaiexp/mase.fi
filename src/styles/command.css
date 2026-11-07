@@ -93,6 +93,7 @@
 .cc-item .cc-ch { color: var(--text); }
 .cc-item .cc-ch .hash { color: var(--muted); }
 .cc-item .cc-ch .hit { color: var(--ch-accent); font-weight: 700; }
+.cc-item .cc-ch .cc-id { color: var(--muted); }
 .cc-item .cc-desc { color: var(--muted); font-size: 11.5px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .cc-item .cc-last { color: var(--faint); font-size: 10.5px; }
 

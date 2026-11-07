@@ -13,7 +13,8 @@ let channels = [];
 // object would resolve inherited keys (#/constructor, #/__proto__) as channels.
 let byId = new Map();
 
-/** The ordered channel list [home, ...projects, activity]. Frozen — read-only to callers. */
+/** The ordered channel list [home, ...projects, activity]. Frozen — read-only to callers.
+ *  Each entry: { id, group, label (= id, the address), name (visible heading), topic, project? }. */
 export function getChannels() {
   return channels;
 }
@@ -45,14 +46,17 @@ export function buildRegistry(data) {
   // Reassign wholesale — consumers read through getChannels()/channelById(), so
   // there are no live references to keep alive and no in-place surgery needed.
   channels = Object.freeze([
-    { id: 'home', group: 'system', label: 'home', topic: 'daily logbook \xb7 appended nightly \xb7 autoscroll on' },
+    { id: 'home', group: 'system', label: 'home', name: 'home', topic: 'daily logbook \xb7 appended nightly \xb7 autoscroll on' },
     ...data.projects.map(p => ({
-      id: p.channel, group: 'projects', label: p.channel,
+      // id and label are the address (hash, data-ch, the "/" token); name is
+      // the visible heading. Only an empty or missing name falls back, no trim,
+      // the same rule as the topic below.
+      id: p.channel, group: 'projects', label: p.channel, name: p.name || p.channel,
       // A blank showcase tagline would leave the topic bar empty after the
       // separator. The name, then the channel, is still a heading.
       topic: p.description || p.name || p.channel, project: p,
     })),
-    { id: 'activity', group: 'system', label: 'activity', topic: 'raw commit stream across all projects' },
+    { id: 'activity', group: 'system', label: 'activity', name: 'activity', topic: 'raw commit stream across all projects' },
   ]);
   byId = new Map(channels.map(c => [c.id, c]));
 }

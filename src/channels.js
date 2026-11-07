@@ -62,7 +62,7 @@ export function navigate(id, { fromHash = false } = {}) {
   setActiveChannel(id);
 
   const c = channelById(id);
-  document.getElementById('topic-hash').textContent = '#' + c.label;
+  document.getElementById('topic-hash').textContent = '#' + c.name;
   document.getElementById('topic-text').textContent = c.topic;
   setTopicMeta(id);
 
