@@ -138,21 +138,39 @@ purge_locked() {
 
 # Read-only. A private name mentioned in some other project's summary or text
 # is reported, never deleted. A report failure does not fail the purge.
+#
+# A mention is the name as a whole word (no letter, digit, _ or - beside it),
+# ASCII case-insensitive, the same case rule the purge uses for names. jq
+# compiles a regex on every test() call, and one call per name per row took 68s
+# on production's ~17k rows and 25 names, past helm's 60s purge timeout. So jq
+# only flattens each row to one lowercased TSV line, and awk matches every name
+# with one alternation compiled once. For a yes/no match, (^|[^…]) and ([^…]|$)
+# are equivalent to lookarounds, which ERE lacks. The pattern reaches awk through
+# ENVIRON because -v would rewrite the backslashes that escape a name's ERE
+# characters.
 mention_report() {
-  local names="$1"
+  local names="$1" re
   local -a files=("$UPDATES_FILE")
   [[ -f "$ARCHIVE_FILE" ]] && files+=("$ARCHIVE_FILE")
-  jq -nr --argjson names "$names" '
-    def re_escape:
+  re="$(jq -nr --argjson names "$names" '
+    def ere_escape:
       reduce split("")[] as $c ("";
-        . + if ($c | test("[\\\\.^$*+?()\\[\\]{}|]")) then "\\" + $c else $c end);
-    [ inputs | .entries[]? as $e
-      | select(any($names[]; . as $n
-          | ($e | [(.summary // ""), (.text // "")] | join("\n"))
-          | test("(?<![A-Za-z0-9_-])" + ($n | re_escape) + "(?![A-Za-z0-9_-])"; "i")))
-      | "still mentioned: \($e.project) \($e.date) (\($e.category))" ]
-    | unique | .[]
-  ' "${files[@]}"
+        . + if ($c | test("[\\\\.^$*+?()\\[\\]{}|/]")) then "\\" + $c else $c end);
+    if ($names | length) == 0 then empty
+    else "(^|[^a-z0-9_-])(" + ($names | map(ere_escape) | join("|")) + ")([^a-z0-9_-]|$)"
+    end
+  ')" || return 1
+  [[ -n "$re" ]] || return 0
+  jq -nr '
+    def flat: split("\n") | join(" ") | split("\t") | join(" ") | split("\r") | join(" ");
+    inputs | .entries[]?
+    | ([.project, .date, .category] | map(tostring))
+      + [[.summary, .text] | map(strings) | join(" ") | ascii_downcase | flat]
+    | @tsv
+  ' "${files[@]}" \
+    | MENTION_RE="$re" awk -F'\t' 'BEGIN { re = ENVIRON["MENTION_RE"] }
+        $4 ~ re { print "still mentioned: " $1 " " $2 " (" $3 ")" }' \
+    | LC_ALL=C sort -u
 }
 
 rc=0
