@@ -50,4 +50,15 @@ describe('buildSlugToChannel channel alias', () => {
     );
     expect(row.channel).toBe('other');
   });
+
+  // Entry projects are free text: a plain-object map would resolve these
+  // through Object.prototype and route the row to a function.
+  it.each(['constructor', '__proto__', 'toString', 'hasOwnProperty'])(
+    'does not resolve an inherited key "%s" as a project', (project) => {
+      const map = buildSlugToChannel(iseps);
+      expect(normalizeEntry({ category: 'feature', project, date: '2026-01-01', text: 'x' }, map)).toBeNull();
+      const daily = normalizeEntry({ category: 'daily', project, date: '2026-01-01', summary: 'x' }, map);
+      expect(daily.channel).toBe('home');
+      expect(daily.projectChannel).toBeUndefined();
+    });
 });
