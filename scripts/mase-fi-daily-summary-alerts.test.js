@@ -1,5 +1,5 @@
 // Golden-file tests for mase-fi-daily-summary's ntfy alerts: the compact FAILED/degraded
-// pushes, the degraded-run pushes (summaries that fell back to a commit count, projects
+// pushes, the degraded-run pushes (summaries claude failed, which post no daily, projects
 // whose feed embargo could not be checked), the on_exit FAILED push on a hard abort, and
 // ntfy_send's token handling (stdin not argv, the HELM_ENV fallback, the CR/LF strip). A recording fake curl
 // stands in for ntfy; `claude -p` is stubbed via CLAUDE_BIN and the showcase API is
@@ -135,10 +135,10 @@ describe('mase-fi-daily-summary — degraded-run alerts', () => {
     const curl = fakeCurl();
     const r = run({ ...curl.env, CLAUDE_BIN: writeClaudeStub(dir, { exitCode: 1 }) });
     expect(r.status).toBe(0);
-    expect(dailies().map((e) => e.summary).sort()).toEqual(['alpha: 2 commits', 'beta: 2 commits', 'chore: solo']);
+    expect(dailies().map((e) => e.summary)).toEqual(['chore: solo']);
     // One consolidated push, not one per project; gamma's single commit never reached claude.
     expect(titles(curl)).toHaveLength(1);
-    expect(curl.argv()).toContain(`${TODAY}: 2/2 project summaries fell back to commit counts`);
+    expect(curl.argv()).toContain(`${TODAY}: 2/2 summarized project(s) got no daily entry`);
   });
 
   it('pushes an alert counting the projects whose feed embargo could not be checked', () => {
@@ -161,7 +161,7 @@ describe('mase-fi-daily-summary — degraded-run alerts', () => {
     });
     expect(titles(curl)).toHaveLength(2);
     expect(curl.argv()).toMatch(/1 project\(s\) got no daily entry/);
-    expect(curl.argv()).toMatch(/1\/1 project summaries fell back/);
+    expect(curl.argv()).toMatch(/1\/1 summarized project\(s\) got no daily entry/);
   });
 
   // An embargoed project is the gate working, and a summary claude did write is not degraded.

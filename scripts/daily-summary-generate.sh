@@ -36,6 +36,13 @@ clean_lines() {
         if (low ~ /\<from a single day\>/) next
         if (low ~ /\<appear to be\>/) next
         if (low ~ /\<distinct threads\>/) next
+        # Asides that reached the public log: "Looking at the commits", "two
+        # commits, no diffs shown — going by messages alone", "based on the two
+        # most notable threads: …". Narrow on purpose: real lines mention diffs.
+        if (low ~ /^looking at\>/) next
+        if (low ~ /\<no diffs?\>/) next
+        if (low ~ /\<going by (the )?(commit )?messages\>/) next
+        if (low ~ /^based on (the )?([a-z0-9]+ )?(most notable|notable|commit|commits|messages|threads)\>/) next
         # drop conversational refusals / no-input replies: Claude Code sometimes
         # tries to read a repo instead of the provided commits and then bails.
         # The prompt makes these rare; this is the safety net.
@@ -73,14 +80,12 @@ truncate_summary() {
 # ships several separate things earns a line each. No tools are needed for pure
 # text generation: `--tools ""` disables the default tool set (the `timeout`
 # wrapper is only a duration backstop). Prints one cleaned+truncated summary
-# per line; falls back to a single "project: N commits" line on any non-zero
-# exit, timeout, or empty reply — the silent-degradation signal the main loop
-# counts and alerts on.
+# per line. On any non-zero exit, timeout, or a reply that cleans to nothing it
+# prints nothing and returns 1: a commit count is not a changelog line, so the
+# main loop posts no daily for that project and counts it for the alert.
 generate_summary() {
     local project="$1"
     local commits_text="$2"
-    local count="$3"
-    local fallback="${project}: ${count} commits"
 
     # "What did the developer do today" for a semi-technical reader — terse and
     # technical is fine, just legible. Output is one line per genuinely distinct
@@ -106,7 +111,7 @@ ${commits_text}
     # from the neutral CLAUDE_CWD so no repo CLAUDE.md leaks in either.
     # `</dev/null` skips claude's 3s "no stdin" wait; `|| true` keeps a single
     # failed/timed-out call from aborting the whole run under `set -e` — this
-    # project falls back, the rest still get summarized.
+    # project gets no daily, the rest still get summarized.
     local response
     response=$(cd "$CLAUDE_CWD" && timeout "$CLAUDE_TIMEOUT" "$CLAUDE_BIN" -p "$prompt" \
         --system-prompt "$system_prompt" --model "$CLAUDE_MODEL" --tools "" \
@@ -122,9 +127,9 @@ ${commits_text}
             truncate_summary "$l"; echo
         done <<< "$lines"
     else
-        # Log the failed/empty reply to the journal so a fallback is diagnosable
-        # (the delegate era discarded the reply, leaving every fallback a black box).
-        echo "generate_summary: empty/failed claude reply for '${project}' — falling back to count" >&2
-        echo "$fallback"
+        # Log the failed/empty reply to the journal so a failed summary is diagnosable
+        # (the delegate era discarded the reply, leaving every failure a black box).
+        echo "generate_summary: empty/failed claude reply for '${project}' — no daily entry" >&2
+        return 1
     fi
 }

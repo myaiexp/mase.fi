@@ -153,4 +153,13 @@ describe('renderPinned — activity stream art (finding #11019)', () => {
     renderPinned('activity', data);
     expect(pinnedEl().innerHTML).toContain('2026-03-05 → 2026-09-05');
   });
+
+  // normalizeStats keeps any string logFirst/logLast from updates.json.
+  it('escapes a stats log range instead of injecting it', () => {
+    const data = { projects: [], entries: [], stats: { logFirst: '<s>first</s>', logLast: '<u>last</u>' } };
+    renderPinned('activity', data);
+    expect(pinnedEl().querySelector('s')).toBeNull();
+    expect(pinnedEl().querySelector('u')).toBeNull();
+    expect(pinnedEl().innerHTML).toContain('&lt;s&gt;first&lt;/s&gt; → &lt;u&gt;last&lt;/u&gt;');
+  });
 });

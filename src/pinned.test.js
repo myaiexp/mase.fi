@@ -111,6 +111,21 @@ describe('renderPinned — home', () => {
     expect(pinnedEl().innerHTML).toContain('&lt;script&gt;');
     expect(pinnedEl().innerHTML).not.toContain('<script>');
   });
+
+  // normalizeDate only lets digits through, but the renderer does not rely on
+  // that: dayOf/timeOf slices of a raw date are escaped too. 10 chars of day,
+  // the T, then 5 chars of time.
+  it('escapes the last-push day and time slices', () => {
+    const data = {
+      stats: {},
+      projects: [],
+      entries: [logEntry({ date: '<s>day</s>T<u/>xy', projectSlug: 'x' })],
+    };
+    renderPinned('home', data);
+    expect(pinnedEl().querySelector('s')).toBeNull();
+    expect(pinnedEl().querySelector('u')).toBeNull();
+    expect(pinnedEl().innerHTML).toContain('&lt;s&gt;day&lt;/s&gt;');
+  });
 });
 
 // ---- renderPinned: unmatched ---------------------------------------------
