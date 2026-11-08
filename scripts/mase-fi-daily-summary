@@ -98,7 +98,7 @@ jq --arg date "$TODAY" '
 # Build daily entries with AI summaries
 echo '[]' > "$ENTRIES"
 
-FALLBACK_COUNT=0     # projects where claude produced nothing usable
+FALLBACK_COUNT=0     # projects where claude produced nothing usable (no daily posted)
 SUMMARIZED_COUNT=0   # projects that actually went through claude (multi-commit)
 UNCHECKED_COUNT=0    # projects skipped because their feed embargo could not be checked
 
@@ -121,12 +121,13 @@ for i in $(jq -r 'range(length)' "$GROUPS_JSON"); do
         summaries=$(jq -r ".[$i].commits[0]" "$GROUPS_JSON")   # single commit → verbatim, one line
     else
         commits_text=$(jq -r ".[$i].commits[]" "$GROUPS_JSON")
-        summaries=$(generate_summary "$project" "$commits_text" "$count")   # 1..MAX_LINES lines
         SUMMARIZED_COUNT=$((SUMMARIZED_COUNT + 1))
-        # generate_summary echoes exactly this one line when claude fails/times out
-        # or its reply cleans to nothing — the silent-degradation signal. The model
-        # prompt forbids the "project: N" shape, so a real summary can't collide.
-        [[ "$summaries" == "${project}: ${count} commits" ]] && FALLBACK_COUNT=$((FALLBACK_COUNT + 1))
+        # Non-zero when claude failed, timed out, or its reply cleaned to nothing:
+        # this project gets no daily entry, and the run alerts once below.
+        if ! summaries=$(generate_summary "$project" "$commits_text"); then   # 1..MAX_LINES lines
+            FALLBACK_COUNT=$((FALLBACK_COUNT + 1))
+            continue
+        fi
     fi
 
     # One daily entry per summary line (a busy project can post several).
@@ -165,11 +166,11 @@ if [[ "$UNCHECKED_COUNT" -gt 0 ]]; then
     echo "${UNCHECKED_COUNT} project(s) skipped: feed embargo could not be checked — ntfy sent"
 fi
 
-# One consolidated alert if any summary silently degraded to a commit count —
-# rather than per-project spam. The run still succeeded (fallback text is valid),
-# so this is informational, not a failure.
+# One consolidated alert if any summarized project got no daily entry, rather than
+# per-project spam. The run still succeeded, so this is informational. A rerun
+# does not retry: the idempotency check skips once any daily for today exists.
 if [[ "$FALLBACK_COUNT" -gt 0 ]]; then
     ntfy_send "mase.fi daily-summary degraded" \
-        "${TODAY}: ${FALLBACK_COUNT}/${SUMMARIZED_COUNT} project summaries fell back to commit counts — claude -p failed, timed out, or returned nothing usable"
-    echo "Degraded run: ${FALLBACK_COUNT}/${SUMMARIZED_COUNT} projects fell back — ntfy sent"
+        "${TODAY}: ${FALLBACK_COUNT}/${SUMMARIZED_COUNT} summarized project(s) got no daily entry — claude -p failed, timed out, or returned nothing usable"
+    echo "Degraded run: ${FALLBACK_COUNT}/${SUMMARIZED_COUNT} projects got no summary — ntfy sent"
 fi

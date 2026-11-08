@@ -141,13 +141,21 @@ describe('mase-fi-daily-summary — grouping + summary branch', () => {
 });
 
 describe('mase-fi-daily-summary — fallback + skip paths', () => {
-  it('falls back to "project: N commits" when claude fails/returns nothing', () => {
-    seed([log('beta', 'c1'), log('beta', 'c2')]);
+  // A count is not a changelog line: a failed summary posts nothing for that
+  // project, and the run alerts instead.
+  it('writes no daily for a project whose summary fails, and still writes the rest', () => {
+    seed([log('beta', 'c1'), log('beta', 'c2'), log('gamma', 'chore: solo')]);
     const CLAUDE_BIN = writeClaudeStub(dir, { output: '', exitCode: 1 });
     const r = run({ CLAUDE_BIN });
-    expect(dailies()).toHaveLength(1);
-    expect(dailies()[0].summary).toBe('beta: 2 commits');
+    expect(dailies().map((e) => e.summary)).toEqual(['chore: solo']);
     expect(r.stdout).toMatch(/Degraded run: 1\/1/);
+  });
+
+  it('writes nothing for a reply that cleans to nothing', () => {
+    seed([log('beta', 'c1'), log('beta', 'c2')]);
+    const CLAUDE_BIN = writeClaudeStub(dir, { output: 'Looking at the commits' });
+    run({ CLAUDE_BIN });
+    expect(dailies()).toEqual([]);
   });
 
   it('is idempotent — skips when daily entries already exist for today', () => {

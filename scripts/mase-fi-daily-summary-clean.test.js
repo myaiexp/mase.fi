@@ -81,6 +81,26 @@ describe('mase-fi-daily-summary — clean_lines drop rules', () => {
     expect(dailies().map((e) => e.summary)).toEqual(['added session claim locks']);
   });
 
+  // Asides that reached the public log (2026-03-18, 2026-06-02, 2026-08-05), next
+  // to real lines that mention diffs and must survive.
+  it('drops looking-at / no-diffs / going-by / based-on narration', () => {
+    multi();
+    const dirty = [
+      'Looking at the commits',
+      'two commits, no diffs shown — going by messages alone.',
+      'based on the two most notable threads: the followup context prefix feature',
+      'going by the commit messages, this was a cleanup day',
+      'gallery shows per-cell diffs of what a candidate changes',
+      'Foreman feed: events, diffs, classified announcements',
+    ].join('\n');
+    const CLAUDE_BIN = writeClaudeStub(dir, { output: dirty });
+    run({ CLAUDE_BIN, MAX_LINES: '5' });
+    expect(dailies().map((e) => e.summary)).toEqual([
+      'gallery shows per-cell diffs of what a candidate changes',
+      'Foreman feed: events, diffs, classified announcements',
+    ]);
+  });
+
   it('drops a dangling open-paren when truncate lands mid-parenthetical', () => {
     multi();
     // >110 chars so truncate_summary clamps; ends with an unclosed "(" fragment
