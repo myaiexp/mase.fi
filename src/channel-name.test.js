@@ -41,7 +41,9 @@ describe('sidebar and tabs', () => {
       el.id = id;
       document.body.appendChild(el);
     }
-    const data = { projects };
+    // The sidebar lists only projects with a loaded entry (sidebar.js
+    // projectsWithEntries), so diet-app needs one to get a row.
+    const data = { projects, entries: [{ channel: 'diet-app', projectChannel: 'diet-app', projectSlug: 'diet-app' }] };
     buildRegistry(data);
     renderChanlist(data, () => {});
   });
