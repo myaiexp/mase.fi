@@ -1,13 +1,14 @@
 // @vitest-environment jsdom
-import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { describe, it, expect, beforeAll, beforeEach, afterEach, vi } from 'vitest';
+import { inlineBaseCss } from '../../../scripts/build-base-css.js';
 
 // The visual contract. BaseToast only stamps these classes; a second inline
 // geometry would not show up in the DOM assertions below.
 // join, not new URL(import.meta.url): under the jsdom vitest environment Vite
 // rewrites that URL off the file: scheme and fileURLToPath throws.
-const baseCss = readFileSync(join(import.meta.dirname, '../../base.css'), 'utf8');
+// The published sheet, not the @import index: the rules live in src/base/*.css.
+const baseCss = inlineBaseCss(join(import.meta.dirname, '../../base.css'));
 
 let BaseToast;
 

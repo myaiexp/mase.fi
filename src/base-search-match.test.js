@@ -5,10 +5,11 @@
 // would silently strip <mark> styling there. They must also stay identical, or a page
 // that switches forms changes colour.
 import { describe, it, expect } from 'vitest';
-import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
+import { inlineBaseCss } from '../scripts/build-base-css.js';
 
-const css = readFileSync(fileURLToPath(new URL('./base.css', import.meta.url)), 'utf8');
+// The published sheet, not the @import index: the rules live in src/base/*.css.
+const css = inlineBaseCss(fileURLToPath(new URL('./base.css', import.meta.url)));
 
 /** The declaration block of the rule whose selector list is exactly `selector`. */
 function block(selector) {
