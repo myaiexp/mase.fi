@@ -4,18 +4,28 @@
 // Mirrors the select-menu.js decomposition: pure logic lives here, testable
 // directly, so the element file stays focused on lifecycle concerns.
 
+/** @import { PreparedTextWithSegments } from '@chenglou/pretext' */
+/** @typedef {PreparedTextWithSegments & { _font?: string }} Prepared A prepared text with the font stashed by doPrepare. */
+/** @typedef {{ text: string, wordSpacing?: number }} JustifiedLine */
+
 import { measureLineStats, layoutNextLine, materializeLineRange, walkLineRanges, measureNaturalWidth, prepareWithSegments } from '@chenglou/pretext';
 
 export const DEFAULT_FONT = '13px monospace';
 
 // Prepare `text` at `font`, stashing the font on the result so downstream
 // re-measurement (truncateLastLine) can reprepare slices at the same font.
+/**
+ * @param {string} text
+ * @param {string} font
+ * @returns {Prepared}
+ */
 export function doPrepare(text, font) {
-  const result = prepareWithSegments(text, font);
+  const result = /** @type {Prepared} */ (prepareWithSegments(text, font));
   result._font = font;
   return result;
 }
 
+/** @param {Prepared} prepared */
 function getFont(prepared) {
   return prepared._font || DEFAULT_FONT;
 }
@@ -24,6 +34,7 @@ function getFont(prepared) {
 // render (null prepared, no segments, or empty text). Callers map null to their
 // own empty value — [] for justifyLines, '' for truncate/wrapOptimal — so the
 // three empty-input guards live in one place instead of being copy-pasted.
+/** @param {Prepared | null} prepared */
 function fullTextOf(prepared) {
   if (!prepared) return null;
   const segments = prepared.segments;
@@ -34,7 +45,13 @@ function fullTextOf(prepared) {
 
 // Wrap `prepared` at `width`, returning each line's text as an array. Callers
 // join with '\n' (single-render) or slice before joining (overflow truncation).
+/**
+ * @param {Prepared} prepared
+ * @param {number} width
+ * @returns {string[]}
+ */
 function collectLines(prepared, width) {
+  /** @type {string[]} */
   const lines = [];
   walkLineRanges(prepared, width, (range) => {
     lines.push(materializeLineRange(prepared, range).text);
@@ -42,6 +59,12 @@ function collectLines(prepared, width) {
   return lines;
 }
 
+/**
+ * @param {string} lineText
+ * @param {number} maxWidth
+ * @param {string} ellipsis
+ * @param {string} font
+ */
 function truncateLastLine(lineText, maxWidth, ellipsis, font) {
   const ellipsisPrep = doPrepare(ellipsis, font);
   const ellipsisWidth = measureNaturalWidth(ellipsisPrep);
@@ -72,6 +95,12 @@ function truncateLastLine(lineText, maxWidth, ellipsis, font) {
 // Break text into justified lines: non-last lines get a `wordSpacing` (px) that
 // stretches them to maxWidth; the last line is left-aligned (or truncated with
 // an ellipsis when the line count overflows maxLines).
+/**
+ * @param {Prepared} prepared
+ * @param {number} maxWidth
+ * @param {number} maxLines
+ * @returns {JustifiedLine[]}
+ */
 export function justifyLines(prepared, maxWidth, maxLines) {
   if (fullTextOf(prepared) === null) return [];
 
@@ -79,6 +108,7 @@ export function justifyLines(prepared, maxWidth, maxLines) {
   // prepareWithSegments re-measure. The width here is identical to
   // measureNaturalWidth(doPrepare(line.text, font)) — same paint-width engine,
   // trailing whitespace excluded the same way — so reusing it is safe.
+  /** @type {{ text: string, width: number }[]} */
   const allLines = [];
   walkLineRanges(prepared, maxWidth, (range) => {
     const line = materializeLineRange(prepared, range);
@@ -89,6 +119,7 @@ export function justifyLines(prepared, maxWidth, maxLines) {
   const isOverflow = maxLines > 0 && allLines.length > maxLines;
   const font = getFont(prepared);
 
+  /** @type {JustifiedLine[]} */
   const result = [];
   for (let i = 0; i < linesToShow.length; i++) {
     const { text, width: naturalWidth } = linesToShow[i];
@@ -112,6 +143,12 @@ export function justifyLines(prepared, maxWidth, maxLines) {
 
 // Truncate to at most `maxLines` lines at `maxWidth`, appending an ellipsis to
 // the last line when the text overflows.
+/**
+ * @param {Prepared} prepared
+ * @param {number} maxWidth
+ * @param {number} maxLines
+ * @param {string} [ellipsis]
+ */
 export function truncate(prepared, maxWidth, maxLines, ellipsis = '…') {
   const fullText = fullTextOf(prepared);
   if (fullText === null) return '';
@@ -120,6 +157,7 @@ export function truncate(prepared, maxWidth, maxLines, ellipsis = '…') {
   if (stats.lineCount <= maxLines) return fullText;
 
   // Walk lines, collecting all visible lines
+  /** @type {string[]} */
   const lines = [];
   let cursor = { segmentIndex: 0, graphemeIndex: 0 };
   for (let i = 0; i < maxLines; i++) {
@@ -140,6 +178,11 @@ export function truncate(prepared, maxWidth, maxLines, ellipsis = '…') {
 // Wrap text to minimize ragged width. When it fits within maxLines, binary-
 // search the narrowest width that still fits (balanced lines); when it exceeds
 // maxLines, wrap at maxWidth and truncate the last kept line with an ellipsis.
+/**
+ * @param {Prepared} prepared
+ * @param {number} maxWidth
+ * @param {number} maxLines
+ */
 export function wrapOptimal(prepared, maxWidth, maxLines) {
   if (fullTextOf(prepared) === null) return '';
 

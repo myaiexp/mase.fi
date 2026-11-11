@@ -2,15 +2,24 @@
 // Pure matching logic lives in notfound.js. Served as /404.html via nginx error_page,
 // so location.pathname is the path the visitor actually typed — except when the page
 // is opened as /404.html itself, where ?p=/some/path previews a typed path.
+/** @import { Candidate, ConfidentPlan, Suggestion } from './notfound.js' */
 import { parentPrefixes, isJunkPath, buildRoutes, fuzzyCandidates, decide, reasonFor, isSafeRedirect } from './notfound.js';
 import { sameOriginPath } from './same-origin.js';
 import { fetchJson, fetchWithTimeout } from './fetch-json.js';
 import { prefersReducedMotion } from './motion.js';
 
-const $ = (id) => document.getElementById(id);
+// Every id is checked against 404.html by dom-contract.test.js.
+const $ = (/** @type {string} */ id) => /** @type {HTMLElement} */ (document.getElementById(id));
 const isPreview = () => location.pathname === '/404.html';
 const PATH_CLAMP = 160;
 
+/**
+ * @template {keyof HTMLElementTagNameMap} K
+ * @param {K} tag
+ * @param {Partial<HTMLElementTagNameMap[K]>} [props]
+ * @param {(string | Node)[]} children
+ * @returns {HTMLElementTagNameMap[K]}
+ */
 function el(tag, props, ...children) {
   const node = Object.assign(document.createElement(tag), props);
   node.append(...children);
@@ -18,7 +27,7 @@ function el(tag, props, ...children) {
 }
 
 // A function, not a shared node: a node can only sit in one place in the DOM.
-const homeLink = (textContent = 'mase.fi') => el('a', { href: '/', textContent });
+const homeLink = (/** @type {string} */ textContent = 'mase.fi') => el('a', { href: '/', textContent });
 
 export function effectivePath() {
   if (isPreview()) {
@@ -34,19 +43,22 @@ export function effectivePath() {
   return location.pathname;
 }
 
+/** @param {string} target */
 function safeHref(target) {
   return isSafeRedirect(target, location.origin) ? target : '/';
 }
 
+/** @param {string} url @param {number} [ms] @returns {Promise<Response | null>} */
 async function probeHead(url, ms = 1500) {
   try {
-    return await fetchWithTimeout(url, { method: 'HEAD', redirect: 'follow' }, ms);
+    return /** @type {Response} */ (await fetchWithTimeout(url, { method: 'HEAD', redirect: 'follow' }, ms));
   } catch {
     return null;
   }
 }
 
 // Longest-first: the deepest surviving parent is the confident target.
+/** @param {string} path @returns {Promise<string | null>} */
 export async function probePrefixes(path) {
   for (const prefix of parentPrefixes(path)) {
     if (!sameOriginPath(prefix, location.origin)) continue;
@@ -65,6 +77,7 @@ async function loadRoutes() {
 }
 
 // error_page keeps the original status but the body can't see it — re-ask nginx.
+/** @param {string} path */
 export async function applyRealStatus(path) {
   if (isPreview()) return;
   const res = await probeHead(path, 1200);
@@ -79,6 +92,7 @@ export async function applyRealStatus(path) {
   }
 }
 
+/** @param {string} path @param {number} headLen */
 function renderTyped(path, headLen) {
   const clamped = path.length > PATH_CLAMP;
   const shown = clamped ? path.slice(0, PATH_CLAMP) : path;
@@ -92,6 +106,7 @@ function renderTyped(path, headLen) {
   }
 }
 
+/** @param {(string | Node)[]} desktop @param {(string | Node)[]} mobile */
 function setHints(desktop, mobile) {
   $('fhints').replaceChildren(
     el('span', { className: 'hint-d' }, ...desktop),
@@ -99,6 +114,7 @@ function setHints(desktop, mobile) {
   );
 }
 
+/** @param {Suggestion} plan */
 function suggestionLink(plan) {
   const a = el('a', { className: 'big', href: safeHref(plan.target) },
     el('span', { className: 'arr', textContent: '→' }),
@@ -108,12 +124,13 @@ function suggestionLink(plan) {
   return a;
 }
 
+/** @param {string} path @param {ConfidentPlan} plan */
 export function renderConfident(path, plan) {
   if (plan.diff) {
     renderTyped(path, plan.target.length);
     const tailNote = $('tailnote');
     tailNote.hidden = false;
-    tailNote.append('the tail ', el('b', { textContent: plan.tail }), ' matched nothing · the head resolves');
+    tailNote.append('the tail ', el('b', { textContent: plan.tail ?? '' }), ' matched nothing · the head resolves');
   }
   const sugg = $('sugg');
   sugg.textContent = '';
@@ -127,6 +144,7 @@ export function renderConfident(path, plan) {
   startCountdown(plan, link);
 }
 
+/** @param {string} path @param {Candidate[]} candidates */
 export function renderFuzzy(path, candidates) {
   const sugg = $('sugg');
   sugg.textContent = '';
@@ -151,6 +169,7 @@ export function renderFuzzy(path, candidates) {
   });
 }
 
+/** @param {number} projectCount */
 export function renderNone(projectCount) {
   const sugg = $('sugg');
   sugg.textContent = '';
@@ -166,12 +185,14 @@ export function renderNone(projectCount) {
   });
 }
 
+/** @param {Suggestion} plan @param {Element | null} suggEl */
 export function startCountdown(plan, suggEl) {
   const box = $('countbox');
   box.hidden = false;
   // Every listener below hangs off this signal, so stop() ends them all at once.
   const ac = new AbortController();
   const on = { signal: ac.signal };
+  /** @type {ReturnType<typeof setInterval> | undefined} */
   let iv;
   const stop = () => {
     clearInterval(iv);
@@ -214,11 +235,11 @@ export function startCountdown(plan, suggEl) {
     setHints([homeLink(), ' for the full directory'], [homeLink()]);
   };
   // Interacting with the redirect target must never count as "stay".
-  const onAny = (e) => {
+  const onAny = (/** @type {Event} */ e) => {
     if (e.target instanceof Element && (e.target.closest('#gobtn') || (suggEl && suggEl.contains(e.target)))) return;
     cancel();
   };
-  const onKey = (e) => {
+  const onKey = (/** @type {KeyboardEvent} */ e) => {
     if (e.metaKey || e.ctrlKey || e.altKey) return;
     if (e.key === 'Enter') go();
     else cancel();
@@ -253,11 +274,11 @@ export async function start() {
   if (prefix) {
     // Project urls may end in `/`; parent prefixes never do.
     const known = routes.find((r) => r.kind === 'path' && r.href.replace(/\/$/, '') === prefix);
-    renderConfident(path, decide({
+    renderConfident(path, /** @type {ConfidentPlan} */ (decide({
       prefixHit: { href: prefix, label: prefix, caption: known ? known.caption : '' },
       candidates: [],
       path,
-    }));
+    })));
     return;
   }
   const plan = decide({ prefixHit: null, candidates: fuzzyCandidates(path, routes), path });

@@ -5,12 +5,20 @@ import {
   materializeRichInlineLineRange,
 } from '@chenglou/pretext/rich-inline';
 
+/** @import { RichInlineItem, RichInlineFragment } from '@chenglou/pretext/rich-inline' */
+
 // 4px gap after the project chip; matches `.feed-row .proj-pill { margin-right: 4px }`.
 const CHIP_GAP_PX = 4;
 
 // Build fragment items for one row from the dataset attrs we stash at render time.
 // `kind` is ours, not pretext's: it tells renderFragment which item is the chip.
+/**
+ * @param {HTMLElement} row
+ * @param {string} font
+ * @returns {(RichInlineItem & { kind?: string })[]}
+ */
 function buildItems(row, font) {
+  /** @type {(RichInlineItem & { kind?: string })[]} */
   const items = [];
   const text = row.dataset.raw || '';
   const project = row.dataset.projectSlug || '';
@@ -25,8 +33,15 @@ function buildItems(row, font) {
 // Render one fragment of a laid-out line into a child span/text-node tree.
 // `frag.gapBefore` carries inter-item whitespace pretext normalized out of
 // item text (e.g. the space after the project chip), so we materialize it as margin-left.
+/**
+ * @param {HTMLElement} parent
+ * @param {RichInlineFragment} frag
+ * @param {{ kind?: string }[]} items
+ * @param {string | null} chipTarget
+ */
 function renderFragment(parent, frag, items, chipTarget) {
   const item = items[frag.itemIndex];
+  /** @type {HTMLElement} */
   let el;
   if (item.kind === 'chip') {
     el = document.createElement('span');
@@ -47,6 +62,10 @@ function renderFragment(parent, frag, items, chipTarget) {
 }
 
 // DOM fallback when pretext can't be invoked yet (zero width, layout failure).
+/**
+ * @param {Element} msg
+ * @param {HTMLElement} row
+ */
 function renderFallback(msg, row) {
   msg.textContent = '';
   if (row.dataset.projectSlug) {
@@ -61,6 +80,11 @@ function renderFallback(msg, row) {
 
 /** Lay out one row's .msg using pretext rich-inline at the given width.
  *  Re-renders into a flat list of <span class="line"> elements. */
+/**
+ * @param {HTMLElement} row
+ * @param {number} msgWidth
+ * @param {string} font
+ */
 export function layoutRow(row, msgWidth, font) {
   const msg = row.querySelector('.msg');
   if (!msg) return;
@@ -96,6 +120,10 @@ export function layoutRow(row, msgWidth, font) {
 
 /** Compute the font CSS shorthand to feed pretext, plus the .msg column width.
  *  Both are uniform across the feed (.msg shares one grid column track). */
+/**
+ * @param {Element} feedEl
+ * @returns {{ font: string, msgWidth: number } | null}
+ */
 export function measureFeedMetrics(feedEl) {
   const probe = feedEl.querySelector('.feed-row .msg');
   if (!probe) return null;
@@ -109,15 +137,20 @@ export function measureFeedMetrics(feedEl) {
 /** Lay out one row at the feed's current metrics. Unlike relayoutAll this never
  *  skips: with no measurable width the row gets layoutRow's plain fallback, so a
  *  caller that overwrote .msg always gets real content back. */
+/**
+ * @param {Element} feedEl
+ * @param {HTMLElement} row
+ */
 export function relayoutRow(feedEl, row) {
   const m = measureFeedMetrics(feedEl);
   layoutRow(row, m ? m.msgWidth : 0, m ? m.font : '');
 }
 
 /** Lay out every .feed-row currently in the feed. */
+/** @param {Element} feedEl */
 export function relayoutAll(feedEl) {
   const m = measureFeedMetrics(feedEl);
   if (!m || m.msgWidth <= 0) return;
-  const rows = feedEl.querySelectorAll('.feed-row');
+  const rows = /** @type {NodeListOf<HTMLElement>} */ (feedEl.querySelectorAll('.feed-row'));
   for (const row of rows) layoutRow(row, m.msgWidth, m.font);
 }

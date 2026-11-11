@@ -2,6 +2,8 @@
 // Owns the custom-element lifecycle (observers, reflow, attribute handling) and
 // rendering; the pure layout algorithms live in text-fit-layout.js.
 
+/** @import { Prepared } from './text-fit-layout.js' */
+
 import { DEFAULT_FONT, doPrepare, justifyLines, truncate, wrapOptimal } from './text-fit-layout.js';
 import { mountShadow } from '../shared/mount-shadow.js';
 import { shadowStyles } from '../shared/shadow-styles.js';
@@ -23,20 +25,26 @@ class BaseTextFit extends HTMLElement {
   static observedAttributes = ['lines', 'mode', 'hyphenate'];
 
   #fullText = '';
+  /** @type {Prepared | null} */
   #prepared = null;
   #cachedFont = '';
+  /** @type {ResizeObserver | null} */
   #resizeObs = null;
+  /** @type {MutationObserver | null} */
   #mutationObs = null;
-  #textEl = null;
+  #textEl;
+  /** @type {(() => void) | null} */
   #fontHandler = null;
   // The title this element last wrote itself. A title attribute that still
   // equals it is ours to refresh; any other value came from the author.
+  /** @type {string | null} */
   #ownTitle = null;
 
   constructor() {
     super();
     mountShadow(this, styles, template);
-    this.#textEl = this.shadowRoot.querySelector('#text');
+    this.#textEl = /** @type {HTMLElement} */ (
+      /** @type {ShadowRoot} */ (this.shadowRoot).querySelector('#text'));
   }
 
   connectedCallback() {
@@ -89,6 +97,11 @@ class BaseTextFit extends HTMLElement {
     this.#cachedFont = '';
   }
 
+  /**
+   * @param {string} name
+   * @param {string | null} oldVal
+   * @param {string | null} newVal
+   */
   attributeChangedCallback(name, oldVal, newVal) {
     if (oldVal === newVal) return;
     if (name === 'hyphenate' && newVal !== null && !hyphenateWarned) {
@@ -107,6 +120,7 @@ class BaseTextFit extends HTMLElement {
     }
   }
 
+  /** @param {number} [width] */
   #reflow(width) {
     if (!this.#fullText) {
       this.#textEl.textContent = '';
@@ -115,9 +129,10 @@ class BaseTextFit extends HTMLElement {
 
     const cs = getComputedStyle(this);
     const font = cs.font || DEFAULT_FONT;
-    if (font !== this.#cachedFont || !this.#prepared) {
+    let prepared = this.#prepared;
+    if (font !== this.#cachedFont || !prepared) {
       this.#cachedFont = font;
-      this.#prepared = doPrepare(this.#fullText, font);
+      prepared = this.#prepared = doPrepare(this.#fullText, font);
     }
 
     const maxWidth = width ?? this.getBoundingClientRect().width;
@@ -126,7 +141,7 @@ class BaseTextFit extends HTMLElement {
       return;
     }
 
-    const parsedLines = parseInt(this.getAttribute('lines'), 10);
+    const parsedLines = parseInt(this.getAttribute('lines') ?? '', 10);
     const lineLimit = Number.isFinite(parsedLines) ? parsedLines : 1;
     const mode = this.getAttribute('mode') || 'fit';
 
@@ -136,16 +151,21 @@ class BaseTextFit extends HTMLElement {
     }
 
     if (mode === 'justify') {
-      this.#renderJustified(maxWidth, lineLimit);
+      this.#renderJustified(prepared, maxWidth, lineLimit);
     } else if (mode === 'wrap') {
-      this.#textEl.textContent = wrapOptimal(this.#prepared, maxWidth, lineLimit);
+      this.#textEl.textContent = wrapOptimal(prepared, maxWidth, lineLimit);
     } else {
-      this.#textEl.textContent = truncate(this.#prepared, maxWidth, lineLimit);
+      this.#textEl.textContent = truncate(prepared, maxWidth, lineLimit);
     }
   }
 
-  #renderJustified(maxWidth, lineLimit) {
-    const laidOut = justifyLines(this.#prepared, maxWidth, lineLimit);
+  /**
+   * @param {Prepared} prepared
+   * @param {number} maxWidth
+   * @param {number} lineLimit
+   */
+  #renderJustified(prepared, maxWidth, lineLimit) {
+    const laidOut = justifyLines(prepared, maxWidth, lineLimit);
     this.#textEl.textContent = '';
     for (const line of laidOut) {
       const span = document.createElement('span');

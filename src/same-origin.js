@@ -8,6 +8,11 @@
 // `//evil.com`, which leaves the origin once used as a URL, so a parsed pathname
 // (slashes already normalized) must not start with `//`. Empty/non-string input
 // is rejected rather than collapsing to `/`. Never throws.
+/**
+ * @param {unknown} raw
+ * @param {string} origin
+ * @returns {string | null}
+ */
 export function sameOriginPath(raw, origin) {
   if (typeof raw !== 'string' || raw.length === 0) return null;
   try {

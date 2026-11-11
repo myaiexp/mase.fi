@@ -16,9 +16,14 @@
 // old browsers); there the CSP limitation still applies, which is no worse than
 // before.
 
+/**
+ * @param {string} cssText
+ */
 export function shadowStyles(cssText) {
+  /** @type {WeakMap<Document, CSSStyleSheet>} */
   const sheets = new WeakMap();
 
+  /** @param {Document} doc */
   function sheetFor(doc) {
     let sheet = sheets.get(doc);
     if (!sheet) {
@@ -32,6 +37,7 @@ export function shadowStyles(cssText) {
 
   return {
     cssText,
+    /** @param {ShadowRoot} root */
     adopt(root) {
       if ('adoptedStyleSheets' in root) {
         try {

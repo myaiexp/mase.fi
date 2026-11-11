@@ -5,6 +5,9 @@
 // match is reachable again. close() also resets so a fresh open starts clean.
 export const TYPEAHEAD_TIMEOUT_MS = 1000;
 
+/**
+ * @param {number} [timeoutMs]
+ */
 export function createLetterJump(timeoutMs = TYPEAHEAD_TIMEOUT_MS) {
   let lastKey = '';
   let cycleIdx = -1;
@@ -19,8 +22,15 @@ export function createLetterJump(timeoutMs = TYPEAHEAD_TIMEOUT_MS) {
   // Returns the highlight index into `labels` (the option labels, in menu
   // order), or -1 when nothing matches. `now` is injectable so tests can drive
   // the idle window without fake timers.
+  /**
+   * @param {string} letter
+   * @param {string[]} labels
+   * @param {number} [now]
+   * @returns {number}
+   */
   function jump(letter, labels, now = Date.now()) {
     const lower = letter.toLowerCase();
+    /** @type {number[]} */
     const matches = [];
     for (let i = 0; i < labels.length; i++) {
       if (labels[i].toLowerCase().startsWith(lower)) matches.push(i);

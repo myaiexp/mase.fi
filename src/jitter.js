@@ -5,6 +5,7 @@ import { prefersReducedMotion } from './motion.js';
 const JITTER_MS = 320;
 const STAGGER_MS = 38;
 
+/** @type {ReturnType<typeof setTimeout>[]} */
 let timers = [];
 
 /** Cancel all pending jitter timers (e.g. on channel switch or search). */
@@ -18,13 +19,17 @@ export function clearJitter() {
  *  animation ends. It is rebuilt rather than restored from a copy taken here: a
  *  copy would undo a resize relayout or a search highlight that reached the row
  *  mid-animation. */
+/**
+ * @param {{ row: HTMLElement }[]} rowEls
+ * @param {(row: HTMLElement) => void} settle
+ */
 export function playJitter(rowEls, settle) {
   if (prefersReducedMotion()) return;
   rowEls.forEach(({ row }, i) => {
-    const msgEl = row.querySelector('.msg');
-    const nickEl = row.querySelector('.nick');
-    const originalText = msgEl.textContent;
-    const originalNick = nickEl.textContent;
+    const msgEl = /** @type {HTMLElement} */ (row.querySelector('.msg'));
+    const nickEl = /** @type {HTMLElement} */ (row.querySelector('.nick'));
+    const originalText = /** @type {string} */ (msgEl.textContent);
+    const originalNick = /** @type {string} */ (nickEl.textContent);
     row.classList.add('jitter');
     row.classList.add('arriving');
     row.style.animationDelay = (i * STAGGER_MS) + 'ms';

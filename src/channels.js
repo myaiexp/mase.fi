@@ -1,4 +1,5 @@
 // Hash-routed navigation orchestrator + registry-facade
+/** @import { AppData } from './types.js' */
 import { entriesFor } from './data.js';
 import { getChannels, channelById, chHeat, chAccent, buildRegistry } from './registry.js';
 import { renderPinned, renderHeroLine } from './pinned.js';
@@ -12,16 +13,20 @@ import { setActiveChannel } from './sidebar.js';
 // the import graph acyclic: renderers → registry, orchestrator → renderers.
 export { getChannels, channelById, chHeat, chAccent };
 
+/** @type {string | null} */
 let currentId = null;
+/** @type {AppData | null} */
 let data = null;
 
+/** @returns {string | null} */
 export function getCurrentChannelId() {
   return currentId;
 }
 
+/** @param {string} id */
 function setTopicMeta(id) {
-  const msgs = entriesFor(id, data).length;
-  const meta = document.getElementById('topic-meta');
+  const msgs = entriesFor(id, /** @type {AppData} */ (data)).length;
+  const meta = /** @type {HTMLElement} */ (document.getElementById('topic-meta'));
   const countSpan = document.createElement('span');
   countSpan.textContent = msgs + ' msgs';
   const modeSpan = document.createElement('span');
@@ -46,6 +51,10 @@ function watchFeedArchive() {
   feed.addEventListener('feed:archive', onFeedArchive);
 }
 
+/**
+ * @param {string} id
+ * @param {{ fromHash?: boolean }} [opts]
+ */
 export function navigate(id, { fromHash = false } = {}) {
   const known = channelById(id);
   if (!known) id = 'home';
@@ -58,25 +67,26 @@ export function navigate(id, { fromHash = false } = {}) {
   currentId = id;
   if (!fromHash) location.hash = '#/' + id;
 
-  document.getElementById('pane').style.setProperty('--ch-accent', chAccent(id));
+  /** @type {HTMLElement} */ (document.getElementById('pane')).style.setProperty('--ch-accent', chAccent(id));
   setActiveChannel(id);
 
-  const c = channelById(id);
-  document.getElementById('topic-hash').textContent = '#' + c.name;
-  document.getElementById('topic-text').textContent = c.topic;
+  const c = /** @type {import('./types.js').Channel} */ (channelById(id));
+  /** @type {HTMLElement} */ (document.getElementById('topic-hash')).textContent = '#' + c.name;
+  /** @type {HTMLElement} */ (document.getElementById('topic-text')).textContent = c.topic;
   setTopicMeta(id);
+  const appData = /** @type {AppData} */ (data);
 
   // navigate is injected into renderFeed (rather than imported by feed.js) so
   // the feed's chip-click navigation doesn't create a feed → channels back-edge.
   if (prevId == null) {
-    renderHeroLine(id, data);
-    renderPinned(id, data);
-    renderFeed(id, data, { immediate: false, navigate });
+    renderHeroLine(id, appData);
+    renderPinned(id, appData);
+    renderFeed(id, appData, { immediate: false, navigate });
   } else {
     playSwitchTransition(() => {
-      renderHeroLine(id, data);
-      renderPinned(id, data);
-      renderFeed(id, data, { navigate });
+      renderHeroLine(id, appData);
+      renderPinned(id, appData);
+      renderFeed(id, appData, { navigate });
     });
   }
 }
@@ -85,7 +95,8 @@ function parseHash() {
   return (location.hash || '').replace(/^#\/?/, '') || 'home';
 }
 
-/** Build channel registry from data and wire hashchange. Caller drives the initial navigate. */
+/** Build channel registry from data and wire hashchange. Caller drives the initial navigate.
+ * @param {AppData} loadedData */
 export function initChannels(loadedData) {
   data = loadedData;
   buildRegistry(data);
@@ -102,6 +113,7 @@ export function applyInitialChannel() {
  * A demos manifest that lost the startup grace race. Writes the list onto the
  * live data object (later navigations read it) and refreshes the open channel's
  * hero card and hero line only when that channel actually gained a chip.
+ * @param {string[]} demos
  */
 export function applyLateDemos(demos) {
   if (!data || !Array.isArray(demos)) return;

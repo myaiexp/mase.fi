@@ -1,4 +1,5 @@
 // Data adapter: fetches updates.json and normalizes it to the shape the UI expects.
+/** @import { AppData, Entry, Project, RawEntry, RawProject, Stats } from './types.js' */
 import { projectLink } from './project-link.js';
 import { entryNow, parseEntryDate } from './dates.js';
 import { fetchDemos, raceTimeout, DEMOS_GRACE_MS } from './data-demos.js';
@@ -13,12 +14,14 @@ const DEMOS_UNREADY = Symbol('demos-unready');
 
 // The manifest races the grace window. A win is the slug list. A loss keeps the
 // still-running promise so the caller can apply it after first paint.
+/** @param {Promise<string[]>} demosPromise @returns {Promise<{ demos: string[], pendingDemos?: Promise<string[]> }>} */
 async function demosWithinGrace(demosPromise) {
   const raced = await raceTimeout(demosPromise, DEMOS_GRACE_MS, DEMOS_UNREADY);
   if (raced === DEMOS_UNREADY) return { demos: [], pendingDemos: demosPromise };
-  return { demos: raced };
+  return { demos: /** @type {string[]} */ (raced) };
 }
 
+/** @param {AppData} data @param {{ pendingDemos?: Promise<string[]> }} demoFields @returns {AppData} */
 function withPendingDemos(data, demoFields) {
   if (demoFields.pendingDemos) data.pendingDemos = demoFields.pendingDemos;
   return data;
@@ -26,6 +29,7 @@ function withPendingDemos(data, demoFields) {
 
 // The degraded shape, and the base the success path overrides — one literal so
 // the two fetchData branches cannot drift apart.
+/** @param {string[]} demos @returns {AppData} */
 function emptyData(demos) {
   return {
     meta: { server: 'irc.mase.fi', bootTime: Date.now() },
@@ -58,6 +62,7 @@ function emptyData(demos) {
  *  - demos: channel slugs with a published demo (from /demos/manifest.json via fetchDemos),
  *    always present (possibly []), so no consumer guards against its absence.
  *  - malformed rows (isRawEntry / isRawProject) are skipped and counted in one warning.
+ * @returns {Promise<AppData>}
  */
 export async function fetchData() {
   // fetchDemos never rejects (it degrades to []). Started now so it overlaps the
@@ -68,7 +73,8 @@ export async function fetchData() {
   // any bug thrown while normalizing: main.js awaits this without a catch, so an
   // escape would stall the app shell. Bad rows never reach it — they are skipped.
   try {
-    const raw = await fetchJson(SOURCE_URL);
+    // Untyped JSON; a null/non-object body throws below and lands in the catch.
+    const raw = /** @type {{ projects?: unknown, entries?: unknown, stats?: unknown }} */ (await fetchJson(SOURCE_URL));
 
     const projectRows = Array.isArray(raw.projects) ? raw.projects : [];
     const entryRows = Array.isArray(raw.entries) ? raw.entries : [];
@@ -98,21 +104,23 @@ export async function fetchData() {
   }
 }
 
+/** @param {unknown} raw @returns {Stats} */
 function normalizeStats(raw) {
   if (!raw || typeof raw !== 'object') return {};
+  const r = /** @type {Record<string, unknown>} */ (raw);
   // No Number() coercion: it maps null, '' and false to 0, and a 0 totalCommits
   // snapshot would win over counting the logs in memory.
-  const count = (v) => (Number.isFinite(v) ? v : undefined);
-  const countMap = (m) => (m && typeof m === 'object' ? m : undefined);
+  const count = (/** @type {unknown} */ v) => (Number.isFinite(v) ? /** @type {number} */ (v) : undefined);
+  const countMap = (/** @type {unknown} */ m) => (m && typeof m === 'object' ? /** @type {Record<string, number>} */ (m) : undefined);
   return {
-    totalCommits: count(raw.totalCommits),
-    totalEntries: count(raw.totalEntries),
-    archivedLogs: count(raw.archivedLogs),
-    logFirst: typeof raw.logFirst === 'string' ? raw.logFirst : undefined,
-    logLast: typeof raw.logLast === 'string' ? raw.logLast : undefined,
-    commitsByProject: countMap(raw.commitsByProject),
-    archivedByProject: countMap(raw.archivedByProject),
-    archive: raw.archive === true,
+    totalCommits: count(r.totalCommits),
+    totalEntries: count(r.totalEntries),
+    archivedLogs: count(r.archivedLogs),
+    logFirst: typeof r.logFirst === 'string' ? r.logFirst : undefined,
+    logLast: typeof r.logLast === 'string' ? r.logLast : undefined,
+    commitsByProject: countMap(r.commitsByProject),
+    archivedByProject: countMap(r.archivedByProject),
+    archive: r.archive === true,
   };
 }
 
@@ -123,6 +131,8 @@ function normalizeStats(raw) {
  * Only finite-dated, project-bearing log/feature entries contribute — the rows
  * the feed holds, so a feature row normalizeEntry dropped (no mapped project)
  * never sets the heat ceiling.
+ * @param {Entry[]} entries
+ * @returns {{ counts: Map<string, number>, lastActivity: Map<string, number> }}
  */
 function aggregateActivity(entries) {
   // On the entry-date axis (entryNow), so the 30-day edge sits where the stamps do.
@@ -146,6 +156,10 @@ function aggregateActivity(entries) {
  * Normalize raw projects into the UI shape: synthesize http(s)-only links,
  * compute 0..1 heat from last-30d counts, and sort most-recently-active first.
  * Pure over (rawProjects, counts, lastActivity).
+ * @param {RawProject[]} rawProjects
+ * @param {Map<string, number>} counts
+ * @param {Map<string, number>} lastActivity
+ * @returns {Project[]}
  */
 function normalizeProjects(rawProjects, counts, lastActivity) {
   // Reduce instead of spreading into Math.max: a large map would exceed the
@@ -157,6 +171,7 @@ function normalizeProjects(rawProjects, counts, lastActivity) {
   const projects = rawProjects.map((p) => {
     const slug = projectSlug(p);
     const heat = Math.min(1, (counts.get(slug) || 0) / maxCount);
+    /** @type {import('./types.js').ProjectLink[]} */
     const links = [];
     const link = projectLink(p.url);
     if (link) links.push(link);
@@ -183,11 +198,14 @@ function normalizeProjects(rawProjects, counts, lastActivity) {
  * own `channel`; the #activity firehose re-selects all `log` entries separately in
  * entriesFor(), so there's no duplication to strip here.
  * Pure over (rawEntries, slugToChannel).
+ * @param {RawEntry[]} rawEntries
+ * @param {Map<string, string>} slugToChannel
+ * @returns {Entry[]}
  */
 function normalizeEntries(rawEntries, slugToChannel) {
   return rawEntries
     .map((e) => normalizeEntry(e, slugToChannel))
-    .filter(Boolean)
+    .filter((e) => e !== null)
     .sort((a, b) => a.date.localeCompare(b.date));
 }
 
@@ -197,6 +215,9 @@ function normalizeEntries(rawEntries, slugToChannel) {
  * - activity → all log entries across projects (firehose)
  * - <slug>   → that project channel's non-log entries (daily + feature); its
  *              logs appear only in #activity
+ * @param {string} channelId
+ * @param {AppData} data
+ * @returns {Entry[]}
  */
 export function entriesFor(channelId, data) {
   if (channelId === 'home') {

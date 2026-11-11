@@ -10,6 +10,12 @@ export const FETCH_TIMEOUT_MS = 8000;
  * returns the Response as-is. Rejects on network error or timeout.
  * A plain setTimeout rather than AbortSignal.timeout: the latter runs on
  * engine-internal timers that test fake timers cannot advance.
+ *
+ * @param {string} url
+ * @param {RequestInit} [init]
+ * @param {number} [timeoutMs]
+ * @param {(r: Response) => unknown} [read] default hands back the Response itself
+ * @returns {Promise<unknown>}
  */
 export async function fetchWithTimeout(url, init = {}, timeoutMs = FETCH_TIMEOUT_MS, read = (r) => r) {
   const ctl = new AbortController();
@@ -26,6 +32,9 @@ export async function fetchWithTimeout(url, init = {}, timeoutMs = FETCH_TIMEOUT
  * non-2xx status, or an unparseable body. The status check matters: a 4xx/5xx
  * with a JSON error body (e.g. from a reverse proxy) would otherwise parse as
  * data and degrade silently instead of reaching the caller's failure path.
+ * @param {string} url
+ * @param {number} [timeoutMs]
+ * @returns {Promise<unknown>} untyped JSON: callers narrow it
  */
 export function fetchJson(url, timeoutMs = FETCH_TIMEOUT_MS) {
   return fetchWithTimeout(url, {}, timeoutMs, (r) => {

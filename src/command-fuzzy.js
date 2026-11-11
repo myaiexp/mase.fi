@@ -1,6 +1,11 @@
 // Subsequence fuzzy ranking + highlight for the "/" autocomplete
 import { escapeHtml } from './html.js';
 
+/**
+ * @param {string} str
+ * @param {string} q
+ * @returns {number}
+ */
 export function fuzzyScore(str, q) {
   if (q === '') return 1;
   str = str.toLowerCase();
@@ -18,6 +23,11 @@ export function fuzzyScore(str, q) {
   return score;
 }
 
+/**
+ * @param {string} str
+ * @param {string} q
+ * @returns {string}
+ */
 export function highlightFuzzy(str, q) {
   if (!q) return escapeHtml(str);
   let out = '', si = 0;

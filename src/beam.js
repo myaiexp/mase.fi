@@ -17,10 +17,12 @@ const FIRST_DELAY_MS = 1600;
 // Deliberate single-active-beam singleton: only one beam runs at a time. mountBeam
 // tears down the previous beam (calls activeCleanup) before mounting the next, so a
 // re-mount never leaves a second animation loop running. Not a multi-beam registry by design.
+/** @type {(() => void) | null} */
 let activeCleanup = null;
 
 // Per-span last painted state: { bucket, decayStep }. Keyed off the
 // span so the cache is GC'd with the element instead of polluting the DOM node.
+/** @type {WeakMap<Element, { bucket: number | undefined, decayStep: number | undefined }>} */
 const lastPaint = new WeakMap();
 
 function sampleScramble() {
@@ -30,6 +32,10 @@ function sampleScramble() {
 // Returns a destruction progress in [0,1] for a char at `charX` given beam center `beamX`.
 // 0 = pristine, 1 = ash. The slope models charge → peak → decay → ash.
 // Exported for unit testing — pure, deterministic, no DOM/animation dependency.
+/**
+ * @param {number} charX
+ * @param {number} beamX
+ */
 export function destructionAt(charX, beamX) {
   const d = beamX - charX;
   if (d < -CHARGE_R)            return 0;
@@ -41,8 +47,14 @@ export function destructionAt(charX, beamX) {
 
 // Exported for unit testing — the lastPaint cache is the cheap invariant worth
 // pinning (same-bucket dest must not rewrite textContent).
+/**
+ * @param {HTMLElement} span
+ * @param {string} original
+ * @param {number} dest
+ */
 export function paintChar(span, original, dest) {
   // Bucket the destruction value so we only mutate textContent when state changes.
+  /** @type {number} */
   let bucket;
   if (dest < 0.08)       bucket = 0; // pristine
   else if (dest < 0.40)  bucket = 1; // charging (scramble, golden)
@@ -89,6 +101,10 @@ export function paintChar(span, original, dest) {
 
 // The logo's monospace grid and its pixel size, or null when the host cannot be
 // measured.
+/**
+ * @param {HTMLElement} asciiEl
+ * @param {string} logoText
+ */
 function measureCharGrid(asciiEl, logoText) {
   // Skip on hidden hosts (e.g. mobile `.pin-grid > .ascii { display: none }`)
   // — measuring 0×0 produces a NaN beam track.
@@ -109,13 +125,18 @@ function measureCharGrid(asciiEl, logoText) {
 }
 
 // Replace the host's text with one absolutely placed span per glyph + the beam.
+/**
+ * @param {HTMLElement} asciiEl
+ * @param {{ rows: string[], charWidth: number, lineHeight: number, width: number, height: number }} grid
+ */
 function buildBeamDom(asciiEl, { rows, charWidth, lineHeight, width, height }) {
   asciiEl.classList.add('beam-host');
   asciiEl.style.width = width + 'px';
   asciiEl.style.height = height + 'px';
   asciiEl.textContent = '';
 
-  const chars = []; // {el, original, x}
+  /** @type {{ el: HTMLElement, original: string, x: number }[]} */
+  const chars = [];
   for (let r = 0; r < rows.length; r++) {
     const text = rows[r];
     for (let c = 0; c < text.length; c++) {
@@ -136,7 +157,12 @@ function buildBeamDom(asciiEl, { rows, charWidth, lineHeight, width, height }) {
   return { chars, beam };
 }
 
-/** Mount the beam effect over an `.ascii` element. Returns a cleanup fn. */
+/**
+ * Mount the beam effect over an `.ascii` element. Returns a cleanup fn.
+ * @param {HTMLElement} asciiEl
+ * @param {string} logoText
+ * @returns {(() => void) | null}
+ */
 export function mountBeam(asciiEl, logoText) {
   if (activeCleanup) activeCleanup();
 
@@ -153,14 +179,23 @@ export function mountBeam(asciiEl, logoText) {
   const X1 = grid.width + BEAM_R + DECAY_R;
 
   let raf = 0;
+  /** @type {ReturnType<typeof setTimeout> | 0} */
   let nextPhaseTimer = 0;
   const listeners = new AbortController();
 
+  /**
+   * @param {number} x
+   * @param {number} intensity
+   */
   function placeBeam(x, intensity) {
     beam.style.transform = `translateX(${x}px)`;
     beam.style.opacity = String(intensity);
   }
 
+  /**
+   * @param {number} beamX
+   * @param {boolean} reform
+   */
   function paintAll(beamX, reform) {
     for (const c of chars) {
       const d = reform ? 1 - destructionAt(c.x, beamX) : destructionAt(c.x, beamX);
@@ -188,6 +223,7 @@ export function mountBeam(asciiEl, logoText) {
     activeCleanup = null;
   }
 
+  /** @param {'sweep' | 'reform'} phase */
   function play(phase) {
     // Detached host: #pinned was replaced without unmountBeam. Tear the
     // rAF/timeout chain down so we don't keep painting into dead nodes.
@@ -197,6 +233,7 @@ export function mountBeam(asciiEl, logoText) {
     }
     const t0 = performance.now();
     const dur = phase === 'sweep' ? SWEEP_MS : REFORM_MS;
+    /** @param {number} now */
     function step(now) {
       if (!asciiEl.isConnected) {
         cleanup();

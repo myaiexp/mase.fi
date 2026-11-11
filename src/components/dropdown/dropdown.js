@@ -3,90 +3,12 @@
 import { addOverlayListeners, removeOverlayListeners } from '../shared/overlay-utils.js';
 import { applyMenuFlip } from '../shared/menu-flip.js';
 import { wrapIndex } from '../shared/menu-nav.js';
-import { MENU_DISABLED_CSS, MENU_DIVIDER_CSS, MENU_ITEM_CSS, MENU_SURFACE_CSS } from '../shared/menu-styles.js';
+import { MENU_SURFACE_CSS } from '../shared/menu-styles.js';
 import { mountShadow } from '../shared/mount-shadow.js';
 import { shadowStyles } from '../shared/shadow-styles.js';
+import './dropdown-item.js';
 
-// ─── base-dropdown-item ──────────────────────────────────────────────────────
-
-const itemStyles = shadowStyles(`
-  :host {
-    display: block;
-    outline: none;
-  }
-  span {${MENU_ITEM_CSS}
-  }
-  span.danger {
-    color: var(--red, #ef4444);
-  }
-  span.disabled {${MENU_DISABLED_CSS}
-  }
-  :host(:focus) span:not(.disabled),
-  span:not(.disabled):hover {
-    background: var(--bg-hover, #27272a);
-  }
-`);
-
-const itemTemplate = document.createElement('template');
-itemTemplate.innerHTML = '<span><slot></slot></span>';
-
-class BaseDropdownItem extends HTMLElement {
-  static observedAttributes = ['variant', 'disabled'];
-
-  #span = null;
-
-  constructor() {
-    super();
-    mountShadow(this, itemStyles, itemTemplate);
-    this.#span = this.shadowRoot.querySelector('span');
-  }
-
-  connectedCallback() {
-    this.setAttribute('tabindex', '-1');
-    this.#syncClasses();
-  }
-
-  attributeChangedCallback() {
-    this.#syncClasses();
-  }
-
-  #syncClasses() {
-    const variant = this.getAttribute('variant');
-    const disabled = this.hasAttribute('disabled');
-    this.#span.classList.toggle('danger', variant === 'danger');
-    this.#span.classList.toggle('disabled', disabled);
-  }
-
-  get disabled() {
-    return this.hasAttribute('disabled');
-  }
-
-  get value() {
-    return this.getAttribute('value') ?? '';
-  }
-}
-
-customElements.define('base-dropdown-item', BaseDropdownItem);
-
-// ─── base-dropdown-divider ───────────────────────────────────────────────────
-
-const dividerStyles = shadowStyles(`
-  :host { display: block; }
-  hr {${MENU_DIVIDER_CSS}
-  }
-`);
-
-const dividerTemplate = document.createElement('template');
-dividerTemplate.innerHTML = '<hr>';
-
-class BaseDropdownDivider extends HTMLElement {
-  constructor() {
-    super();
-    mountShadow(this, dividerStyles, dividerTemplate);
-  }
-}
-
-customElements.define('base-dropdown-divider', BaseDropdownDivider);
+/** @typedef {import('./dropdown-item.js').BaseDropdownItem} BaseDropdownItem */
 
 // ─── base-dropdown ───────────────────────────────────────────────────────────
 
@@ -127,16 +49,21 @@ class BaseDropdown extends HTMLElement {
   // element avoids stamping a bookkeeping flag onto the public DOM node (which
   // would survive detach/reattach and leak into the element's namespace) and
   // lets GC reclaim removed items.
+  /** @type {WeakSet<BaseDropdownItem>} */
   #boundItems = new WeakSet();
-  #menu = null;
+  /** @type {HTMLElement} */
+  #menu;
+  /** @type {MutationObserver | null} */
   #observer = null;
+  /** @type {Element | null} */
   #trigger = null;
+  /** @type {((e: Event) => void) | null} */
   #onTriggerClick = null;
 
   constructor() {
     super();
     mountShadow(this, dropdownStyles, dropdownTemplate);
-    this.#menu = this.shadowRoot.querySelector('[part="menu"]');
+    this.#menu = /** @type {HTMLElement} */ (/** @type {ShadowRoot} */ (this.shadowRoot).querySelector('[part="menu"]'));
   }
 
   connectedCallback() {
@@ -162,13 +89,13 @@ class BaseDropdown extends HTMLElement {
   #bindTrigger() {
     const trigger = this.querySelector('[slot="trigger"]');
     if (trigger && trigger !== this.#trigger) {
-      this.#trigger?.removeEventListener('click', this.#onTriggerClick);
+      this.#trigger?.removeEventListener('click', /** @type {EventListener} */ (this.#onTriggerClick));
       this.#trigger = trigger;
       this.#onTriggerClick = (e) => {
         e.stopPropagation();
         this.isOpen ? this.close() : this.open();
       };
-      this.#trigger.addEventListener('click', this.#onTriggerClick);
+      trigger.addEventListener('click', this.#onTriggerClick);
     }
   }
 
@@ -178,15 +105,17 @@ class BaseDropdown extends HTMLElement {
       if (!this.#boundItems.has(item)) {
         this.#boundItems.add(item);
         item.addEventListener('click', () => this.#selectItem(item));
-        item.addEventListener('keydown', (e) => this.#onItemKeydown(e, item));
+        item.addEventListener('keydown', (e) => this.#onItemKeydown(/** @type {KeyboardEvent} */ (e), item));
       }
     }
   }
 
+  /** @returns {BaseDropdownItem[]} */
   #items() {
-    return [...this.querySelectorAll('base-dropdown-item')];
+    return [.../** @type {NodeListOf<BaseDropdownItem>} */ (this.querySelectorAll('base-dropdown-item'))];
   }
 
+  /** @param {BaseDropdownItem} item */
   #selectItem(item) {
     if (item.disabled) return;
     this.dispatchEvent(new CustomEvent('select', {
@@ -196,6 +125,10 @@ class BaseDropdown extends HTMLElement {
     this.close();
   }
 
+  /**
+   * @param {KeyboardEvent} e
+   * @param {BaseDropdownItem} item
+   */
   #onItemKeydown(e, item) {
     // Tab moves focus to the next real tab stop. Close without preventDefault so
     // that move still happens; leaving the menu open paints it over the page.
@@ -234,7 +167,7 @@ class BaseDropdown extends HTMLElement {
     const first = this.#items().find(i => !i.disabled);
     first?.focus();
 
-    addOverlayListeners(this, (e) => !this.contains(e.target));
+    addOverlayListeners(this, (e) => !this.contains(/** @type {Node} */ (e.target)));
   }
 
   close() {

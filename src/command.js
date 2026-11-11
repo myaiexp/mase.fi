@@ -6,15 +6,30 @@ import { buildCommands } from './slash-commands.js';
 import { applySearch } from './command-search.js';
 import { noticeLine } from './sys-notice.js';
 import { createAutocomplete } from './command-complete.js';
+/** @import { AppData } from './types.js' */
+/** @import { Command, Match } from './command-complete.js' */
 
 // Module state — everything below is set by initCommand, except searchTerm.
-let data = null;
+/** @type {AppData} */
+let data;
+/** @type {Command[]} */
 let commands = [];
-let autocomplete = null;
+/** @type {ReturnType<typeof createAutocomplete>} */
+let autocomplete;
 let searchTerm = '';
-let $cmd, $cmdInput, $cmdPrompt, $cmdHint, $feed;
+/** @type {HTMLElement} */
+let $cmd;
+/** @type {HTMLInputElement} */
+let $cmdInput;
+/** @type {HTMLElement} */
+let $cmdPrompt;
+/** @type {HTMLElement} */
+let $cmdHint;
+/** @type {HTMLElement} */
+let $feed;
 
 // Run a feed search and remember the term so feed:relayout can re-apply it.
+/** @param {string} term */
 function search(term) {
   searchTerm = term.toLowerCase();
   return applySearch($feed, searchTerm);
@@ -55,6 +70,7 @@ function updateMode() {
   }
 }
 
+/** @param {Match} m */
 function onChooseMatch(m) {
   if (m.kind === 'cmd') { runCommand(m.cmd); return; }
   $cmdInput.value = '';
@@ -65,6 +81,7 @@ function onChooseMatch(m) {
 
 // Append ephemeral IRC-style server-notice line(s) to the feed; the next
 // channel render wipes them via replaceChildren.
+/** @param {string | string[] | null | undefined} lines */
 function notice(lines) {
   const arr = Array.isArray(lines) ? lines : [lines];
   for (const text of arr) {
@@ -79,6 +96,7 @@ function clearNotices() {
 }
 
 // Run a slash-command: print its returned line(s) as notices, then reset input.
+/** @param {Command} cmd */
 function runCommand(cmd) {
   const out = cmd.run();
   if (out != null) notice(out);
@@ -90,32 +108,36 @@ function runCommand(cmd) {
 // Relative label ('3m'/'2h'/'1d') for the autocomplete's last-seen column.
 // Not project.lastActivity (an epoch-ms timestamp used for recency sort) —
 // this walks entriesFor, which for project channels also excludes log entries.
+/** @param {string} id */
 function formatRelativeActivity(id) {
   const es = entriesFor(id, data);
   if (!es.length) return '—';
   const t = parseEntryDate(es[es.length - 1].date);
-  const mins = Math.max(0, Math.round((entryNow() - t) / 60000));
+  const mins = Math.max(0, Math.round((entryNow() - t.getTime()) / 60000));
   if (mins < 60) return mins + 'm';
   if (mins < 1440) return Math.round(mins / 60) + 'h';
   return Math.round(mins / 1440) + 'd';
 }
 
-/** Wire the command input with mode switching, autocomplete popup, search, and global shortcuts. */
+/**
+ * Wire the command input with mode switching, autocomplete popup, search, and global shortcuts.
+ * @param {AppData} loadedData
+ */
 export function initCommand(loadedData) {
   data = loadedData;
 
-  $cmd       = document.getElementById('cmd');
-  $cmdInput  = document.getElementById('cmd-input');
-  $cmdPrompt = document.getElementById('cmd-prompt');
-  $cmdHint   = document.getElementById('cmd-hint');
-  $feed      = document.getElementById('feed');
+  $cmd       = /** @type {HTMLElement} */ (document.getElementById('cmd'));
+  $cmdInput  = /** @type {HTMLInputElement} */ (document.getElementById('cmd-input'));
+  $cmdPrompt = /** @type {HTMLElement} */ (document.getElementById('cmd-prompt'));
+  $cmdHint   = /** @type {HTMLElement} */ (document.getElementById('cmd-hint'));
+  $feed      = /** @type {HTMLElement} */ (document.getElementById('feed'));
 
   autocomplete = createAutocomplete({
     getCommands: () => commands,
     formatRelativeActivity,
     onChoose: onChooseMatch,
   });
-  autocomplete.bind($cmdInput, document.getElementById('cmd-complete'));
+  autocomplete.bind($cmdInput, /** @type {HTMLElement} */ (document.getElementById('cmd-complete')));
 
   // Build the slash-command registry, wiring the side-effect hooks commands
   // need (search reset + notice teardown) without slash-commands.js touching the DOM.
@@ -160,7 +182,9 @@ export function initCommand(loadedData) {
   // Global: "/" to focus, "?" for help, "g h" / "g a" quick jumps.
   // One timer owns the g window. Re-arming g or resolving the chord clears it,
   // so an earlier timeout cannot null `leader` inside a later window.
+  /** @type {string | null} */
   let leader = null;
+  /** @type {ReturnType<typeof setTimeout> | 0} */
   let leaderTimer = 0;
   const clearLeader = () => {
     leader = null;

@@ -10,15 +10,25 @@
 // .cc-head / .cc-desc CSS vocabulary. cc-opt-N ids the Nth option row.
 const OPTION_ID_PREFIX = 'cc-opt-';
 
+/** @param {number} i */
 export const optionId = (i) => `${OPTION_ID_PREFIX}${i}`;
 
 // Attributes for one selectable row, spliced into the .cc-item template string.
+/**
+ * @param {number} i
+ * @param {boolean} selected
+ */
 export function optionAttrs(i, selected) {
   return `role="option" id="${optionId(i)}" aria-selected="${selected ? 'true' : 'false'}"`;
 }
 
 // Slash mode: mark the popup a listbox and point the input's combobox
 // relationship at the option `activeIdx`.
+/**
+ * @param {HTMLElement} $input
+ * @param {HTMLElement} $cc
+ * @param {number} activeIdx
+ */
 export function markListbox($input, $cc, activeIdx) {
   $cc.setAttribute('role', 'listbox');
   $cc.setAttribute('aria-label', 'Channel and command matches');
@@ -28,6 +38,11 @@ export function markListbox($input, $cc, activeIdx) {
 
 // Move the active option without re-rendering: reflect aria-selected on the rows
 // and aria-activedescendant on the input (used by the mouseenter hover path).
+/**
+ * @param {HTMLElement} $input
+ * @param {HTMLElement} $cc
+ * @param {number} activeIdx
+ */
 export function setActive($input, $cc, activeIdx) {
   $cc.querySelectorAll('[role="option"]').forEach((el, i) => {
     el.setAttribute('aria-selected', i === activeIdx ? 'true' : 'false');
@@ -38,6 +53,10 @@ export function setActive($input, $cc, activeIdx) {
 
 // Help mode: informational rows, not a listbox. Keep aria-expanded (a popup is
 // visible) but drop the listbox role and any active descendant.
+/**
+ * @param {HTMLElement} $input
+ * @param {HTMLElement} $cc
+ */
 export function markHelp($input, $cc) {
   $cc.setAttribute('role', 'note');
   $cc.removeAttribute('aria-label');
@@ -46,6 +65,10 @@ export function markHelp($input, $cc) {
 }
 
 // Popup hidden: collapse the combobox and clear the popup's role.
+/**
+ * @param {HTMLElement} $input
+ * @param {HTMLElement} $cc
+ */
 export function collapseCombobox($input, $cc) {
   $input.setAttribute('aria-expanded', 'false');
   $input.removeAttribute('aria-activedescendant');

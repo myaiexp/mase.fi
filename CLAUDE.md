@@ -43,11 +43,13 @@ Shared web components library built from `src/components/` via Vite library mode
 - **Build:** `pnpm build:components` → `dist/base-components.js` (IIFE)
 - **URL:** `https://mase.fi/base-components.js`
 - Full per-component API (props, attrs, behavior): `docs/base-components.md`
+- **base.css source:** `src/base.css` is an `@import` index of the section partials in `src/base/*.css`; the build inlines them into one byte-stable `dist/base.css` (`scripts/build-base-css.js`). Edit a partial, never the published file. Details: `docs/shared-assets.md` § Source layout
 - **Cross-origin caching:** `base.css`, `base-components.js`, and `/fonts/` are served with a status-gated Cache-Control map (`$shared_cc`), and consumers link the CSS and JS unversioned and never `cacheFirst` them. Contract: `docs/shared-assets.md`
 
 ## Deploy
 
-- Run `deploy` — pushes to the Forgejo `origin`, which fires a post-receive hook → `sudo forgejo-deploy mase.fi`.
+- Default branch is `master` (renamed from `main` 2026-11-11, on Forgejo and the `github` mirror). Run `deploy` — pushes to the Forgejo `origin` and `github`, which fires a post-receive hook → `sudo forgejo-deploy mase.fi`.
 - Server-side build (`/usr/local/bin/forgejo-deploy`, `mase.fi` case): checks out to `/var/www/homepage-build`, runs `CI=true pnpm install --frozen-lockfile && pnpm run build` (build-lock-wrapped, includes `build:components`) as user `mase`, then copies `dist/.` → `/var/www/html` (chowned to www-data). Build failure aborts before the copy, so a broken build can't ship a stale/empty webroot.
 - **build-lock:** package.json's `build` and `build:components` scripts already wrap vite in `build-lock`. Do **not** double-prefix (e.g. `build-lock pnpm run build`) — invoke as plain `pnpm run build`.
-- **Local / worktree:** `pnpm install` then `pnpm dev` (Vite). The app fetches `/updates.json`; drop a gitignored fixture at `public/updates.json` (`{"entries":[…],"projects":[…]}`) or the shell renders empty with a load-failure notice (404 → `projects: [], entries: [], loadFailed: true`). Gates: `pnpm lint`, `pnpm test`, and `pnpm test:coverage`, which fails below the floor in `vitest.config.js`.
+- **Local / worktree:** `pnpm install` then `pnpm dev` (Vite). The app fetches `/updates.json`; drop a gitignored fixture at `public/updates.json` (`{"entries":[…],"projects":[…]}`) or the shell renders empty with a load-failure notice (404 → `projects: [], entries: [], loadFailed: true`). Gates: `pnpm typecheck`, `pnpm lint`, `pnpm test`, and `pnpm test:coverage`, which fails below the floor in `vitest.config.js`.
+- **Types:** plain JS checked as strict TypeScript (`tsconfig.json`: `allowJs` + `checkJs` + `strict`, `pnpm typecheck`, which `deploy` also runs on the landed tree). Annotate with JSDoc; shared data shapes live in `src/types.d.ts` (`/** @import { Entry } from './types.js' */`). No `@ts-ignore` / `@ts-expect-error`.

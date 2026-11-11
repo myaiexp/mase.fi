@@ -3,6 +3,12 @@
 // so the ladder is unit-testable.
 import { sameOriginPath } from './same-origin.js';
 
+/** @typedef {{ href: string, label: string, caption: string, keys: string[], kind: 'path' | 'subdomain', extra?: boolean }} Route */
+/** @typedef {{ route: Route, distance: number }} Candidate */
+/** @typedef {{ target: string, targetLabel: string, targetCaption?: string }} Suggestion */
+/** @typedef {Suggestion & { state: 'confident', diff: boolean, tail?: string }} ConfidentPlan */
+/** @typedef {ConfidentPlan | { state: 'fuzzy', candidates: Candidate[] } | { state: 'none' }} Plan */
+
 // Top-level webroot dirs that are real destinations but not showcase projects,
 // so updates.json never lists them. Verify against /var/www/html when touching.
 // buildRoutes derives each one's label (the shown route) and key from href.
@@ -18,6 +24,7 @@ const JUNK_MAX_LEN = 120;
 const JUNK_PATTERNS = [/wp-/i, /\.php\b/i, /\.env\b/i, /%2f/i, /\.asp\b/i, /\.cgi\b/i];
 
 // Query/hash dropped, duplicate and trailing slashes collapsed: '/a//b/' -> '/a/b'.
+/** @param {unknown} pathname @returns {string} */
 function cleanPath(pathname) {
   return String(pathname || '').split(/[?#]/)[0].replace(/\/+/g, '/').replace(/\/$/, '');
 }
@@ -25,6 +32,7 @@ function cleanPath(pathname) {
 // Longest-first parent paths deeper than root: '/a/b/c' -> ['/a/b', '/a'].
 // The typed path itself is excluded (it just 404'd) and so is '/' (root always
 // exists — that is the state-3 fallback, never a "confident match").
+/** @param {unknown} pathname @param {number} [cap] @returns {string[]} */
 export function parentPrefixes(pathname, cap = 5) {
   const segs = cleanPath(pathname).split('/').filter(Boolean);
   const out = [];
@@ -35,6 +43,7 @@ export function parentPrefixes(pathname, cap = 5) {
 }
 
 // Scanner/junk traffic gets no matching effort: straight to state 3.
+/** @param {unknown} pathname @returns {boolean} */
 export function isJunkPath(pathname) {
   const p = String(pathname || '');
   if (p.length > JUNK_MAX_LEN) return true;
@@ -47,8 +56,12 @@ export function isJunkPath(pathname) {
 // mase.fi-path urls become path routes; other hosts become subdomain routes
 // (the "moved" case — typing the app's old mase.fi path should point at its
 // new home). Bad/missing urls are skipped, never thrown on.
+/** @param {unknown} updates untyped updates.json @returns {Route[]} */
 export function buildRoutes(updates) {
-  const projects = Array.isArray(updates?.projects) ? updates.projects : [];
+  const projectRows = /** @type {{ projects?: unknown } | null | undefined} */ (updates)?.projects;
+  /** @type {{ url?: unknown, name?: string, slug?: string, desc?: unknown, channel?: string }[]} */
+  const projects = Array.isArray(projectRows) ? projectRows : [];
+  /** @type {Route[]} */
   const routes = [];
   for (const p of projects) {
     if (typeof p?.url !== 'string') continue;
@@ -77,6 +90,7 @@ export function buildRoutes(updates) {
   return routes;
 }
 
+/** @param {string} a @param {string} b @returns {number} */
 export function levenshtein(a, b) {
   if (a === b) return 0;
   if (!a.length) return b.length;
@@ -99,11 +113,13 @@ export function levenshtein(a, b) {
 // prefix has failed its probe, so a route at any of those paths is known dead:
 // suggesting it would redirect back into this page every 5s (`/demos/` with
 // no index.html matches the `/demos` route at distance 0).
+/** @param {unknown} pathname @param {Route[]} routes @returns {Candidate[]} */
 export function fuzzyCandidates(pathname, routes) {
   const seg = String(pathname || '').split('/').filter(Boolean)[0]?.toLowerCase();
   if (!seg) return [];
   const dead = new Set([cleanPath(pathname), ...parentPrefixes(pathname)]);
   const maxD = Math.min(4, Math.floor(seg.length / 2));
+  /** @type {Candidate[]} */
   const scored = [];
   for (const r of routes) {
     if (r.kind === 'path' && dead.has(cleanPath(r.href))) continue;
@@ -118,6 +134,10 @@ export function fuzzyCandidates(pathname, routes) {
 // The decision ladder. A surviving parent prefix always wins (confident, with
 // diff rendering). A near-exact fuzzy hit (d ≤ 2) with a clear margin over the
 // runner-up auto-redirects too; anything weaker renders as a pick-list.
+/**
+ * @param {{ prefixHit: { href: string, label: string, caption: string } | null, candidates: Candidate[] | null, path: string }} input
+ * @returns {Plan}
+ */
 export function decide({ prefixHit, candidates, path }) {
   if (prefixHit) {
     return { state: 'confident', target: prefixHit.href, targetLabel: prefixHit.label, targetCaption: prefixHit.caption, tail: path.slice(prefixHit.href.length), diff: true };
@@ -140,6 +160,7 @@ export function decide({ prefixHit, candidates, path }) {
   return { state: 'none' };
 }
 
+/** @param {Candidate} cand @returns {string} */
 export function reasonFor(cand) {
   if (cand.route.kind === 'subdomain') return 'moved';
   if (cand.distance === 0) return 'exact';
@@ -154,6 +175,7 @@ export function reasonFor(cand) {
 // scheme-relative, backslash, javascript:, foreign hosts, `mase.fi.evil.com` —
 // is refused. The host check has to skip this origin: in production its hostname
 // is mase.fi, so it would otherwise re-admit whatever sameOriginPath refused.
+/** @param {unknown} target @param {string} origin @returns {boolean} */
 export function isSafeRedirect(target, origin) {
   if (typeof target !== 'string') return false;
   if (sameOriginPath(target, origin) !== null) return true;

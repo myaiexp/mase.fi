@@ -4,9 +4,12 @@ import { logStats, commitsForProject } from './log-stats.js';
 import { dayOf, timeOf } from './dates.js';
 import { mountBeam, unmountBeam } from './beam.js';
 import { escapeHtml } from './html.js';
+/** @import { AppData, Project, ProjectLink } from './types.js' */
+/** @typedef {[string, string, string?]} PinRow */
 
 // heat → status business rule. Single source for the >0.6 / >0.3 breakpoints so
 // the desktop hero card and the mobile hero line can't silently diverge.
+/** @param {number} heat */
 function heatStatus(heat) {
   if (heat > 0.6) return { cardBadge: '● shipping', cardLine: 'actively shipping', mobileLabel: 'shipping' };
   if (heat > 0.3) return { cardBadge: '● steady', cardLine: 'steady', mobileLabel: 'steady' };
@@ -17,6 +20,11 @@ function heatStatus(heat) {
 // Single source for the /demos/ URL shape. `demos` is the canonical always-present
 // slug list from fetchData (never undefined). Returns '' when there's no demo;
 // `arrow` appends the → glyph (desktop card only).
+/**
+ * @param {string} channel
+ * @param {string[]} demos
+ * @param {{arrow?: boolean}} [opts]
+ */
 function demoLinkHtml(channel, demos, { arrow = false } = {}) {
   if (!demos.includes(channel)) return '';
   return '<a class="demo-link" href="/demos/' + escapeHtml(channel) + '/">try demo' +
@@ -25,6 +33,7 @@ function demoLinkHtml(channel, demos, { arrow = false } = {}) {
 
 // One {label, href} link as an anchor — the card's links row and the hero line
 // both render project and home links through it.
+/** @param {ProjectLink} l */
 function linkHtml(l) {
   return '<a href="' + escapeHtml(l.href) + '">' + escapeHtml(l.label) + '</a>';
 }
@@ -36,10 +45,18 @@ const HOME_LINKS = [
 ];
 
 // The project behind a channel id, or undefined for home/activity/unknown ids.
+/**
+ * @param {string} id
+ * @param {AppData} data
+ */
 function projectFor(id, data) {
   return data.projects.find(p => p.channel === id);
 }
 
+/**
+ * @param {Array<[string, string]>} meta
+ * @param {string} [right]
+ */
 export function cardHead(meta, right) {
   const chips = meta
     .map(([k, v]) => '<span class="ch-meta"><i>' + escapeHtml(k) + '</i><b>' + escapeHtml(v) + '</b></span>')
@@ -53,6 +70,9 @@ export function cardHead(meta, right) {
 // Shared pinned-card skeleton. `rows` are [dt, ddHtml, ddClass?] — ddHtml is
 // already escaped at the call site; ddClass is required for CSS that targets
 // `dd.accent` / `dd.links` (colour + flex gap), not a descendant.
+/**
+ * @param {{meta: Array<[string, string]>, right: string, art: string, tagline: string, rows: PinRow[]}} card
+ */
 function pinCard({ meta, right, art, tagline, rows }) {
   const dl = rows.map(([dt, ddHtml, ddClass]) => {
     const cls = ddClass ? ' class="' + escapeHtml(ddClass) + '"' : '';
@@ -68,6 +88,7 @@ function pinCard({ meta, right, art, tagline, rows }) {
     '</div></div></div>';
 }
 
+/** @param {AppData} data */
 function pinnedHome(data) {
   const { totalCommits, buckets, last, logRange } = logStats(data, 28);
   // The channel's age is when its log starts (YYYY-MM of the #activity range).
@@ -95,8 +116,12 @@ function pinnedHome(data) {
   });
 }
 
+/**
+ * @param {Project} p
+ * @param {AppData} data
+ */
 function pinnedProject(p, data) {
-  const art = PROJECT_ART[p.channel] || '';
+  const art = /** @type {Record<string, string>} */ (PROJECT_ART)[p.channel] || '';
   const commits = commitsForProject(p, data);
   const status = heatStatus(p.heat);
   const demoLink = demoLinkHtml(p.channel, data.demos, { arrow: true });
@@ -116,6 +141,7 @@ function pinnedProject(p, data) {
 
 // The #activity stream art: one row per category, bars decorative, the box
 // widened to the widest count so the right border stays aligned.
+/** @param {Record<string, number>} counts */
 function streamArt(counts) {
   const rows = [['log', '▇▇▇▇▇▇▇▇▇'], ['feature', '▇▇▇'], ['daily', '▇▇▇▇▇']]
     .map(([cat, bar]) => [cat, bar, String(counts[cat] || 0)]);
@@ -128,6 +154,7 @@ function streamArt(counts) {
   ].join('\n');
 }
 
+/** @param {AppData} data */
 function pinnedActivity(data) {
   const { counts, totalEntries, buckets: recent, logRange } = logStats(data, 28);
   const range = logRange ? escapeHtml(logRange.from) + ' → ' + escapeHtml(logRange.to) : '—';
@@ -152,14 +179,22 @@ function pinnedActivity(data) {
   });
 }
 
-/** Replace #hero-line content with a mobile-only quick-access row. */
+/**
+ * Replace #hero-line content with a mobile-only quick-access row.
+ * @param {string} id
+ * @param {AppData} data
+ */
 export function renderHeroLine(id, data) {
   // activity and unmatched channels: empty string — CSS :empty hides the element
-  document.getElementById('hero-line').innerHTML = heroLineHtml(id, data);
+  /** @type {HTMLElement} */ (document.getElementById('hero-line')).innerHTML = heroLineHtml(id, data);
 }
 
 // The arrow, then the present parts joined by a · separator. '' when the channel
 // has no hero line (activity, unmatched ids).
+/**
+ * @param {string} id
+ * @param {AppData} data
+ */
 function heroLineHtml(id, data) {
   let parts;
   if (id === 'home') {
@@ -177,7 +212,11 @@ function heroLineHtml(id, data) {
   return '<span class="arr">→</span> ' + parts.join(' <span class="sep">\xb7</span> ');
 }
 
-/** Replace #pinned content with the channel-appropriate card. */
+/**
+ * Replace #pinned content with the channel-appropriate card.
+ * @param {string} id
+ * @param {AppData} data
+ */
 export function renderPinned(id, data) {
   let html = '';
   if (id === 'home') html = pinnedHome(data);
@@ -187,7 +226,7 @@ export function renderPinned(id, data) {
     if (project) html = pinnedProject(project, data);
   }
   // html is built from escapeHtml-sanitized data; static markup only elsewhere
-  const pinnedEl = document.getElementById('pinned');
+  const pinnedEl = /** @type {HTMLElement} */ (document.getElementById('pinned'));
   // Tear down the home-channel beam *before* replacing markup — mountBeam only
   // runs its previous cleanup on the next mount, which never happens if we
   // leave #home. Home remounts immediately after this.
@@ -197,7 +236,7 @@ export function renderPinned(id, data) {
   // beam destruction effect. `mountBeam` no-ops on reduced-motion / hidden hosts
   // and self-cleans the previous mount via its activeCleanup tracking.
   if (id === 'home') {
-    const asciiEl = pinnedEl.querySelector('.ascii');
+    const asciiEl = /** @type {HTMLElement | null} */ (pinnedEl.querySelector('.ascii'));
     if (asciiEl) mountBeam(asciiEl, LOGO);
   }
 }

@@ -10,15 +10,20 @@
 // Deriving the list from the prototype means a new public setter is covered
 // without anyone remembering to register it.
 
+/**
+ * @param {HTMLElement} el
+ */
 export function upgradeProperties(el) {
   for (const name of setterNames(el)) {
     if (!Object.prototype.hasOwnProperty.call(el, name)) continue;
-    const value = el[name];
-    delete el[name];
-    el[name] = value;
+    const target = /** @type {Record<string, unknown>} */ (/** @type {unknown} */ (el));
+    const value = target[name];
+    delete target[name];
+    target[name] = value;
   }
 }
 
+/** @param {HTMLElement} el */
 function setterNames(el) {
   const names = new Set();
   for (

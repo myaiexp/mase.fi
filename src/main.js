@@ -26,7 +26,7 @@ async function init() {
 
 if (shouldSkipBoot(reduced)) {
   if (reduced) writeBootStamp();
-  document.getElementById('app').hidden = false;
+  /** @type {HTMLElement} */ (document.getElementById('app')).hidden = false;
   document.getElementById('boot')?.remove();
   init();
 } else {
