@@ -1,26 +1,30 @@
 // @vitest-environment jsdom
 // Tests for <base-text-fit>: render modes, the title tooltip, and the connect/disconnect lifecycle.
 import { describe, it, expect, beforeAll, beforeEach, afterEach, vi } from 'vitest';
+import { $, $$, shadow } from '../../dom-test-helpers.js';
 
 // Every ResizeObserver the component constructs, so lifecycle tests can assert
 // on the exact instance it disconnects.
+/** @type {{ disconnect: import('vitest').Mock }[]} */
 const resizeObservers = [];
 
 // Canvas mock MUST be installed before pretext initializes.
 // Pretext caches the canvas context as a module-level singleton on first use.
 beforeAll(() => {
   const mockCtx = {
-    measureText: (text) => ({ width: text.length * 8 }), // 8px per char (monospace sim)
+    measureText: (/** @type {string} */ text) => ({ width: text.length * 8 }), // 8px per char (monospace sim)
     font: '',
   };
   vi.stubGlobal('OffscreenCanvas', class {
     getContext() { return mockCtx; }
   });
-  HTMLCanvasElement.prototype.getContext = () => mockCtx;
+  HTMLCanvasElement.prototype.getContext = /** @type {HTMLCanvasElement['getContext']} */ (/** @type {unknown} */ (() => mockCtx));
 
   // Mock ResizeObserver (not available in jsdom)
   vi.stubGlobal('ResizeObserver', class {
+    /** @param {(entries: { target: Element, contentRect: { width: number } }[]) => void} cb */
     constructor(cb) { this._cb = cb; resizeObservers.push(this); }
+    /** @param {Element} el */
     observe(el) {
       Promise.resolve().then(() => this._cb([{ target: el, contentRect: { width: 200 } }]));
     }
@@ -41,7 +45,7 @@ describe('base-text-fit', () => {
     document.body.appendChild(el);
     await new Promise(r => setTimeout(r, 0));
     // 'Short' = 5 chars * 8px = 40px, container is 200px -> fits
-    expect(el.shadowRoot.querySelector('#text').textContent).toBe('Short');
+    expect($('#text', shadow(el)).textContent).toBe('Short');
   });
 
   it('truncates with ellipsis when text overflows single line', async () => {
@@ -50,7 +54,7 @@ describe('base-text-fit', () => {
     el.textContent = 'A'.repeat(50);
     document.body.appendChild(el);
     await new Promise(r => setTimeout(r, 0));
-    const rendered = el.shadowRoot.querySelector('#text').textContent;
+    const rendered = $('#text', shadow(el)).textContent;
     expect(rendered).toContain('\u2026');
     expect(rendered.length).toBeLessThan(50);
   });
@@ -61,7 +65,7 @@ describe('base-text-fit', () => {
     el.textContent = 'word '.repeat(100);
     document.body.appendChild(el);
     await new Promise(r => setTimeout(r, 0));
-    const rendered = el.shadowRoot.querySelector('#text').textContent;
+    const rendered = $('#text', shadow(el)).textContent;
     expect(rendered).toContain('\u2026');
   });
 
@@ -86,7 +90,7 @@ describe('base-text-fit', () => {
     el.textContent = 'A'.repeat(50);
     document.body.appendChild(el);
     await new Promise(r => setTimeout(r, 0));
-    expect(el.shadowRoot.querySelector('#text').textContent).toBe('A'.repeat(50));
+    expect($('#text', shadow(el)).textContent).toBe('A'.repeat(50));
   });
 
   it('paints text synchronously on connect (no blank frame before RO fires)', () => {
@@ -95,7 +99,7 @@ describe('base-text-fit', () => {
     document.body.appendChild(el);
     // No await: assert immediately, before the async ResizeObserver callback.
     // jsdom has no layout so width is 0 -> full-text fallback paints at once.
-    expect(el.shadowRoot.querySelector('#text').textContent).toBe('Sync paint');
+    expect($('#text', shadow(el)).textContent).toBe('Sync paint');
   });
 
 });
@@ -103,13 +107,14 @@ describe('base-text-fit', () => {
 describe('base-text-fit lifecycle', () => {
   // jsdom has no document.fonts; give each test a real EventTarget in its place
   // so the loadingdone wiring is reachable.
+  /** @type {EventTarget} */
   let fonts;
   beforeEach(() => {
     fonts = new window.EventTarget();
     Object.defineProperty(document, 'fonts', { value: fonts, configurable: true });
   });
   afterEach(() => {
-    delete document.fonts;
+    Reflect.deleteProperty(document, 'fonts');
     vi.restoreAllMocks();
   });
 
@@ -120,7 +125,7 @@ describe('base-text-fit lifecycle', () => {
     const el = document.createElement('base-text-fit');
     el.textContent = 'bye';
     document.body.appendChild(el);
-    const ro = resizeObservers.at(-1);
+    const ro = resizeObservers[resizeObservers.length - 1];
     expect(ro.disconnect).not.toHaveBeenCalled();
 
     document.body.removeChild(el);
@@ -138,7 +143,7 @@ describe('base-text-fit lifecycle', () => {
     document.body.appendChild(el);
     el.textContent = 'new';
     await Promise.resolve(); // MutationObserver callbacks run as microtasks
-    expect(el.shadowRoot.querySelector('#text').textContent).toBe('new');
+    expect($('#text', shadow(el)).textContent).toBe('new');
     expect(el.title).toBe('new');
   });
 
@@ -166,7 +171,7 @@ describe('base-text-fit lifecycle', () => {
     const el = document.createElement('base-text-fit');
     el.textContent = 'font swap';
     document.body.appendChild(el);
-    const textEl = el.shadowRoot.querySelector('#text');
+    const textEl = $('#text', shadow(el));
 
     textEl.textContent = 'stale';
     fonts.dispatchEvent(new Event('loadingdone'));
@@ -199,7 +204,7 @@ describe('base-text-fit mode=justify', () => {
     el.textContent = 'over the lazy dog and then some more words to fill this out well';
     document.body.appendChild(el);
     await new Promise(r => setTimeout(r, 0));
-    const spans = el.shadowRoot.querySelectorAll('.jl');
+    const spans = $$('.jl', shadow(el));
     expect(spans.length).toBeGreaterThan(1);
     // At least one non-last line should have word-spacing (lines that don't fill maxWidth exactly)
     const hasJustified = Array.from(spans).slice(0, -1).some(s => s.style.cssText.includes('word-spacing'));
@@ -215,7 +220,7 @@ describe('base-text-fit mode=justify', () => {
     el.textContent = 'word '.repeat(100);
     document.body.appendChild(el);
     await new Promise(r => setTimeout(r, 0));
-    const spans = el.shadowRoot.querySelectorAll('.jl');
+    const spans = $$('.jl', shadow(el));
     expect(spans.length).toBe(2);
     expect(spans[1].textContent).toContain('\u2026');
   });
@@ -227,7 +232,7 @@ describe('base-text-fit mode=justify', () => {
     el.textContent = 'Short text';
     document.body.appendChild(el);
     await new Promise(r => setTimeout(r, 0));
-    const spans = el.shadowRoot.querySelectorAll('.jl');
+    const spans = $$('.jl', shadow(el));
     expect(spans.length).toBe(1);
     // Single line = last line, no word-spacing
     expect(spans[0].style.wordSpacing).toBe('');
@@ -242,7 +247,7 @@ describe('base-text-fit mode=wrap', () => {
     el.textContent = 'word '.repeat(100);
     document.body.appendChild(el);
     await new Promise(r => setTimeout(r, 0));
-    const rendered = el.shadowRoot.querySelector('#text').textContent;
+    const rendered = $('#text', shadow(el)).textContent;
     // Overflow branch: kept first 3 lines, last truncated with ellipsis.
     expect(rendered.split('\n').length).toBe(3);
     expect(rendered).toContain('…');
@@ -255,7 +260,7 @@ describe('base-text-fit mode=wrap', () => {
     el.textContent = 'tiny';
     document.body.appendChild(el);
     await new Promise(r => setTimeout(r, 0));
-    const rendered = el.shadowRoot.querySelector('#text').textContent;
+    const rendered = $('#text', shadow(el)).textContent;
     // Balanced branch: fits within lines, no truncation.
     expect(rendered).not.toContain('…');
     expect(rendered.replace(/\n/g, '')).toBe('tiny');

@@ -2,7 +2,7 @@
 // formatRelativeActivity: the autocomplete popup's .cc-last "time since" column,
 // driven through initCommand with data.entriesFor mocked per test.
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import { setupDom, setChannels, ch, type, items } from './command-test-helpers.js';
+import { appData, entriesAt, setupDom, setChannels, ch, type, items, $ } from './command-test-helpers.js';
 
 vi.mock('./registry.js', () => ({
   getChannels: vi.fn(() => []),
@@ -15,7 +15,12 @@ vi.mock('./data.js', () => ({
   entriesFor: vi.fn(() => []),
 }));
 
-let command, registry, data;
+/** @type {typeof import('./command.js')} */
+let command;
+/** @type {typeof import('./registry.js')} */
+let registry;
+/** @type {typeof import('./data.js')} */
+let data;
 
 beforeEach(async () => {
   vi.resetModules();
@@ -34,37 +39,38 @@ describe('formatRelativeActivity (cc-last column)', () => {
 
   function lastCell() {
     type('/home');
-    return items()[0].querySelector('.cc-last').textContent;
+    return $(items()[0], '.cc-last').textContent;
   }
 
+  /** @param {string} iso */
   function entryAt(iso) {
-    return [{ date: iso }];
+    return entriesAt(iso);
   }
 
   beforeEach(() => {
     vi.useFakeTimers();
     vi.setSystemTime(NOW);
     setChannels(registry, [ch('home')]);
-    command.initCommand({});
+    command.initCommand(appData());
   });
 
   afterEach(() => {
     vi.useRealTimers();
-    data.entriesFor.mockImplementation(() => []);
+    vi.mocked(data.entriesFor).mockImplementation(() => []);
   });
 
   it("renders '3m' for an entry three minutes ago", () => {
-    data.entriesFor.mockReturnValue(entryAt('2026-06-13T14:57'));
+    vi.mocked(data.entriesFor).mockReturnValue(entryAt('2026-06-13T14:57'));
     expect(lastCell()).toBe('3m');
   });
 
   it("renders '2h' for an entry two hours ago", () => {
-    data.entriesFor.mockReturnValue(entryAt('2026-06-13T13:00'));
+    vi.mocked(data.entriesFor).mockReturnValue(entryAt('2026-06-13T13:00'));
     expect(lastCell()).toBe('2h');
   });
 
   it("renders '3d' for an entry three days ago", () => {
-    data.entriesFor.mockReturnValue(entryAt('2026-06-10T15:00'));
+    vi.mocked(data.entriesFor).mockReturnValue(entryAt('2026-06-10T15:00'));
     expect(lastCell()).toBe('3d');
   });
 
@@ -73,7 +79,7 @@ describe('formatRelativeActivity (cc-last column)', () => {
   });
 
   it("clamps a future-dated entry to '0m'", () => {
-    data.entriesFor.mockReturnValue(entryAt('2026-06-13T15:05'));
+    vi.mocked(data.entriesFor).mockReturnValue(entryAt('2026-06-13T15:05'));
     expect(lastCell()).toBe('0m');
   });
 });

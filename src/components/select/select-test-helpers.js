@@ -1,7 +1,21 @@
 // Shared jsdom fixtures for the <base-select> suites: build a select, reach its shadow parts
 
+/**
+ * @typedef {HTMLElement & {
+ *   value: string, selectedOption: HTMLElement | null, isOpen: boolean,
+ *   open(): void, close(): void, disabled?: boolean, _menu: HTMLElement,
+ *   _selectOption(div: HTMLElement): void,
+ * }} SelectEl
+ */
+/** @typedef {{ value: string, label?: string, disabled?: boolean, action?: boolean }} OptionSpec */
+/** @typedef {{ label: string, options: OptionSpec[] }} GroupSpec */
+
+/**
+ * @param {{ options?: OptionSpec[], groups?: GroupSpec[], placeholder?: string, searchable?: boolean, disabled?: boolean, size?: string, value?: string }} [spec]
+ * @returns {SelectEl}
+ */
 export function createSelect({ options = [], groups = [], placeholder = '', searchable = false, disabled = false, size = '', value = '' } = {}) {
-  const el = document.createElement('base-select');
+  const el = /** @type {SelectEl} */ (document.createElement('base-select'));
   if (placeholder) el.setAttribute('placeholder', placeholder);
   if (searchable) el.setAttribute('searchable', '');
   if (disabled) el.setAttribute('disabled', '');
@@ -34,14 +48,42 @@ export function createSelect({ options = [], groups = [], placeholder = '', sear
   return el;
 }
 
+/**
+ * @param {ParentNode} root
+ * @param {string} sel
+ * @returns {HTMLElement}
+ */
+export function $(root, sel) {
+  const found = root.querySelector(sel);
+  if (!found) throw new Error(`missing element: ${sel}`);
+  return /** @type {HTMLElement} */ (found);
+}
+
+/**
+ * @param {ParentNode} root
+ * @param {string} sel
+ * @returns {HTMLElement[]}
+ */
+export function $$(root, sel) {
+  return [.../** @type {NodeListOf<HTMLElement>} */ (root.querySelectorAll(sel))];
+}
+
+/** @param {HTMLElement} el */
 export function getMenu(el) {
-  return el.shadowRoot.querySelector('[part="menu"]');
+  return $(/** @type {ShadowRoot} */ (el.shadowRoot), '[part="menu"]');
 }
 
+/**
+ * The trigger is an input when searchable and a button otherwise; typed as the
+ * input since the tests only read value/selection on the searchable form.
+ * @param {HTMLElement} el
+ * @returns {HTMLInputElement}
+ */
 export function getTrigger(el) {
-  return el.shadowRoot.querySelector('[part="trigger"]');
+  return /** @type {HTMLInputElement} */ ($(/** @type {ShadowRoot} */ (el.shadowRoot), '[part="trigger"]'));
 }
 
+/** @param {HTMLElement} el */
 export function getOptions(el) {
-  return [...getMenu(el).querySelectorAll('.option')];
+  return [.../** @type {NodeListOf<HTMLElement>} */ (getMenu(el).querySelectorAll('.option'))];
 }

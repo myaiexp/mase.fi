@@ -2,7 +2,8 @@
 // Totals and commitsForProject live in data-stats.test.js.
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { logStats } from './log-stats.js';
-import { entry } from './data-test-helpers.js';
+import { entry, appData } from './data-test-helpers.js';
+/** @import { Entry } from './types.js' */
 
 // Pin the clock: dayStr builds fixtures from "now" and logStats reads "now" again,
 // so a run straddling 00:00 UTC between the two would shift every bucket by one.
@@ -13,8 +14,9 @@ beforeEach(() => {
 afterEach(() => vi.useRealTimers());
 
 // stats is always present on fetchData's output, possibly empty.
+/** @param {Entry[]} entries */
 function dataWith(entries) {
-  return { entries, stats: {} };
+  return appData({ entries });
 }
 
 // Normalized date string "YYYY-MM-DDTHH:MM" for `offsetDays` from today's UTC
@@ -22,11 +24,12 @@ function dataWith(entries) {
 // day the feed's separators use), so tests build dates in UTC terms — the shared
 // day definition — which makes the bucket index deterministic in any runner
 // timezone AND lets tests hit the exact midnight boundary instead of dodging it.
+/** @param {number} offsetDays @param {number} [hour] */
 function dayStr(offsetDays, hour = 12) {
   const d = new Date();
   d.setUTCHours(0, 0, 0, 0);
   d.setUTCDate(d.getUTCDate() + offsetDays);
-  const pad = (n) => String(n).padStart(2, '0');
+  const pad = (/** @type {number} */ n) => String(n).padStart(2, '0');
   return `${d.getUTCFullYear()}-${pad(d.getUTCMonth() + 1)}-${pad(d.getUTCDate())}T${pad(hour)}:00`;
 }
 
@@ -127,13 +130,13 @@ describe('logStats last', () => {
       entry('daily', 'home', { date: '2026-12-31T08:00', projectSlug: 'ignored' }), // non-log, ignored
     ]);
     const got = logStats(data).last;
-    expect(got.date).toBe('2026-03-20T08:00');
-    expect(got.projectSlug).toBe('newest');
+    expect(got?.date).toBe('2026-03-20T08:00');
+    expect(got?.projectSlug).toBe('newest');
   });
 
   it('still considers a log entry whose date is unparseable', () => {
     const data = dataWith([entry('log', 'activity', { date: 'zzz-unparseable' })]);
-    expect(logStats(data).last.date).toBe('zzz-unparseable');
+    expect(logStats(data).last?.date).toBe('zzz-unparseable');
   });
 });
 

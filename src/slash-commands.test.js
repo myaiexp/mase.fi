@@ -52,7 +52,13 @@ describe('formatServerTime', () => {
 });
 
 describe('buildCommands', () => {
-  const run = (name) => buildCommands().find((c) => c.name === name).run();
+  /** @param {string} name @param {Parameters<typeof buildCommands>[0]} [ctx] */
+  const cmd = (name, ctx) => {
+    const found = buildCommands(ctx).find((c) => c.name === name);
+    if (!found) throw new Error(`no command ${name}`);
+    return found;
+  };
+  const run = (/** @type {string} */ name) => cmd(name).run();
 
   afterEach(() => {
     vi.unstubAllGlobals();
@@ -65,8 +71,7 @@ describe('buildCommands', () => {
   });
 
   it('help lists every command and the channel-jump hint', () => {
-    const help = buildCommands().find((c) => c.name === 'help');
-    const lines = help.run();
+    const lines = /** @type {string[]} */ (run('help'));
     expect(lines[0]).toMatch(/slash commands/);
     expect(lines.some((l) => l.includes('/whoami'))).toBe(true);
     expect(lines.some((l) => l.includes('/clear'))).toBe(true);
@@ -75,12 +80,12 @@ describe('buildCommands', () => {
 
   it('uptime uses meta.server and bootTime', () => {
     const data = { meta: { server: 'irc.test', bootTime: Date.now() - 3661000 } };
-    const out = buildCommands({ data }).find((c) => c.name === 'uptime').run();
+    const out = cmd('uptime', { data }).run();
     expect(out).toMatch(/^irc\.test \xb7 up 0d 01h 01m \xb7 ping \d+ms$/);
   });
 
   it('uptime falls back to page load and irc.mase.fi without data.meta', () => {
-    const out = buildCommands().find((c) => c.name === 'uptime').run();
+    const out = run('uptime');
     expect(out).toMatch(/^irc\.mase\.fi \xb7 up 0d 00h 00m \xb7 ping \d+ms$/);
   });
 
@@ -117,13 +122,13 @@ describe('buildCommands', () => {
   });
 
   it('clear with no hooks prints nothing and does not throw', () => {
-    expect(buildCommands().find((c) => c.name === 'clear').run()).toBeNull();
+    expect(run('clear')).toBeNull();
   });
 
   it('clear invokes both clearSearch and clearNotices and prints nothing', () => {
     const clearSearch = vi.fn();
     const clearNotices = vi.fn();
-    const out = buildCommands({ clearSearch, clearNotices }).find((c) => c.name === 'clear').run();
+    const out = cmd('clear', { clearSearch, clearNotices }).run();
     expect(out).toBeNull();
     expect(clearSearch).toHaveBeenCalledOnce();
     expect(clearNotices).toHaveBeenCalledOnce();

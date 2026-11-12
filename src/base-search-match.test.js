@@ -12,11 +12,15 @@ import { inlineBaseCss } from '../scripts/build-base-css.js';
 const css = inlineBaseCss(fileURLToPath(new URL('./base.css', import.meta.url)));
 
 /** The declaration block of the rule whose selector list is exactly `selector`. */
+/**
+ * @param {string} selector
+ * @returns {string}
+ */
 function block(selector) {
   const escaped = selector.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
   const m = css.match(new RegExp(`(?:^|\\n)${escaped}\\s*\\{([^}]*)\\}`));
   expect(m, `no rule for ${selector}`).toBeTruthy();
-  return m[1].trim();
+  return /** @type {RegExpMatchArray} */ (m)[1].trim();
 }
 
 describe('base.css search match', () => {

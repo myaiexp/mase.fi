@@ -5,7 +5,19 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { ioInstances, installFeedDom, removeFeedStubs, makeData, rows } from './feed-test-helpers.js';
 
-let renderFeed, fetchData, loadArchive, renderPinned;
+/** @import { AppData } from './types.js' */
+
+/** @type {typeof import('./feed.js').renderFeed} */
+let renderFeed;
+/** @type {typeof import('./data.js').fetchData} */
+let fetchData;
+/** @type {typeof import('./data.js').loadArchive} */
+let loadArchive;
+/** @type {typeof import('./pinned.js').renderPinned} */
+let renderPinned;
+
+/** @param {Partial<AppData>} [over] @returns {AppData} */
+const appData = (over = {}) => ({ ...makeData(0), ...over });
 
 beforeEach(async () => {
   vi.resetModules();
@@ -20,7 +32,9 @@ beforeEach(async () => {
 afterEach(removeFeedStubs);
 
 const notices = () => [...document.querySelectorAll('#feed .load-notice')].map(el => el.textContent);
+/** @param {string} id @param {AppData} data */
 const render = (id, data) => renderFeed(id, data, { immediate: true, navigate: () => {} });
+/** @param {(resolve: (v?: unknown) => void, reject: (e: Error) => void) => void} settle */
 const later = (settle) => vi.fn(() => new Promise((resolve, reject) => setTimeout(() => settle(resolve, reject), 0)));
 
 describe('hot file failure', () => {
@@ -32,14 +46,14 @@ describe('hot file failure', () => {
   });
 
   it.each(['home', 'activity', 'some-project'])('says so in the %s pane', (id) => {
-    render(id, { entries: [], projects: [], loadFailed: true });
+    render(id, appData({ loadFailed: true }));
     expect(notices()).toHaveLength(1);
     expect(notices()[0]).toMatch(/couldn.t load the log/);
     expect(rows()).toHaveLength(0);
   });
 
   it('adds nothing when the load worked, even on an empty channel', () => {
-    render('home', { entries: [], projects: [], loadFailed: false });
+    render('home', appData({ loadFailed: false }));
     expect(notices()).toEqual([]);
   });
 
@@ -47,15 +61,16 @@ describe('hot file failure', () => {
     const pinned = document.createElement('div');
     pinned.id = 'pinned';
     document.body.appendChild(pinned);
-    const right = () => pinned.querySelector('.card-head .right').textContent;
-    renderPinned('home', { projects: [], entries: [], stats: {}, loadFailed: true });
+    const right = () => pinned.querySelector('.card-head .right')?.textContent;
+    renderPinned('home', appData({ loadFailed: true }));
     expect(right()).not.toMatch(/live/);
-    renderPinned('home', { projects: [], entries: [], stats: {}, loadFailed: false });
+    renderPinned('home', appData({ loadFailed: false }));
     expect(right()).toMatch(/live/);
   });
 });
 
 describe('archive failure', () => {
+  /** @param {number} n */
   function archiveData(n) {
     const data = makeData(n);
     Object.assign(data, { hasArchive: true, archiveLoaded: false, projects: [] });
@@ -75,12 +90,12 @@ describe('archive failure', () => {
   it('puts one sentence at the top of #activity when the archive fetch fails', async () => {
     vi.stubGlobal('fetch', later((_, reject) => reject(new Error('timeout'))));
     render('activity', archiveData(50));
-    ioInstances.at(-1).fire();
+    ioInstances.at(-1)?.fire();
     await vi.waitFor(() => expect(notices()).toHaveLength(1));
     expect(notices()[0]).toMatch(/older history didn.t load/);
     // Above the oldest row: that is where the history stops.
-    const feed = document.getElementById('feed');
+    const feed = /** @type {HTMLElement} */ (document.getElementById('feed'));
     const kids = [...feed.children];
-    expect(kids.indexOf(feed.querySelector('.load-notice'))).toBeLessThan(kids.indexOf(rows()[0]));
+    expect(kids.indexOf(/** @type {Element} */ (feed.querySelector('.load-notice')))).toBeLessThan(kids.indexOf(rows()[0]));
   });
 });

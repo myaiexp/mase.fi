@@ -25,11 +25,13 @@ describe('fetchData project heat + recency', () => {
     vi.useFakeTimers({ now: NOW, toFake: ['Date'] });
   });
 
+  /** @param {unknown[]} projects @param {unknown[]} entries */
   async function load(projects, entries) {
     stubFetch({ projects, entries });
     return fetchData();
   }
 
+  /** @param {import('./types.js').Project[]} projects */
   function byChannel(projects) {
     return Object.fromEntries(projects.map((p) => [p.channel, p]));
   }

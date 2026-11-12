@@ -1,11 +1,14 @@
 // @vitest-environment jsdom
+// applyMenuFlip tests: the shared 200px estimate and the flip-up boundary
 import { describe, it, expect, afterEach } from 'vitest';
 import { MENU_HEIGHT_ESTIMATE, applyMenuFlip } from './menu-flip.js';
 
 // Build a fake trigger host whose getBoundingClientRect yields a given `bottom`,
 // plus a real menu element we can inspect for the `flip` class.
+// applyMenuFlip reads only getBoundingClientRect().bottom, so a stub stands in for the host.
+/** @param {number} bottom */
 function makeFlipPair(bottom) {
-  const host = { getBoundingClientRect: () => ({ bottom }) };
+  const host = /** @type {Element} */ (/** @type {unknown} */ ({ getBoundingClientRect: () => ({ bottom }) }));
   const menu = document.createElement('div');
   return { host, menu };
 }

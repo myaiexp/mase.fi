@@ -3,7 +3,7 @@ import { describe, it, expect, vi, afterEach } from 'vitest';
 import { fetchWithTimeout, fetchJson } from './fetch-json.js';
 
 // A fetch that never answers until its signal aborts, then rejects like a browser.
-const hungFetch = () => vi.fn((url, init) => new Promise((_, reject) => {
+const hungFetch = () => vi.fn((/** @type {string} */ _url, /** @type {RequestInit & { signal: AbortSignal }} */ init) => new Promise((_, reject) => {
   init.signal.addEventListener('abort', () => reject(init.signal.reason));
 }));
 
@@ -17,7 +17,7 @@ describe('fetchWithTimeout', () => {
     const fetchMock = vi.fn(async () => ({ ok: true }));
     vi.stubGlobal('fetch', fetchMock);
     await fetchWithTimeout('/x', { method: 'HEAD' }, 1000);
-    const [, init] = fetchMock.mock.calls[0];
+    const [, init] = /** @type {[string, RequestInit]} */ (/** @type {unknown} */ (fetchMock.mock.calls[0]));
     expect(init.method).toBe('HEAD');
     expect(init.signal).toBeInstanceOf(AbortSignal);
   });
@@ -33,8 +33,9 @@ describe('fetchWithTimeout', () => {
 
   it('keeps the time box open while `read` consumes the body', async () => {
     vi.useFakeTimers();
+    /** @type {AbortSignal} */
     let signal;
-    vi.stubGlobal('fetch', vi.fn(async (url, init) => { signal = init.signal; return { ok: true }; }));
+    vi.stubGlobal('fetch', vi.fn(async (/** @type {string} */ _url, /** @type {RequestInit} */ init) => { signal = /** @type {AbortSignal} */ (init.signal); return { ok: true }; }));
     const p = fetchWithTimeout('/x', {}, 1000, () => new Promise((_, reject) => {
       signal.addEventListener('abort', () => reject(signal.reason));
     }));

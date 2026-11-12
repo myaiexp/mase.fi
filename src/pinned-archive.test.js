@@ -2,6 +2,8 @@
 // Activity card totals after loadArchive fails or succeeds (finding #9436)
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { renderPinned } from './pinned.js';
+import { appData } from './data-test-helpers.js';
+import { $ } from './dom-test-helpers.js';
 import { loadArchive } from './data-archive.js';
 
 beforeEach(() => {
@@ -18,8 +20,9 @@ afterEach(() => {
 
 // The hot window after a compact: one recent log + one daily in memory, the
 // rest of the history counted by stats.archivedLogs.
+/** @param {number} archivedLogs */
 function hotWindow(archivedLogs) {
-  return {
+  return appData({
     projects: [],
     entries: [
       { channel: 'activity', category: 'log', date: '2026-08-01T08:00', nick: 'git', text: 'hot log' },
@@ -28,10 +31,10 @@ function hotWindow(archivedLogs) {
     stats: { archivedLogs, logFirst: '2026-01-01', logLast: '2026-08-01' },
     hasArchive: true,
     archiveLoaded: false,
-  };
+  });
 }
 
-const pinnedHtml = () => document.getElementById('pinned').innerHTML;
+const pinnedHtml = () => $('#pinned').innerHTML;
 
 describe('renderPinned — activity after loadArchive', () => {
   it('keeps the all-history total when the archive fetch fails', async () => {

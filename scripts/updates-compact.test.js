@@ -6,7 +6,16 @@ import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { makeTempDir, cleanup, SCRIPTS_DIR } from './test-helpers.js';
 
-let dir, hotSrc, archSrc, hotDst, archDst;
+/** @type {string} */
+let dir;
+/** @type {string} */
+let hotSrc;
+/** @type {string} */
+let archSrc;
+/** @type {string} */
+let hotDst;
+/** @type {string} */
+let archDst;
 
 beforeEach(() => {
   dir = makeTempDir();
@@ -18,6 +27,13 @@ beforeEach(() => {
 afterEach(() => cleanup(dir));
 
 // source updates-compact.sh and call compact_updates_json
+/**
+ * @param {string} hot
+ * @param {string} arch
+ * @param {string} hotOut
+ * @param {string} archOut
+ * @param {string} cutoff
+ */
 function compactViaShell(hot, arch, hotOut, archOut, cutoff) {
   const script = `
     set -e
@@ -29,6 +45,10 @@ function compactViaShell(hot, arch, hotOut, archOut, cutoff) {
   });
 }
 
+/**
+ * @param {string} file
+ * @returns {import('./test-helpers.js').UpdatesDoc}
+ */
 const readOut = (file) => JSON.parse(readFileSync(file, 'utf8'));
 
 describe('compact_updates_json — strip commits + archive old logs (finding #8804)', () => {
@@ -62,7 +82,7 @@ describe('compact_updates_json — strip commits + archive old logs (finding #88
       commitsByProject: { beta: 2 },
       archivedByProject: { beta: 1 },
     });
-    expect(hot.stats.totalEntries).toBe(4); // 2 non-logs in hot + 2 logs overall
+    expect(hot.stats?.totalEntries).toBe(4); // 2 non-logs in hot + 2 logs overall
   });
 
   it('is idempotent — a second compact does not duplicate archived logs', () => {
@@ -83,7 +103,7 @@ describe('compact_updates_json — strip commits + archive old logs (finding #88
     expect(arch.entries[0].text).toBe('ancient');
     const hot = readOut(hotSrc);
     expect(hot.entries.filter((e) => e.category === 'log')).toHaveLength(1);
-    expect(hot.stats.totalCommits).toBe(2);
+    expect(hot.stats?.totalCommits).toBe(2);
   });
 
   it('keeps every log in the hot file when none are older than the cutoff', () => {
@@ -97,8 +117,8 @@ describe('compact_updates_json — strip commits + archive old logs (finding #88
     const arch = readOut(archDst);
     expect(hot.entries).toHaveLength(1);
     expect(arch.entries).toHaveLength(0);
-    expect(hot.stats.archive).toBe(false);
-    expect(hot.stats.totalCommits).toBe(1);
+    expect(hot.stats?.archive).toBe(false);
+    expect(hot.stats?.totalCommits).toBe(1);
   });
 
   it('treats a missing archive source as empty rather than failing', () => {

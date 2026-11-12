@@ -1,11 +1,13 @@
 // Unit tests for the all-history stat rules: logStats totals, counts, range + commitsForProject.
 import { describe, it, expect } from 'vitest';
 import { logStats, commitsForProject } from './log-stats.js';
-import { entry } from './data-test-helpers.js';
+import { entry, appData, project as proj } from './data-test-helpers.js';
+/** @import { Entry } from './types.js' */
 
 // stats is always present on fetchData's output, possibly empty.
+/** @param {Entry[]} entries */
 function dataWith(entries) {
-  return { entries, stats: {} };
+  return appData({ entries });
 }
 
 // ---- logStats.totalCommits -----------------------------------------------
@@ -43,48 +45,48 @@ describe('logStats totalCommits', () => {
     // After a retention cut the hot file holds only recent logs; the pinned
     // The home card's commit total must keep the all-history count (finding #8804),
     // including logs prepended since the last compact.
-    const data = {
+    const data = appData({
       entries: [entry('log', 'activity'), entry('log', 'activity')],
       stats: { archivedLogs: 9666 },
       archiveLoaded: false,
-    };
+    });
     expect(logStats(data).totalCommits).toBe(9668);
     expect(logStats(data).buckets.length).toBe(28); // buckets still from in-memory
   });
 
   it('does not add archivedLogs after the archive has been merged into memory', () => {
-    const data = {
+    const data = appData({
       entries: [entry('log', 'activity'), entry('log', 'activity')],
       stats: { archivedLogs: 100 },
       archiveLoaded: true,
-    };
+    });
     expect(logStats(data).totalCommits).toBe(2);
   });
 
   it('falls back to a snapshot totalCommits when archivedLogs is absent', () => {
-    const data = {
+    const data = appData({
       entries: [entry('log', 'activity'), entry('log', 'activity')],
       stats: { totalCommits: 9668 },
-    };
+    });
     expect(logStats(data).totalCommits).toBe(9668);
   });
 
   it('prefers the merged rows over a snapshot totalCommits once the archive is in memory', () => {
     // A compact from before archivedLogs existed carries only the snapshot. After
     // a merge every log row is in memory, so the in-memory count is the total.
-    const data = {
+    const data = appData({
       entries: [entry('log', 'activity'), entry('log', 'activity'), entry('log', 'activity')],
       stats: { totalCommits: 9000 },
       archiveLoaded: true,
-    };
+    });
     expect(logStats(data).totalCommits).toBe(3);
   });
 
   it('ignores a non-numeric stats.totalCommits and falls back to counting', () => {
-    const data = {
+    const data = appData({
       entries: [entry('log', 'activity')],
-      stats: { totalCommits: 'nope' },
-    };
+      stats: /** @type {any} */ ({ totalCommits: 'nope' }), // wrong type on purpose
+    });
     expect(logStats(data).totalCommits).toBe(1);
   });
 });
@@ -106,19 +108,19 @@ describe('logStats totalEntries', () => {
   it('is the non-log rows plus the all-history log total after a retention cut', () => {
     // 2 non-log rows + (100 archived + 2 hot logs); same figure the #home card
     // shows as its commit total, so the two cards cannot disagree.
-    const data = { entries: rows(), stats: { archivedLogs: 100 }, archiveLoaded: false };
+    const data = appData({ entries: rows(), stats: { archivedLogs: 100 }, archiveLoaded: false });
     const { totalEntries, totalCommits } = logStats(data);
     expect(totalCommits).toBe(102);
     expect(totalEntries).toBe(104);
   });
 
   it('is the in-memory row count once the archive is merged', () => {
-    const data = { entries: rows(), stats: { archivedLogs: 100 }, archiveLoaded: true };
+    const data = appData({ entries: rows(), stats: { archivedLogs: 100 }, archiveLoaded: true });
     expect(logStats(data).totalEntries).toBe(4);
   });
 
   it('adds the non-log rows to a snapshot totalCommits', () => {
-    const data = { entries: rows(), stats: { totalCommits: 50 } };
+    const data = appData({ entries: rows(), stats: { totalCommits: 50 } });
     expect(logStats(data).totalEntries).toBe(52);
   });
 });
@@ -132,17 +134,17 @@ describe('commitsForProject', () => {
     entry('feature', 'helm'), // not a commit
     entry('log', 'other'), // another channel
   ];
-  const project = { slug: 'helm-app', channel: 'helm' };
+  const project = proj({ slug: 'helm-app', channel: 'helm' });
 
   it('reads commitsByProject by slug first', () => {
-    const data = { entries: hot(), stats: { commitsByProject: { 'helm-app': 42, helm: 7 } } };
+    const data = appData({ entries: hot(), stats: { commitsByProject: { 'helm-app': 42, helm: 7 } } });
     expect(commitsForProject(project, data)).toBe(42);
   });
 
   it('falls back to the channel key when the slug has no count', () => {
-    const data = { entries: hot(), stats: { commitsByProject: { helm: 7 } } };
+    const data = appData({ entries: hot(), stats: { commitsByProject: { helm: 7 } } });
     expect(commitsForProject(project, data)).toBe(7);
-    expect(commitsForProject({ channel: 'helm' }, data)).toBe(7);
+    expect(commitsForProject(proj({ channel: 'helm' }), data)).toBe(7);
   });
 
   it('counts the project channel log rows in memory without a stat', () => {
@@ -150,10 +152,10 @@ describe('commitsForProject', () => {
   });
 
   it('ignores non-numeric counts and inherited keys', () => {
-    const data = { entries: hot(), stats: { commitsByProject: { 'helm-app': 'x', helm: null } } };
+    const data = appData({ entries: hot(), stats: /** @type {any} */ ({ commitsByProject: { 'helm-app': 'x', helm: null } }) /* bad counts on purpose */ });
     expect(commitsForProject(project, data)).toBe(2);
-    const inherited = { entries: hot(), stats: { commitsByProject: {} } };
-    expect(commitsForProject({ slug: 'constructor', channel: 'toString' }, inherited)).toBe(0);
+    const inherited = appData({ entries: hot(), stats: { commitsByProject: {} } });
+    expect(commitsForProject(proj({ slug: 'constructor', channel: 'toString' }), inherited)).toBe(0);
   });
 });
 
@@ -166,35 +168,35 @@ describe('commitsForProject — live between compacts (idea #4713)', () => {
     entry('log', 'helm'), // prepended by a deploy after the last compact
     entry('log', 'other'),
   ];
-  const project = { slug: 'helm', channel: 'helm' };
+  const project = proj({ slug: 'helm', channel: 'helm' });
 
   it('adds the archived count to the project log rows in memory', () => {
-    const data = { entries: hot(), stats: { archivedByProject: { helm: 40 }, commitsByProject: { helm: 42 } } };
+    const data = appData({ entries: hot(), stats: { archivedByProject: { helm: 40 }, commitsByProject: { helm: 42 } } });
     expect(commitsForProject(project, data)).toBe(43);
   });
 
   it('matches archive keys case-insensitively against the routing slug', () => {
-    const data = { entries: hot(), stats: { archivedByProject: { Helm: 10, helm: 5, other: 9 } } };
+    const data = appData({ entries: hot(), stats: { archivedByProject: { Helm: 10, helm: 5, other: 9 } } });
     expect(commitsForProject(project, data)).toBe(18);
   });
 
   it('routes by slug, not channel, when the project has its own slug', () => {
-    const data = { entries: hot(), stats: { archivedByProject: { 'helm-app': 10, helm: 99 } } };
-    expect(commitsForProject({ slug: 'helm-app', channel: 'helm' }, data)).toBe(13);
+    const data = appData({ entries: hot(), stats: { archivedByProject: { 'helm-app': 10, helm: 99 } } });
+    expect(commitsForProject(proj({ slug: 'helm-app', channel: 'helm' }), data)).toBe(13);
   });
 
   it('counts only memory once the archive is merged', () => {
-    const data = { entries: hot(), archiveLoaded: true, stats: { archivedByProject: { helm: 40 } } };
+    const data = appData({ entries: hot(), archiveLoaded: true, stats: { archivedByProject: { helm: 40 } } });
     expect(commitsForProject(project, data)).toBe(3);
   });
 
   it('treats a project absent from the archive as zero archived', () => {
-    const data = { entries: hot(), stats: { archivedByProject: {} } };
+    const data = appData({ entries: hot(), stats: { archivedByProject: {} } });
     expect(commitsForProject(project, data)).toBe(3);
   });
 
   it('ignores non-numeric archived counts', () => {
-    const data = { entries: hot(), stats: { archivedByProject: { helm: 'x', HELM: 2 } } };
+    const data = appData({ entries: hot(), stats: /** @type {any} */ ({ archivedByProject: { helm: 'x', HELM: 2 } }) /* bad count on purpose */ });
     expect(commitsForProject(project, data)).toBe(5);
   });
 });
@@ -203,10 +205,10 @@ describe('commitsForProject — live between compacts (idea #4713)', () => {
 
 describe('logStats counts', () => {
   it('counts non-log rows from memory and logs by the archive-cut rule', () => {
-    const data = {
+    const data = appData({
       entries: [entry('log', 'activity'), entry('feature', 'explorer'), entry('daily', 'home'), entry('daily', 'home')],
       stats: { archivedLogs: 40 },
-    };
+    });
     const s = logStats(data);
     expect(s.counts).toEqual({ log: 41, feature: 1, daily: 2 });
     expect(s.totalEntries).toBe(44);
@@ -220,7 +222,7 @@ describe('logStats first', () => {
       entry('log', 'activity', { date: '2026-01-10T08:00' }),
       entry('daily', 'home', { date: '2025-01-01T08:00' }),
     ]);
-    expect(logStats(data).first.date).toBe('2026-01-10T08:00');
+    expect(logStats(data).first?.date).toBe('2026-01-10T08:00');
   });
 });
 
@@ -238,15 +240,15 @@ describe('logStats logRange', () => {
   });
 
   it('takes the wider end from stats and memory', () => {
-    const data = {
+    const data = appData({
       entries: [entry('log', 'activity', { date: '2026-08-01T08:00' })],
       stats: { logFirst: '2026-03-05', logLast: '2026-07-30' },
-    };
+    });
     expect(logStats(data).logRange).toEqual({ from: '2026-03-05', to: '2026-08-01' });
   });
 
   it('uses the compact-time range alone when no log is in memory', () => {
-    const data = { entries: [], stats: { logFirst: '2026-03-05', logLast: '2026-09-02' } };
+    const data = appData({ entries: [], stats: { logFirst: '2026-03-05', logLast: '2026-09-02' } });
     expect(logStats(data).logRange).toEqual({ from: '2026-03-05', to: '2026-09-02' });
   });
 });

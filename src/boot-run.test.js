@@ -4,7 +4,7 @@
 // completion), and a keypress must only count once the 400ms debounce has passed.
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { runBoot } from './boot.js';
-import { KEY, NOW, freezeBootClock, throwOn } from './boot-test-helpers.js';
+import { KEY, NOW, freezeBootClock, throwOn, byId } from './boot-test-helpers.js';
 
 freezeBootClock();
 
@@ -28,9 +28,9 @@ describe('runBoot finish', () => {
     window.addEventListener('mase:booted', booted);
 
     runBoot();
-    document.getElementById('boot').click();
+    byId('boot').click();
 
-    expect(document.getElementById('app').hidden).toBe(false);
+    expect(byId('app').hidden).toBe(false);
     expect(Number(localStorage.getItem(KEY))).toBe(NOW);
 
     vi.advanceTimersByTime(300);
@@ -44,9 +44,9 @@ describe('runBoot finish', () => {
     window.addEventListener('mase:booted', booted);
     try {
       runBoot();
-      document.getElementById('boot').click();
+      byId('boot').click();
 
-      expect(document.getElementById('app').hidden).toBe(false);
+      expect(byId('app').hidden).toBe(false);
 
       vi.advanceTimersByTime(300);
       expect(booted).toHaveBeenCalledOnce();
@@ -60,7 +60,7 @@ describe('runBoot finish', () => {
   // max inter-line delay (200ms) but shorter than the 400ms finish pause.
   // Leaves us in that pause — the window where a click used to race finish().
   function drainScript() {
-    const boot = document.getElementById('boot');
+    const boot = byId('boot');
     let prev = boot.childElementCount;
     let staleMs = 0;
     for (let t = 0; t < 5000; t += 10) {
@@ -84,18 +84,18 @@ describe('runBoot finish', () => {
     runBoot();
     drainScript();
 
-    const boot = document.getElementById('boot');
+    const boot = byId('boot');
     expect(boot.querySelectorAll('.boot-ok').length).toBeGreaterThan(0);
-    expect(boot.querySelector('.boot-warn').textContent).toBe('[ WARN ]');
+    expect(/** @type {HTMLElement} */ (boot.querySelector('.boot-warn')).textContent).toBe('[ WARN ]');
     expect(boot.querySelectorAll('.boot-dim').length).toBeGreaterThan(0);
     expect(boot.querySelector('pre.boot-logo')).toBeTruthy();
     expect([...boot.querySelectorAll('.boot-dim')].some((el) =>
       el.textContent.includes('welcome, mase')
     )).toBe(true);
-    expect(document.getElementById('app').hidden).toBe(true);
+    expect(byId('app').hidden).toBe(true);
 
     vi.advanceTimersByTime(800);
-    expect(document.getElementById('app').hidden).toBe(false);
+    expect(byId('app').hidden).toBe(false);
     expect(document.getElementById('boot')).toBeNull();
     expect(booted).toHaveBeenCalledOnce();
     // Stamp is written at finish time, which is after ~1.6s of fake-timer
@@ -117,10 +117,10 @@ describe('runBoot finish', () => {
 
     runBoot();
     drainScript();
-    expect(document.getElementById('app').hidden).toBe(true);
+    expect(byId('app').hidden).toBe(true);
 
-    document.getElementById('boot').click();
-    expect(document.getElementById('app').hidden).toBe(false);
+    byId('boot').click();
+    expect(byId('app').hidden).toBe(false);
 
     // Drain the click's 300ms remove + the leftover natural-completion finish().
     vi.advanceTimersByTime(800);
@@ -139,7 +139,7 @@ describe('runBoot finish', () => {
     vi.advanceTimersByTime(399);
     pressKey();
 
-    expect(document.getElementById('app').hidden).toBe(true);
+    expect(byId('app').hidden).toBe(true);
     expect(localStorage.getItem(KEY)).toBeNull();
   });
 
@@ -151,7 +151,7 @@ describe('runBoot finish', () => {
     vi.advanceTimersByTime(400);
     pressKey();
 
-    expect(document.getElementById('app').hidden).toBe(false);
+    expect(byId('app').hidden).toBe(false);
     // The fake clock advanced with the timers, so the stamp is finish() time.
     expect(Number(localStorage.getItem(KEY))).toBe(NOW + 400);
 

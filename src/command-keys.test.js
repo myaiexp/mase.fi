@@ -2,7 +2,7 @@
 // Command input key sequences: leftover slash→help, Tab-complete, global
 // shortcuts, Escape, and autocomplete choose (Enter/click channel navigation).
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import { setupDom, setChannels, ch, type, press, items, cc } from './command-test-helpers.js';
+import { appData, setupDom, setChannels, ch, type, press, items, cc, byId, $ } from './command-test-helpers.js';
 
 vi.mock('./registry.js', () => ({
   getChannels: vi.fn(() => []),
@@ -15,9 +15,14 @@ vi.mock('./data.js', () => ({
   entriesFor: vi.fn(() => []),
 }));
 
-let command, registry, channels;
+/** @type {typeof import('./command.js')} */
+let command;
+/** @type {typeof import('./registry.js')} */
+let registry;
+/** @type {typeof import('./channels.js')} */
+let channels;
 
-const input = () => document.getElementById('cmd-input');
+const input = () => /** @type {HTMLInputElement} */ (byId('cmd-input'));
 
 beforeEach(async () => {
   vi.resetModules();
@@ -27,7 +32,7 @@ beforeEach(async () => {
   channels = await import('./channels.js');
   command = await import('./command.js');
   setChannels(registry, [ch('home'), ch('explorer', 'explorer', 'file explorer'), ch('activity')]);
-  command.initCommand({});
+  command.initCommand(appData());
 });
 
 afterEach(() => {
@@ -133,7 +138,7 @@ describe('global shortcuts (window keydown, non-input target)', () => {
     press(document.body, '/');
     expect(document.activeElement).toBe(input());
     expect(input().value).toBe('/');
-    expect(document.getElementById('cmd').classList.contains('mode-slash')).toBe(true);
+    expect(byId('cmd').classList.contains('mode-slash')).toBe(true);
     expect(cc().hidden).toBe(false);
   });
 
@@ -141,7 +146,7 @@ describe('global shortcuts (window keydown, non-input target)', () => {
     press(document.body, '?');
     expect(document.activeElement).toBe(input());
     expect(input().value).toBe('?');
-    expect(document.getElementById('cmd').classList.contains('mode-help')).toBe(true);
+    expect(byId('cmd').classList.contains('mode-help')).toBe(true);
     expect(cc().getAttribute('role')).toBe('note');
   });
 
@@ -203,6 +208,7 @@ describe('global shortcuts (window keydown, non-input target)', () => {
 });
 
 // A feed row shaped the way applySearch reads it: .feed-row[data-raw] > .msg.
+/** @param {string} text */
 function addRow(text) {
   const row = document.createElement('div');
   row.className = 'feed-row';
@@ -211,7 +217,7 @@ function addRow(text) {
   msg.className = 'msg';
   msg.textContent = text;
   row.appendChild(msg);
-  document.getElementById('feed').appendChild(row);
+  byId('feed').appendChild(row);
   return row;
 }
 
@@ -230,9 +236,9 @@ describe('Escape', () => {
     expect(el.value).toBe('');
     expect(document.querySelector('#feed mark')).toBeNull();
     expect(document.querySelector('#feed .search-dim')).toBeNull();
-    expect(hit.querySelector('.msg').textContent).toBe('shipped the wander rename');
-    expect(document.getElementById('cmd').classList.contains('mode-search')).toBe(false);
-    expect(document.getElementById('cmd-hint').textContent).toBe('');
+    expect($(hit, '.msg').textContent).toBe('shipped the wander rename');
+    expect(byId('cmd').classList.contains('mode-search')).toBe(false);
+    expect(byId('cmd-hint').textContent).toBe('');
     expect(document.activeElement).not.toBe(el);
   });
 
@@ -249,7 +255,7 @@ describe('Escape', () => {
     expect(cc().getAttribute('role')).toBeNull();
     expect(el.getAttribute('aria-expanded')).toBe('false');
     expect(el.hasAttribute('aria-activedescendant')).toBe(false);
-    expect(document.getElementById('cmd').classList.contains('mode-slash')).toBe(false);
+    expect(byId('cmd').classList.contains('mode-slash')).toBe(false);
     expect(channels.navigate).not.toHaveBeenCalled();
     expect(document.activeElement).not.toBe(el);
 

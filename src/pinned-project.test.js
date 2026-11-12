@@ -4,6 +4,9 @@
 // shared cardHead/home coverage and jsdom harness note.
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { renderPinned } from './pinned.js';
+import { appData } from './data-test-helpers.js';
+/** @import { Entry, Project } from './types.js' */
+import { $ } from './dom-test-helpers.js';
 
 beforeEach(() => {
   vi.stubGlobal('matchMedia', vi.fn().mockReturnValue({ matches: true }));
@@ -19,7 +22,7 @@ afterEach(() => {
   document.body.replaceChildren();
 });
 
-const pinnedEl = () => document.getElementById('pinned');
+const pinnedEl = () => $('#pinned');
 
 // A normalized entry matching data.js fetchData() output: { channel, category, date, nick, text }.
 function logEntry(extra = {}) {
@@ -28,7 +31,8 @@ function logEntry(extra = {}) {
 
 describe('renderPinned — project', () => {
   // demos and stats mirror fetchData's canonical shape (always present).
-  const projectData = (project, entries = [], demos = []) => ({ projects: [project], entries, demos, stats: {} });
+  /** @param {Partial<Project>} project @param {Partial<Entry>[]} [entries] @param {string[]} [demos] */
+  const projectData = (project, entries = [], demos = []) => appData({ projects: [project], entries, demos, stats: {} });
 
   it('renders a project card with commits, heat, status, description and links', () => {
     const project = {
@@ -73,7 +77,7 @@ describe('renderPinned — project', () => {
     renderPinned('explorer', projectData({
       channel: 'explorer', heat: 0.5, description: '', name: 'Helm', links: [],
     }));
-    expect(pinnedEl().querySelector('.pin-tagline').textContent).toBe('Helm');
+    expect($('.pin-tagline', pinnedEl()).textContent).toBe('Helm');
   });
 
   it('escapes a name standing in for an empty description', () => {
@@ -81,7 +85,7 @@ describe('renderPinned — project', () => {
       channel: 'explorer', heat: 0.5, description: '', name: '<script>', links: [],
     }));
     expect(pinnedEl().querySelector('.pin-tagline script')).toBeNull();
-    expect(pinnedEl().querySelector('.pin-tagline').textContent).toBe('<script>');
+    expect($('.pin-tagline', pinnedEl()).textContent).toBe('<script>');
   });
 
   it('labels a mid-heat project as steady', () => {
@@ -117,7 +121,7 @@ describe('renderPinned — project', () => {
   it('renders a "try demo →" chip when the channel has a published demo', () => {
     const data = projectData({ channel: 'explorer', heat: 0.5, description: 'd', links: [] }, [], ['explorer']);
     renderPinned('explorer', data);
-    const a = pinnedEl().querySelector('.demo-link');
+    const a = $('.demo-link', pinnedEl());
     expect(a).not.toBeNull();
     expect(a.getAttribute('href')).toBe('/demos/explorer/');
     expect(a.textContent).toContain('try demo');
@@ -133,7 +137,7 @@ describe('renderPinned — project', () => {
     renderPinned(slug, data);
     // Same shape as the link-escape test above: the payload round-trips as the
     // attribute value, and a raw quote would have closed href= and spawned a script.
-    const a = pinnedEl().querySelector('.demo-link');
+    const a = $('.demo-link', pinnedEl());
     expect(pinnedEl().querySelector('script')).toBeNull();
     expect(a.getAttribute('href')).toBe(`/demos/${slug}/`);
     expect(pinnedEl().innerHTML).toContain('&quot;');
@@ -156,7 +160,7 @@ describe('renderPinned — project', () => {
     // Without escapeHtml the unescaped quote would close href= and the <script>
     // would become a live element. Assert against the DOM (serialization-robust):
     // no breakout, and the whole payload is trapped as the href value / link text.
-    const a = pinnedEl().querySelector('.links a');
+    const a = $('.links a', pinnedEl());
     expect(pinnedEl().querySelector('script')).toBeNull();
     expect(pinnedEl().querySelector('.links b')).toBeNull();
     expect(a.getAttribute('href')).toBe('"><script>alert(1)</script>');

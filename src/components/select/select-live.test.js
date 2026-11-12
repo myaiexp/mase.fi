@@ -1,31 +1,11 @@
 // @vitest-environment jsdom
 // Option edits after <base-select> connects: disabled, value, action, and label.
 import { describe, it, expect, beforeAll, afterEach } from 'vitest';
+import { createSelect, getTrigger, getOptions, $ } from './select-test-helpers.js';
 
 beforeAll(async () => {
   await import('./select.js');
 });
-
-function createSelect({ options = [], value = '' } = {}) {
-  const el = document.createElement('base-select');
-  if (value) el.setAttribute('value', value);
-  for (const opt of options) {
-    const o = document.createElement('base-option');
-    o.setAttribute('value', opt.value);
-    o.textContent = opt.label ?? opt.value;
-    el.appendChild(o);
-  }
-  document.body.appendChild(el);
-  return el;
-}
-
-function getTrigger(el) {
-  return el.shadowRoot.querySelector('[part="trigger"]');
-}
-
-function getOptions(el) {
-  return [...el.shadowRoot.querySelector('[part="menu"]').querySelectorAll('.option')];
-}
 
 // MutationObserver delivers on a microtask; the child-add suite flushes the same way.
 function flushObserver() {
@@ -40,7 +20,7 @@ describe('base-select live option edits', () => {
       { value: 'a', label: 'Alpha' },
       { value: 'b', label: 'Beta' },
     ] });
-    el.querySelector('base-option').setAttribute('disabled', '');
+    $(el, 'base-option').setAttribute('disabled', '');
     await flushObserver();
 
     getTrigger(el).click();
@@ -54,7 +34,7 @@ describe('base-select live option edits', () => {
 
   it('commits a value attribute changed after connect', async () => {
     const el = createSelect({ options: [{ value: 'a', label: 'Alpha' }] });
-    el.querySelector('base-option').setAttribute('value', 'b');
+    $(el, 'base-option').setAttribute('value', 'b');
     await flushObserver();
 
     getTrigger(el).click();
@@ -64,13 +44,14 @@ describe('base-select live option edits', () => {
 
   it('shows an action button added after connect', async () => {
     const el = createSelect({ options: [{ value: 'a', label: 'Alpha' }] });
-    el.querySelector('base-option').setAttribute('action', '');
+    $(el, 'base-option').setAttribute('action', '');
     await flushObserver();
 
-    const btn = getOptions(el)[0].querySelector('.action-btn');
+    const btn = $(getOptions(el)[0], '.action-btn');
     expect(btn).not.toBeNull();
+    /** @type {unknown[]} */
     const received = [];
-    el.addEventListener('option-action', (e) => received.push(e.detail));
+    el.addEventListener('option-action', (e) => received.push(/** @type {CustomEvent} */ (e).detail));
     btn.click();
     expect(received).toEqual([{ value: 'a', label: 'Alpha', anchor: btn }]);
   });
@@ -78,7 +59,7 @@ describe('base-select live option edits', () => {
   it('updates the closed trigger when a selected option\'s text changes', async () => {
     const el = createSelect({ value: 'a', options: [{ value: 'a', label: 'Alpha' }] });
     expect(getTrigger(el).textContent).toBe('Alpha');
-    el.querySelector('base-option').textContent = 'Beta';
+    $(el, 'base-option').textContent = 'Beta';
     await flushObserver();
     expect(getTrigger(el).textContent).toBe('Beta');
   });

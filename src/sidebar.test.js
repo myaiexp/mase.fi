@@ -13,6 +13,8 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { renderChanlist, setActiveChannel } from './sidebar.js';
 import { initChannels } from './channels.js';
+import { appData, entry } from './data-test-helpers.js';
+import { $, $$ } from './dom-test-helpers.js';
 
 // Mount the two containers renderChanlist writes into (built node-by-node so the
 // security hook's innerHTML ban doesn't apply to the test harness; renderChanlist
@@ -30,18 +32,20 @@ function mountContainers() {
 // chHeat(channel) === heat. channel id is p0, p1, ... in order. Each gets one
 // routed entry, since the sidebar lists only projects with a loaded entry
 // (sidebar-empty.test.js).
+/** @param {number[]} heats */
 function dataWithHeats(heats) {
-  return {
+  return appData({
     projects: heats.map((heat, i) => ({
       name: 'P' + i, channel: 'p' + i, description: 'desc ' + i, heat,
     })),
-    entries: heats.map((_, i) => ({ channel: 'p' + i, category: 'daily', projectChannel: 'p' + i })),
-  };
+    entries: heats.map((_, i) => entry('daily', 'p' + i, { projectChannel: 'p' + i })),
+  });
 }
 
 // Count filled (.on) vs total heat-bar cells for one channel's sidebar row.
+/** @param {string} chId */
 function heatCells(chId) {
-  const span = document.querySelector(`.chan[data-ch="${chId}"] .heat`);
+  const span = $(`.chan[data-ch="${chId}"] .heat`);
   return {
     total: span.querySelectorAll('b').length,
     on: span.querySelectorAll('b.on').length,
@@ -123,8 +127,8 @@ describe('setActiveChannel class toggle', () => {
     renderChanlist(data, () => {});
   });
 
-  const activeChans = () => [...document.querySelectorAll('.chan.active')].map(el => el.dataset.ch);
-  const activeTabs = () => [...document.querySelectorAll('.tab.active')].map(el => el.dataset.ch);
+  const activeChans = () => $$('.chan.active').map(el => el.dataset.ch);
+  const activeTabs = () => $$('.tab.active').map(el => el.dataset.ch);
 
   it('sets active on exactly the matching sidebar row and tab', () => {
     setActiveChannel('p1');
@@ -165,10 +169,11 @@ describe('renderChanlist click wiring', () => {
     mountContainers();
     const data = dataWithHeats([0.5, 0.5]);
     initChannels(data);
+    /** @type {string[]} */
     const seen = [];
     renderChanlist(data, id => seen.push(id));
-    document.querySelector('.chan[data-ch="p1"]').click();
-    document.querySelector('.tab[data-ch="home"]').click();
+    $('.chan[data-ch="p1"]').click();
+    $('.tab[data-ch="home"]').click();
     expect(seen).toEqual(['p1', 'home']);
   });
 });
@@ -182,17 +187,17 @@ describe('accessibility attributes', () => {
   });
 
   it('exposes sidebar rows as keyboard-operable links with a clean name', () => {
-    const row = document.querySelector('.chan[data-ch="p0"]');
+    const row = $('.chan[data-ch="p0"]');
     expect(row.getAttribute('role')).toBe('link');
     expect(row.getAttribute('tabindex')).toBe('0');
     expect(row.getAttribute('aria-label')).toBe('P0 channel'); // the name, not the id
     // Decorative bits are hidden from the accessibility tree.
-    expect(row.querySelector('.hash').getAttribute('aria-hidden')).toBe('true');
-    expect(row.querySelector('.heat').getAttribute('aria-hidden')).toBe('true');
+    expect($('.hash', row).getAttribute('aria-hidden')).toBe('true');
+    expect($('.heat', row).getAttribute('aria-hidden')).toBe('true');
   });
 
   it('labels mobile tab buttons', () => {
-    const tab = document.querySelector('.tab[data-ch="home"]');
+    const tab = $('.tab[data-ch="home"]');
     expect(tab.tagName).toBe('BUTTON');
     expect(tab.getAttribute('aria-label')).toBe('home channel');
   });
@@ -200,12 +205,12 @@ describe('accessibility attributes', () => {
   it('marks only the active channel with aria-current=page on row and tab', () => {
     setActiveChannel('p0');
     const current = () =>
-      [...document.querySelectorAll('[aria-current="page"]')].map(el => `${el.tagName}:${el.dataset.ch}`);
+      $$('[aria-current="page"]').map(el => `${el.tagName}:${el.dataset.ch}`);
     expect(current().sort()).toEqual(['BUTTON:p0', 'DIV:p0']);
 
     setActiveChannel('home');
     // aria-current moved; the previous channel no longer carries it.
-    expect(document.querySelector('.chan[data-ch="p0"]').hasAttribute('aria-current')).toBe(false);
+    expect($('.chan[data-ch="p0"]').hasAttribute('aria-current')).toBe(false);
     expect(current().sort()).toEqual(['BUTTON:home', 'DIV:home']);
   });
 });
@@ -218,10 +223,10 @@ describe('renderChanlist escaping', () => {
 
   beforeEach(() => {
     mountContainers();
-    const data = {
+    const data = appData({
       projects: [{ name: '', channel: hostile, description: 'd', heat: 0.5 }],
-      entries: [{ channel: hostile, category: 'daily', projectChannel: hostile }],
-    };
+      entries: [entry('daily', hostile, { projectChannel: hostile })],
+    });
     initChannels(data);
     renderChanlist(data, () => {});
   });
@@ -230,13 +235,14 @@ describe('renderChanlist escaping', () => {
     { sel: '.chan', name: '.name' },
     { sel: '.tab', name: '.tab-name' },
   ])('$sel round-trips a hostile id without attribute or node injection', ({ sel, name }) => {
-    const el = [...document.querySelectorAll(sel)].find(e => e.dataset.ch !== 'home' && e.dataset.ch !== 'activity');
-    expect(el).toBeTruthy();
+    const found = $$(sel).find(e => e.dataset.ch !== 'home' && e.dataset.ch !== 'activity');
+    expect(found).toBeTruthy();
+    const el = /** @type {HTMLElement} */ (found);
     // The browser decodes the escaped attribute, so the full id comes back
     // intact rather than cut at the first quote.
     expect(el.getAttribute('data-ch')).toBe(hostile);
     expect(el.getAttribute('aria-label')).toBe(hostile + ' channel');
-    expect(el.querySelector(name).textContent).toBe(hostile);
+    expect($(name, el).textContent).toBe(hostile);
     // No breakout: no attributes or nodes created from the payload.
     expect(el.hasAttribute('onclick')).toBe(false);
     expect(el.hasAttribute('x')).toBe(false);
@@ -252,6 +258,7 @@ describe('renderChanlist escaping', () => {
 });
 
 describe('keyboard navigation', () => {
+  /** @param {HTMLElement} el @param {string} key */
   function press(el, key) {
     el.dispatchEvent(new KeyboardEvent('keydown', { key, bubbles: true, cancelable: true }));
   }
@@ -260,9 +267,10 @@ describe('keyboard navigation', () => {
     mountContainers();
     const data = dataWithHeats([0.5, 0.5]);
     initChannels(data);
+    /** @type {string[]} */
     const seen = [];
     renderChanlist(data, id => seen.push(id));
-    const row = document.querySelector('.chan[data-ch="p1"]');
+    const row = $('.chan[data-ch="p1"]');
     press(row, 'Enter');
     press(row, ' ');
     press(row, 'a'); // ignored

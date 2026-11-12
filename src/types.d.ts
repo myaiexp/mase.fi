@@ -89,3 +89,10 @@ export interface Channel {
   topic: string;
   project?: Project;
 }
+
+declare global {
+  interface Window {
+    /** The toast service the base-components bundle publishes for consumers (toast.js). */
+    BaseToast?: typeof import('./components/toast/toast.js').BaseToast;
+  }
+}

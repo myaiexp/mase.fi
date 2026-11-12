@@ -6,18 +6,28 @@ import { join } from 'node:path';
 import { writeFileSync, readFileSync } from 'node:fs';
 import { makeTempDir, cleanup, writeJson, readJson, runScript } from './test-helpers.js';
 
-let dir, file, apiFile, extraFile;
+/** @type {string} */
+let dir;
+/** @type {string} */
+let file;
+/** @type {string} */
+let apiFile;
+/** @type {string} */
+let extraFile;
 
 // Point SHOWCASE_API at a local fixture via file:// (curl reads it directly),
 // so the merge runs with no live helm API.
+/** @param {unknown} value */
 const setApi = (value) => {
   writeFileSync(apiFile, typeof value === 'string' ? value : JSON.stringify(value));
   return `file://${apiFile}`;
 };
+/** @param {unknown[]} arr */
 const setExtra = (arr) => {
   writeFileSync(extraFile, JSON.stringify(arr));
   return extraFile;
 };
+/** @param {Record<string, string>} [env] */
 const run = (env = {}) => runScript('mase-fi-projects', [], { UPDATES_FILE: file, ...env });
 
 beforeEach(() => {

@@ -14,7 +14,9 @@ import { inlineBaseCss } from '../scripts/build-base-css.js';
 const css = inlineBaseCss(fileURLToPath(new URL('./base.css', import.meta.url)));
 
 /** Every `--name: value;` declaration in the file, last-wins like the cascade. */
+/** @param {string} source */
 function declarations(source) {
+  /** @type {Map<string, string>} */
   const out = new Map();
   for (const m of source.matchAll(/^\s*(--[a-z0-9-]+)\s*:\s*([^;]+);/gim)) {
     out.set(m[1], m[2].trim());

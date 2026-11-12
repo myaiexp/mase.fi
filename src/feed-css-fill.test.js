@@ -11,10 +11,12 @@ import { fileURLToPath } from 'node:url';
 const css = readFileSync(fileURLToPath(new URL('./styles/feed.css', import.meta.url)), 'utf8');
 
 /** Every [selector, declarations] pair in a flat (non-nested) stylesheet. */
+/** @param {string} text @returns {[string, string][]} */
 function rules(text) {
+  /** @type {[string, string][]} */
   const out = [];
   const stripped = text.replace(/\/\*[\s\S]*?\*\//g, '');
-  for (const m of stripped.matchAll(/([^{}]+)\{([^{}]*)\}/g)) out.push([m[1].trim(), m[2]]);
+  for (const m of stripped.matchAll(/([^{}]+)\{([^{}]*)\}/g)) out.push([(m[1] ?? '').trim(), m[2] ?? '']);
   return out;
 }
 

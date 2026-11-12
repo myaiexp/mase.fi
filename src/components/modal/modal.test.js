@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
+// <base-modal> tests: open/close, slots, backdrop/Escape dismissal, focus trap, close event
 import { describe, it, expect, beforeAll, afterEach, vi } from 'vitest';
-import { createModal } from './modal-test-helpers.js';
+import { createModal, shadowEl } from './modal-test-helpers.js';
 
 beforeAll(async () => {
   await import('./modal.js');
@@ -46,7 +47,7 @@ describe('base-modal', () => {
     const modal = createModal();
     modal.open();
 
-    const backdrop = modal.shadowRoot.querySelector('[data-backdrop]');
+    const backdrop = shadowEl(modal, '[data-backdrop]');
     expect(backdrop).toBeTruthy();
 
     backdrop.dispatchEvent(new MouseEvent('click', { bubbles: true }));
@@ -57,7 +58,7 @@ describe('base-modal', () => {
     const modal = createModal('<p>body text</p>');
     modal.open();
 
-    const content = modal.shadowRoot.querySelector('[data-content]');
+    const content = shadowEl(modal, '[data-content]');
     expect(content).toBeTruthy();
 
     content.dispatchEvent(new MouseEvent('click', { bubbles: true }));
@@ -71,9 +72,9 @@ describe('base-modal', () => {
       <button slot="footer">OK</button>
     `);
 
-    const headerSlot = modal.shadowRoot.querySelector('slot[name="header"]');
-    const defaultSlot = modal.shadowRoot.querySelector('slot:not([name])');
-    const footerSlot = modal.shadowRoot.querySelector('slot[name="footer"]');
+    const headerSlot = /** @type {HTMLSlotElement} */ (shadowEl(modal, 'slot[name="header"]'));
+    const defaultSlot = /** @type {HTMLSlotElement} */ (shadowEl(modal, 'slot:not([name])'));
+    const footerSlot = /** @type {HTMLSlotElement} */ (shadowEl(modal, 'slot[name="footer"]'));
 
     expect(headerSlot).toBeTruthy();
     expect(defaultSlot).toBeTruthy();
@@ -152,6 +153,7 @@ describe('base-modal', () => {
     modal.open();
     modal.open();
     modal.close();
+    /** @param {{ mock: { calls: unknown[][] } }} spy */
     const keydownOf = (spy) => spy.mock.calls.filter(([type]) => type === 'keydown').map(([, fn]) => fn);
     const live = keydownOf(add).filter((fn) => !keydownOf(remove).includes(fn));
     add.mockRestore();
@@ -162,12 +164,14 @@ describe('base-modal', () => {
   it('close event carries bubbles, composed, and null detail', () => {
     const modal = createModal();
     modal.open();
-    let captured = null;
-    modal.addEventListener('close', (e) => { captured = e; });
+    /** @type {Event[]} */
+    const captured = [];
+    modal.addEventListener('close', (e) => { captured.push(e); });
     modal.close();
-    expect(captured).toBeInstanceOf(CustomEvent);
-    expect(captured.bubbles).toBe(true);
-    expect(captured.composed).toBe(true);
-    expect(captured.detail).toBe(null);
+    const ev = /** @type {CustomEvent} */ (captured[0]);
+    expect(ev).toBeInstanceOf(CustomEvent);
+    expect(ev.bubbles).toBe(true);
+    expect(ev.composed).toBe(true);
+    expect(ev.detail).toBe(null);
   });
 });

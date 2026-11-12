@@ -5,9 +5,11 @@
 // runBoot()'s reveal is in boot-run.test.js.
 import { describe, it, expect, vi } from 'vitest';
 import { shouldSkipBoot, writeBootStamp, initReplayBoot } from './boot.js';
-import { KEY, NOW, TTL_MS, freezeBootClock, throwOn } from './boot-test-helpers.js';
+import { KEY, NOW, TTL_MS, freezeBootClock, throwOn, bootWindow } from './boot-test-helpers.js';
 
 freezeBootClock();
+
+const replayBoot = () => /** @type {() => void} */ (bootWindow.__maseReplayBoot)();
 
 describe('shouldSkipBoot', () => {
   it('skips when no stamp is stored but prefersReducedMotion is true', () => {
@@ -65,14 +67,14 @@ describe('shouldSkipBoot', () => {
   it('force-replays (shows boot) over a fresh stamp when MASE_FORCE_BOOT is set', () => {
     // A within-TTL stamp would normally skip, but the replay flag overrides it.
     localStorage.setItem(KEY, String(NOW - 3600 * 1000));
-    window.MASE_FORCE_BOOT = true;
+    bootWindow.MASE_FORCE_BOOT = true;
     expect(shouldSkipBoot(false)).toBe(false);
   });
 
   it('reduced-motion still wins over a force-replay request', () => {
     // forceReplay gets past the first gate, but reduced-motion then skips anyway.
     localStorage.setItem(KEY, String(NOW - 3600 * 1000));
-    window.MASE_FORCE_BOOT = true;
+    bootWindow.MASE_FORCE_BOOT = true;
     expect(shouldSkipBoot(true)).toBe(true);
   });
 });
@@ -131,11 +133,12 @@ describe('initReplayBoot', () => {
   it('clears the boot stamp before reloading', () => {
     localStorage.setItem(KEY, String(NOW));
     // Read at call time: a stamp still present when reload runs means a skipped boot.
+    /** @type {(string | null)[]} */
     const stampAtReload = [];
     vi.stubGlobal('location', { reload: () => stampAtReload.push(localStorage.getItem(KEY)) });
     try {
       initReplayBoot();
-      window.__maseReplayBoot();
+      replayBoot();
       expect(stampAtReload).toEqual([null]);
     } finally {
       vi.unstubAllGlobals();
@@ -148,7 +151,7 @@ describe('initReplayBoot', () => {
     vi.stubGlobal('location', { reload });
     try {
       initReplayBoot();
-      expect(() => window.__maseReplayBoot()).not.toThrow();
+      expect(() => replayBoot()).not.toThrow();
       expect(reload).toHaveBeenCalledOnce();
     } finally {
       spy.mockRestore();

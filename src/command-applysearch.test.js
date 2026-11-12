@@ -4,7 +4,7 @@
 // feed:relayout re-apply. The lower-level applySearch(el, term) unit tests
 // against pretext-laid-out rows live in command-search.test.js.
 import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { setupDom, setChannels, ch, type, press, feedRow } from './command-test-helpers.js';
+import { appData, setupDom, setChannels, ch, type, press, feedRow, byId, $ } from './command-test-helpers.js';
 
 vi.mock('./registry.js', () => ({
   getChannels: vi.fn(() => []),
@@ -17,7 +17,10 @@ vi.mock('./data.js', () => ({
   entriesFor: vi.fn(() => []),
 }));
 
-let command, registry;
+/** @type {typeof import('./command.js')} */
+let command;
+/** @type {typeof import('./registry.js')} */
+let registry;
 
 beforeEach(async () => {
   vi.resetModules();
@@ -32,15 +35,13 @@ beforeEach(async () => {
 describe('applySearch', () => {
   beforeEach(() => {
     setChannels(registry, [ch('home')]);
-    document
-      .getElementById('feed')
-      .append(feedRow('hello world', 'hello world'), feedRow('goodbye moon', 'goodbye moon'));
-    command.initCommand({});
+    byId('feed').append(feedRow('hello world', 'hello world'), feedRow('goodbye moon', 'goodbye moon'));
+    command.initCommand(appData());
   });
 
   it('says no matches beside the clear hint when no row contains the query', () => {
     type('zzz');
-    const hint = document.getElementById('cmd-hint').textContent;
+    const hint = byId('cmd-hint').textContent;
     expect(hint).toContain('no matches');
     expect(hint).toContain('esc');
     expect(hint).toContain('clear');
@@ -48,7 +49,7 @@ describe('applySearch', () => {
 
   it('does not say no matches when a row contains the query', () => {
     type('world');
-    const hint = document.getElementById('cmd-hint').textContent;
+    const hint = byId('cmd-hint').textContent;
     expect(hint).not.toContain('no matches');
     expect(hint).toContain('esc');
     expect(hint).toContain('clear');
@@ -58,7 +59,7 @@ describe('applySearch', () => {
     type('WORLD');
     const rows = [...document.querySelectorAll('.feed-row')];
     expect(rows[0].classList.contains('search-dim')).toBe(false);
-    expect(rows[0].querySelector('mark').textContent).toBe('world');
+    expect($(rows[0], 'mark').textContent).toBe('world');
     expect(rows[1].classList.contains('search-dim')).toBe(true);
     expect(rows[1].querySelector('mark')).toBeNull();
   });
@@ -95,15 +96,15 @@ describe('applySearch', () => {
   it('a search replaced by "/" is not re-applied by a later feed:relayout', () => {
     type('world');
     type('/');
-    document.getElementById('feed').dispatchEvent(new CustomEvent('feed:relayout'));
+    byId('feed').dispatchEvent(new CustomEvent('feed:relayout'));
     expect(document.querySelector('mark')).toBeNull();
     expect(document.querySelector('.search-dim')).toBeNull();
   });
 
   function stripSearchMarkup() {
     for (const row of document.querySelectorAll('.feed-row')) {
-      const msg = row.querySelector('.msg');
-      msg.textContent = row.dataset.raw;
+      const msg = $(row, '.msg');
+      msg.textContent = /** @type {HTMLElement} */ (row).dataset.raw ?? null;
       row.classList.remove('search-dim');
     }
   }
@@ -114,17 +115,17 @@ describe('applySearch', () => {
     expect(document.querySelector('mark')).toBeNull();
     expect(document.querySelector('.search-dim')).toBeNull();
 
-    document.getElementById('feed').dispatchEvent(new CustomEvent('feed:relayout'));
+    byId('feed').dispatchEvent(new CustomEvent('feed:relayout'));
 
     const rows = [...document.querySelectorAll('.feed-row')];
     expect(rows[0].classList.contains('search-dim')).toBe(false);
-    expect(rows[0].querySelector('mark').textContent).toBe('world');
+    expect($(rows[0], 'mark').textContent).toBe('world');
     expect(rows[1].classList.contains('search-dim')).toBe(true);
     expect(rows[1].querySelector('mark')).toBeNull();
   });
 
   it('is a no-op on feed:relayout when no search term is active', () => {
-    document.getElementById('feed').dispatchEvent(new CustomEvent('feed:relayout'));
+    byId('feed').dispatchEvent(new CustomEvent('feed:relayout'));
     expect(document.querySelector('mark')).toBeNull();
     expect(document.querySelector('.search-dim')).toBeNull();
     expect([...document.querySelectorAll('.feed-row .msg')].map((m) => m.textContent))

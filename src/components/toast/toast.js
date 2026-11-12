@@ -40,5 +40,5 @@ export class BaseToast {
 }
 
 if (typeof window !== 'undefined') {
-  /** @type {Window & { BaseToast?: typeof BaseToast }} */ (window).BaseToast = BaseToast;
+  window.BaseToast = BaseToast;
 }

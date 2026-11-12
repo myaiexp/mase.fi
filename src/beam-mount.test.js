@@ -7,13 +7,14 @@ import { mountBeam, unmountBeam } from './beam.js';
 // Keep measurement off the canvas: mountBeam only needs a positive charWidth
 // to enter the animated path, and jsdom's measureText is not a contract we pin.
 vi.mock('@chenglou/pretext', () => ({
-  prepareWithSegments: (text) => text,
-  measureNaturalWidth: (prepared) => String(prepared).length * 8,
+  prepareWithSegments: (/** @type {string} */ text) => text,
+  measureNaturalWidth: (/** @type {unknown} */ prepared) => String(prepared).length * 8,
 }));
 
 // jsdom does not implement matchMedia; bare matchMedia(...) would ReferenceError.
+/** @param {boolean} matches */
 function stubReducedMotion(matches) {
-  vi.stubGlobal('matchMedia', (query) => ({ matches, media: query }));
+  vi.stubGlobal('matchMedia', (/** @type {string} */ query) => ({ matches, media: query }));
 }
 
 function makeHost() {
@@ -135,8 +136,8 @@ describe('mountBeam', () => {
   // Fake timers drive requestAnimationFrame too (one frame per 16ms) and count
   // a pending frame in getTimerCount.
   const FRAME_MS = 16;
-  const beamOf = (host) => host.querySelector('.ascii-beam');
-  const charsOf = (host) => [...host.querySelectorAll('.bch')].map((el) => el.textContent).join('');
+  const beamOf = (/** @type {HTMLElement} */ host) => /** @type {HTMLElement} */ (host.querySelector('.ascii-beam'));
+  const charsOf = (/** @type {HTMLElement} */ host) => [...host.querySelectorAll('.bch')].map((el) => el.textContent).join('');
 
   it('self-cleans within one frame when the host is detached mid-sweep', () => {
     // play()'s entry check only runs between phases. A host detached while a

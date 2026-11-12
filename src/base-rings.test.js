@@ -11,17 +11,22 @@ import { inlineBaseCss } from '../scripts/build-base-css.js';
 const css = inlineBaseCss(fileURLToPath(new URL('./base.css', import.meta.url)));
 
 /** The declaration block of the first rule whose selector list is exactly `selector`. */
+/**
+ * @param {string} selector
+ * @returns {string}
+ */
 function block(selector) {
   const escaped = selector.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
   const m = css.match(new RegExp(`(?:^|\\n)${escaped}\\s*\\{([^}]*)\\}`));
   expect(m, `no rule for ${selector}`).toBeTruthy();
-  return m[1];
+  return /** @type {RegExpMatchArray} */ (m)[1];
 }
 
+/** @param {string} name */
 function token(name) {
   const m = css.match(new RegExp(`${name}\\s*:\\s*(\\d+)px\\s*;`));
   expect(m, `${name} must be declared in px`).toBeTruthy();
-  return Number(m[1]);
+  return Number(/** @type {RegExpMatchArray} */ (m)[1]);
 }
 
 describe('base.css accent outlines', () => {

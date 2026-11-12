@@ -5,10 +5,18 @@ const DEFAULT_FONT = '13px monospace';
 
 // Canvas mock MUST be installed before pretext initializes.
 // Pretext caches the canvas context as a module-level singleton on first use.
-let justifyLines, truncate, wrapOptimal, prepareWithSegments;
+/** @import { Prepared } from './text-fit-layout.js' */
+/** @type {typeof import('./text-fit-layout.js').justifyLines} */
+let justifyLines;
+/** @type {typeof import('./text-fit-layout.js').truncate} */
+let truncate;
+/** @type {typeof import('./text-fit-layout.js').wrapOptimal} */
+let wrapOptimal;
+/** @type {typeof import('@chenglou/pretext').prepareWithSegments} */
+let prepareWithSegments;
 beforeAll(async () => {
   const mockCtx = {
-    measureText: (text) => ({ width: text.length * 8 }), // 8px per char (monospace sim)
+    measureText: (/** @type {string} */ text) => ({ width: text.length * 8 }), // 8px per char (monospace sim)
     font: '',
   };
   vi.stubGlobal('OffscreenCanvas', class {
@@ -18,7 +26,9 @@ beforeAll(async () => {
   ({ prepareWithSegments } = await import('@chenglou/pretext'));
 });
 
+/** @param {string} text @returns {Prepared} */
 function prep(text) {
+  /** @type {Prepared} */
   const result = prepareWithSegments(text, DEFAULT_FONT);
   result._font = DEFAULT_FONT;
   return result;
@@ -80,7 +90,8 @@ describe('truncate', () => {
 
 describe('wrapOptimal', () => {
   it('returns empty string for null prepared', () => {
-    expect(wrapOptimal(null, 200, 2)).toBe('');
+    // null is off-contract on purpose: the guard for an unprepared element is what's tested.
+    expect(wrapOptimal(/** @type {any} */ (null), 200, 2)).toBe('');
   });
 
   it('returns empty string for empty text', () => {

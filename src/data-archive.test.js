@@ -3,7 +3,7 @@ import { describe, it, expect, vi, afterEach } from 'vitest';
 import { fetchData, entriesFor } from './data.js';
 import { logStats } from './log-stats.js';
 import { loadArchive } from './data-archive.js';
-import { entry, stubFetch } from './data-test-helpers.js';
+import { entry, stubFetch, appData } from './data-test-helpers.js';
 
 afterEach(() => {
   vi.unstubAllGlobals();
@@ -16,7 +16,7 @@ describe('loadArchive', () => {
   it('is a no-op when hasArchive is false (does not fetch)', async () => {
     const fetchMock = vi.fn();
     vi.stubGlobal('fetch', fetchMock);
-    const data = { entries: [entry('log', 'activity')], projects: [], hasArchive: false, archiveLoaded: false };
+    const data = appData({ entries: [entry('log', 'activity')], hasArchive: false });
     await loadArchive(data);
     expect(fetchMock).not.toHaveBeenCalled();
     expect(data.archiveLoaded).toBe(false);
@@ -25,7 +25,7 @@ describe('loadArchive', () => {
   it('is a no-op when the archive was already merged', async () => {
     const fetchMock = vi.fn();
     vi.stubGlobal('fetch', fetchMock);
-    const data = { entries: [], projects: [], hasArchive: true, archiveLoaded: true };
+    const data = appData({ hasArchive: true, archiveLoaded: true });
     await loadArchive(data);
     expect(fetchMock).not.toHaveBeenCalled();
   });
@@ -37,15 +37,14 @@ describe('loadArchive', () => {
         { category: 'log', project: 'helm', date: '2026-08-20T10:00', text: 'already-hot' },
       ],
     });
-    const data = {
+    const data = appData({
       projects: [{ name: 'Helm', channel: 'helm', slug: 'helm' }],
       entries: [
         entry('log', 'activity', { date: '2026-08-20T10:00', text: 'already-hot', projectSlug: 'helm' }),
         entry('log', 'activity', { date: '2026-09-01T10:00', text: 'recent', projectSlug: 'helm' }),
       ],
       hasArchive: true,
-      archiveLoaded: false,
-    };
+    });
     await loadArchive(data);
     expect(data.archiveLoaded).toBe(true);
     expect(data.entries.map((e) => e.text)).toEqual(['ancient', 'already-hot', 'recent']);
@@ -67,13 +66,11 @@ describe('loadArchive', () => {
         const fetchMock = makeFetch();
         vi.stubGlobal('fetch', fetchMock);
         const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
-        const data = {
+        const data = appData({
           entries: [entry('log', 'activity'), entry('daily', 'home')],
-          projects: [],
           stats: { archivedLogs: 500 },
           hasArchive: true,
-          archiveLoaded: false,
-        };
+        });
         await expect(loadArchive(data)).resolves.toBe(data);
         expect(data.archiveLoaded).toBe(false);
         expect(data.entries).toHaveLength(2);
@@ -98,7 +95,7 @@ describe('loadArchive', () => {
         null,
       ],
     });
-    const data = { entries: [], projects: [{ channel: 'helm' }], hasArchive: true, archiveLoaded: false };
+    const data = appData({ projects: [{ channel: 'helm' }], hasArchive: true });
     await loadArchive(data);
     expect(data.archiveLoaded).toBe(true);
     // Archive rows are keyed on `category` like the hot path — `cat` is the
@@ -116,12 +113,10 @@ describe('loadArchive', () => {
         { category: 'log', date: '2026-01-03T10:00', summary: 'no-project' },
       ],
     });
-    const data = {
-      entries: [],
+    const data = appData({
       projects: [{ name: 'Explorer', channel: 'exp', slug: 'explorer' }],
       hasArchive: true,
-      archiveLoaded: false,
-    };
+    });
     await loadArchive(data);
     const [mapped, unmapped, bare] = data.entries;
     expect(mapped).toMatchObject({ channel: 'exp', projectChannel: 'exp', projectSlug: 'explorer', nick: 'git', category: 'log' });
@@ -137,19 +132,20 @@ describe('loadArchive', () => {
     stubFetch({ entries: [raw], projects });
     const hot = await fetchData();
     stubFetch({ entries: [raw] });
-    const data = { entries: [], projects, hasArchive: true, archiveLoaded: false };
+    const data = appData({ projects, hasArchive: true });
     await loadArchive(data);
     expect(data.entries[0]).toEqual(hot.entries[0]);
   });
 
   it('shares one fetch between concurrent calls on the same data', async () => {
+    /** @type {((v: unknown) => void) | undefined} */
     let release;
     const fetchMock = vi.fn(() => new Promise((resolve) => { release = resolve; }));
     vi.stubGlobal('fetch', fetchMock);
-    const data = { entries: [], projects: [], hasArchive: true, archiveLoaded: false };
+    const data = appData({ hasArchive: true });
     const a = loadArchive(data);
     const b = loadArchive(data);
-    release({ ok: true, json: async () => ({ entries: [{ category: 'log', date: '2026-01-01T10:00', text: 'x' }] }) });
+    release?.({ ok: true, json: async () => ({ entries: [{ category: 'log', date: '2026-01-01T10:00', text: 'x' }] }) });
     await Promise.all([a, b]);
     expect(fetchMock).toHaveBeenCalledOnce();
     expect(data.entries).toHaveLength(1);

@@ -4,6 +4,8 @@
 // harness note.
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { renderHeroLine } from './pinned.js';
+import { appData } from './data-test-helpers.js';
+import { $ } from './dom-test-helpers.js';
 
 beforeEach(() => {
   vi.stubGlobal('matchMedia', vi.fn().mockReturnValue({ matches: true }));
@@ -19,11 +21,11 @@ afterEach(() => {
   document.body.replaceChildren();
 });
 
-const heroEl = () => document.getElementById('hero-line');
+const heroEl = () => $('#hero-line');
 
 describe('renderHeroLine', () => {
   it('renders static activity/github links for home', () => {
-    renderHeroLine('home', { projects: [] });
+    renderHeroLine('home', appData({ projects: [] }));
     const html = heroEl().innerHTML;
     expect(html).toContain('href="#/activity"');
     expect(html).toContain('href="https://github.com/myaiexp"');
@@ -34,7 +36,7 @@ describe('renderHeroLine', () => {
       projects: [{ channel: 'explorer', heat: 0.8, links: [{ href: 'https://mase.fi/explorer', label: 'mase.fi' }] }],
       demos: [],
     };
-    renderHeroLine('explorer', data);
+    renderHeroLine('explorer', appData(data));
     const html = heroEl().innerHTML;
     expect(html).toContain('href="https://mase.fi/explorer"');
     expect(html).toContain('>mase.fi</a>');
@@ -42,7 +44,7 @@ describe('renderHeroLine', () => {
   });
 
   it('renders only the status when a matched project has no links', () => {
-    renderHeroLine('explorer', { projects: [{ channel: 'explorer', heat: 0.4, links: [] }], demos: [] });
+    renderHeroLine('explorer', appData({ projects: [{ channel: 'explorer', heat: 0.4, links: [] }], demos: [] }));
     const html = heroEl().innerHTML;
     expect(html).not.toContain('<a');
     expect(html).toContain('steady'); // heat > 0.3
@@ -50,8 +52,8 @@ describe('renderHeroLine', () => {
 
   it('includes a demo link when the channel has a published demo', () => {
     const data = { projects: [{ channel: 'explorer', heat: 0.4, links: [] }], demos: ['explorer'] };
-    renderHeroLine('explorer', data);
-    const a = heroEl().querySelector('.demo-link');
+    renderHeroLine('explorer', appData(data));
+    const a = $('.demo-link', heroEl());
     expect(a).not.toBeNull();
     expect(a.getAttribute('href')).toBe('/demos/explorer/');
   });
@@ -59,8 +61,8 @@ describe('renderHeroLine', () => {
   it('escapes a quote in the demo slug so the href cannot break out', () => {
     const slug = '"><script>alert(1)</script>';
     const data = { projects: [{ channel: slug, heat: 0.4, links: [] }], demos: [slug] };
-    renderHeroLine(slug, data);
-    const a = heroEl().querySelector('.demo-link');
+    renderHeroLine(slug, appData(data));
+    const a = $('.demo-link', heroEl());
     expect(heroEl().querySelector('script')).toBeNull();
     expect(a.getAttribute('href')).toBe(`/demos/${slug}/`);
     expect(heroEl().innerHTML).toContain('&quot;');
@@ -72,8 +74,8 @@ describe('renderHeroLine', () => {
       projects: [{ channel: 'explorer', heat: 0.8, links: [{ href: '"><script>alert(1)</script>', label: '<b>x</b>' }] }],
       demos: [],
     };
-    renderHeroLine('explorer', data);
-    const a = heroEl().querySelector('a');
+    renderHeroLine('explorer', appData(data));
+    const a = $('a', heroEl());
     expect(heroEl().querySelector('script')).toBeNull();
     expect(heroEl().querySelector('b')).toBeNull();
     expect(a.getAttribute('href')).toBe('"><script>alert(1)</script>');
@@ -108,17 +110,17 @@ describe('renderHeroLine', () => {
         '<span class="sep">·</span> <span class="status">idle</span>',
     },
   ])('renders the exact hero line for $name', ({ id, data, html }) => {
-    renderHeroLine(id, data);
+    renderHeroLine(id, appData(data));
     expect(heroEl().innerHTML).toBe(html);
   });
 
   it('clears the hero line for activity and unmatched channels', () => {
     heroEl().textContent = 'stale';
-    renderHeroLine('activity', { projects: [] });
+    renderHeroLine('activity', appData({ projects: [] }));
     expect(heroEl().innerHTML).toBe('');
 
     heroEl().textContent = 'stale';
-    renderHeroLine('nope', { projects: [] });
+    renderHeroLine('nope', appData({ projects: [] }));
     expect(heroEl().innerHTML).toBe('');
   });
 });

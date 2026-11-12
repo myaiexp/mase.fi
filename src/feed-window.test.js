@@ -1,15 +1,18 @@
 // @vitest-environment jsdom
 // renderFeed tests: newest-WINDOW_SIZE windowing and scroll-up lazy reveal (with
 // day-separator seam dedup), proj-pill chip navigation, layout-before-scroll-
-// compensation ordering, and switch-time jitter. jsdom has no
+// compensation ordering. Switch-time jitter lives in feed-jitter.test.js. jsdom has no
 // IntersectionObserver/ResizeObserver and no layout, so the observers are stubbed
 // (feed-test-helpers.js; the IO stub is hand-fired to simulate scroll-up). Archive
-// lazy-load lives in feed-archive.test.js.
+// lazy-load lives in feed-archive*.test.js.
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import {
-  ioInstances, installFeedDom, removeFeedStubs, makeData, distinctDays, rows, dayHeaders, sentinel,
+  installFeedDom, removeFeedStubs, makeData, lastIo, distinctDays, rows, dayHeaders, sentinel,
 } from './feed-test-helpers.js';
 
+/** @import { Entry } from './types.js' */
+
+/** @type {typeof import('./feed.js').renderFeed} */
 let renderFeed;
 
 beforeEach(async () => {
@@ -27,14 +30,14 @@ describe('renderFeed windowing', () => {
     expect(rows().length).toBe(200);
     // Window is entries.slice(len-200) in ascending order: last row is the newest
     // entry overall, first row is entry 250 — proving we kept the tail, not the head.
-    expect(rows().at(-1).dataset.raw).toBe('commit 449');
+    expect(rows().at(-1)?.dataset.raw).toBe('commit 449');
     expect(rows()[0].dataset.raw).toBe('commit 250');
   });
 
   it('renders a top sentinel and observes it while older entries remain', () => {
     renderFeed('activity', makeData(450), { immediate: true, navigate: () => {} });
     expect(sentinel()).toBeTruthy();
-    expect(ioInstances.at(-1).targets).toContain(sentinel());
+    expect(lastIo().targets).toContain(sentinel());
   });
 
   it('omits the sentinel (and never observes) when everything fits in one window', () => {
@@ -45,11 +48,11 @@ describe('renderFeed windowing', () => {
 
   it('prepends the next older batch on intersection, growing the window', () => {
     renderFeed('activity', makeData(450), { immediate: true, navigate: () => {} });
-    ioInstances.at(-1).fire();
+    lastIo().fire();
     expect(rows().length).toBe(400);
     // The batch prepended above the previous window: first row is now entry 50.
     expect(rows()[0].dataset.raw).toBe('commit 50');
-    expect(rows().at(-1).dataset.raw).toBe('commit 449'); // newest still anchored at the bottom
+    expect(rows().at(-1)?.dataset.raw).toBe('commit 449'); // newest still anchored at the bottom
   });
 
   it('never duplicates a day header at the batch seam', () => {
@@ -57,7 +60,7 @@ describe('renderFeed windowing', () => {
     renderFeed('activity', data, { immediate: true, navigate: () => {} });
     // Newest 200 = entries 250..449.
     expect(dayHeaders().length).toBe(distinctDays(data.entries.slice(250)));
-    ioInstances.at(-1).fire(); // reveal → materialized 50..449
+    lastIo().fire(); // reveal → materialized 50..449
     expect(dayHeaders().length).toBe(distinctDays(data.entries.slice(50)));
     // If the seam duplicated the shared boundary day, header count would exceed
     // the distinct-day count; asserting exact equality catches that.
@@ -65,7 +68,7 @@ describe('renderFeed windowing', () => {
 
   it('reveals to exhaustion, then removes the sentinel and disconnects', () => {
     renderFeed('activity', makeData(450), { immediate: true, navigate: () => {} });
-    const io = ioInstances.at(-1);
+    const io = lastIo();
     io.fire(); // 200 → 400
     io.fire(); // 400 → 450 (min(600,450)) — exhausted
     expect(rows().length).toBe(450);
@@ -79,7 +82,7 @@ describe('renderFeed windowing', () => {
 
   it('disconnects the prior channel observer when the feed is re-rendered', () => {
     renderFeed('activity', makeData(450), { immediate: true, navigate: () => {} });
-    const first = ioInstances.at(-1);
+    const first = lastIo();
     renderFeed('activity', makeData(450), { immediate: true, navigate: () => {} });
     expect(first.disconnected).toBe(true);
   });
@@ -88,8 +91,10 @@ describe('renderFeed windowing', () => {
 // ---- project-chip click navigation (ensureChipNav) ------------------------
 
 describe('renderFeed chip navigation', () => {
+  /** @type {typeof import('./feed-layout.js').layoutRow} */
   let layoutRow;
 
+  /** @param {{ projectSlug?: string, projectChannel?: string, text?: string }} fields @returns {Entry} */
   function chipEntry({ projectSlug, projectChannel, text = 'commit' }) {
     return {
       channel: 'activity',
@@ -106,7 +111,7 @@ describe('renderFeed chip navigation', () => {
   // layoutRow(0) takes the fallback path and copies row.dataset.targetChannel onto
   // the .proj-pill — the same DOM the click delegate consumes.
   function materializePills() {
-    for (const row of document.querySelectorAll('#feed .feed-row')) {
+    for (const row of rows()) {
       layoutRow(row, 0, '13px monospace');
     }
   }
@@ -117,44 +122,38 @@ describe('renderFeed chip navigation', () => {
 
   it('navigates to the mapped channel when a data-target-channel chip is clicked', () => {
     const navigate = vi.fn();
-    renderFeed('activity', {
-      entries: [chipEntry({ projectSlug: 'explorer', projectChannel: 'explorer' })],
-    }, { immediate: true, navigate });
+    renderFeed('activity', makeData(0, 30, [chipEntry({ projectSlug: 'explorer', projectChannel: 'explorer' })]), { immediate: true, navigate });
     materializePills();
 
     const pill = document.querySelector('.proj-pill[data-target-channel]');
     expect(pill).toBeTruthy();
-    expect(pill.dataset.targetChannel).toBe('explorer');
-    pill.click();
+    expect(/** @type {HTMLElement} */ (pill).dataset.targetChannel).toBe('explorer');
+    /** @type {HTMLElement} */ (pill).click();
     expect(navigate).toHaveBeenCalledOnce();
     expect(navigate).toHaveBeenCalledWith('explorer');
   });
 
   it('does not navigate when an unmapped pill (no data-target-channel) is clicked', () => {
     const navigate = vi.fn();
-    renderFeed('activity', {
-      entries: [chipEntry({ projectSlug: 'secret-tool' })],
-    }, { immediate: true, navigate });
+    renderFeed('activity', makeData(0, 30, [chipEntry({ projectSlug: 'secret-tool' })]), { immediate: true, navigate });
     materializePills();
 
     const pill = document.querySelector('.proj-pill');
     expect(pill).toBeTruthy();
-    expect(pill.dataset.targetChannel).toBeUndefined();
-    pill.click();
+    expect(/** @type {HTMLElement} */ (pill).dataset.targetChannel).toBeUndefined();
+    /** @type {HTMLElement} */ (pill).click();
     expect(navigate).not.toHaveBeenCalled();
   });
 
   it('does not stack click listeners across re-renders of the same feed', () => {
     const navigate = vi.fn();
-    const data = {
-      entries: [chipEntry({ projectSlug: 'explorer', projectChannel: 'explorer' })],
-    };
+    const data = makeData(0, 30, [chipEntry({ projectSlug: 'explorer', projectChannel: 'explorer' })]);
     renderFeed('activity', data, { immediate: true, navigate });
     materializePills();
     renderFeed('activity', data, { immediate: true, navigate });
     materializePills();
 
-    document.querySelector('.proj-pill[data-target-channel]').click();
+    /** @type {HTMLElement} */ (document.querySelector('.proj-pill[data-target-channel]')).click();
     expect(navigate).toHaveBeenCalledOnce();
     expect(navigate).toHaveBeenCalledWith('explorer');
   });
@@ -166,8 +165,11 @@ describe('renderFeed chip navigation', () => {
 // 0, so dropping the addition, doubling it, or reading the pre-layout height
 // still passes an order-only check.
 describe('revealOlder lays out before scroll compensation', () => {
+  /** @type {string[]} */
   let order;
+  /** @type {typeof import('./feed.js').renderFeed} */
   let localRender;
+  /** @type {number} */
   let scrollTop;
   const BASE_HEIGHT = 1000;
   const ROW_GROWTH = 17;
@@ -196,7 +198,7 @@ describe('revealOlder lays out before scroll compensation', () => {
     Object.defineProperty(feed, 'scrollTop', {
       configurable: true,
       get: () => scrollTop,
-      set: (v) => { order.push('scroll'); scrollTop = v; },
+      set: (/** @type {number} */ v) => { order.push('scroll'); scrollTop = v; },
     });
     Object.defineProperty(feed, 'scrollHeight', {
       configurable: true,
@@ -212,7 +214,7 @@ describe('revealOlder lays out before scroll compensation', () => {
     localRender('activity', makeData(450), { immediate: true, navigate: () => {} });
     const before = scrollTop;
     const start = order.length;
-    ioInstances.at(-1).fire();
+    lastIo().fire();
     const reveal = order.slice(start);
     const firstLayout = reveal.indexOf('layout');
     const firstScroll = reveal.indexOf('scroll');
@@ -222,66 +224,5 @@ describe('revealOlder lays out before scroll compensation', () => {
     expect(firstLayout).toBeLessThan(firstScroll);
     expect(layouts).toBeGreaterThan(0);
     expect(scrollTop).toBe(before + layouts * ROW_GROWTH);
-  });
-});
-
-// A channel switch (immediate: false) animates only the newest MAX_JITTER rows.
-// playJitter owns the reduced-motion check, so this runs the real jitter.js and
-// reads the `.jitter` class it tags each animating row with.
-describe('renderFeed switch-time jitter', () => {
-  beforeEach(() => vi.useFakeTimers());
-  afterEach(() => {
-    vi.clearAllTimers();
-    vi.useRealTimers();
-  });
-
-  const reducedMotion = (matches) => vi.stubGlobal('matchMedia', (query) => ({ matches, media: query }));
-  const jittering = () => rows().filter((r) => r.classList.contains('jitter'));
-
-  it('jitters exactly the newest 14 rows when motion is allowed', () => {
-    reducedMotion(false);
-    renderFeed('activity', makeData(30), { navigate: () => {} });
-    expect(jittering()).toEqual(rows().slice(-14));
-    expect(jittering().at(-1).dataset.raw).toBe('commit 29');
-  });
-
-  // A search typed while rows are still scrambling marks the live .msg; settling
-  // has to leave those marks in place. The listener is command.js's own re-apply.
-  it('a search applied mid-jitter is still highlighted once the rows settle', async () => {
-    const { applySearch } = await import('./command-search.js');
-    reducedMotion(false);
-    const feed = document.getElementById('feed');
-    let term = '';
-    feed.addEventListener('feed:relayout', () => { if (term) applySearch(feed, term); });
-    renderFeed('activity', makeData(30), { navigate: () => {} });
-
-    vi.advanceTimersByTime(60); // the first rows are mid-scramble
-    term = 'commit 2';
-    applySearch(feed, term);
-    vi.advanceTimersByTime(2000);
-
-    expect(jittering()).toEqual([]);
-    const tail = rows().slice(-14); // commit 16 … commit 29
-    expect(tail.map((r) => r.querySelector('.msg').textContent)).toEqual(tail.map((r) => r.dataset.raw));
-    const hits = tail.filter((r) => r.dataset.raw.includes('commit 2'));
-    expect(hits.map((r) => r.dataset.raw)).toEqual(Array.from({ length: 10 }, (_, i) => `commit ${20 + i}`));
-    for (const r of hits) expect(r.querySelector('mark').textContent).toBe('commit 2');
-    for (const r of tail.filter((x) => !hits.includes(x))) {
-      expect(r.classList.contains('search-dim')).toBe(true);
-      expect(r.querySelector('mark')).toBeNull();
-    }
-  });
-
-  it('jitters nothing under prefers-reduced-motion', () => {
-    reducedMotion(true);
-    renderFeed('activity', makeData(30), { navigate: () => {} });
-    expect(rows().length).toBe(30);
-    expect(jittering()).toEqual([]);
-  });
-
-  it('jitters nothing on an immediate render', () => {
-    reducedMotion(false);
-    renderFeed('activity', makeData(30), { immediate: true, navigate: () => {} });
-    expect(jittering()).toEqual([]);
   });
 });

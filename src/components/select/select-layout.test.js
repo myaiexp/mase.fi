@@ -1,11 +1,22 @@
 // @vitest-environment jsdom
 // <base-select> layout: menu auto-flip near the viewport bottom and intrinsic sizing
 import { describe, it, expect, beforeAll, afterEach } from 'vitest';
-import { createSelect, getMenu, getTrigger } from './select-test-helpers.js';
+import { createSelect, getMenu, getTrigger, $ } from './select-test-helpers.js';
 
 beforeAll(async () => {
   await import('./select.js');
 });
+
+/**
+ * Stub the host rect; only top/bottom matter to the flip maths.
+ * @param {HTMLElement} el
+ * @param {{ top: number, bottom: number }} rect
+ */
+function stubRect(el, { top, bottom }) {
+  el.getBoundingClientRect = () => ({
+    top, bottom, left: 0, right: 100, width: 100, height: 40, x: 0, y: top, toJSON: () => ({}),
+  });
+}
 
 describe('base-select auto-flip', () => {
   afterEach(() => { document.body.innerHTML = ''; });
@@ -15,14 +26,13 @@ describe('base-select auto-flip', () => {
   it('adds flip class when near bottom', () => {
     const el = createSelect({ options: [{ value: 'x', label: 'X' }] });
 
-    el.getBoundingClientRect = () => ({
-      top: 900, bottom: 940, left: 0, right: 100, width: 100, height: 40,
-    });
+    stubRect(el, { top: 900, bottom: 940 });
     Object.defineProperty(window, 'innerHeight', { value: 768, configurable: true });
 
     el.open();
     expect(getMenu(el).classList.contains('flip')).toBe(true);
-    delete el.getBoundingClientRect;
+    // Drop the own-property stub so the prototype method is visible again.
+    Reflect.deleteProperty(el, 'getBoundingClientRect');
   });
 
   it('no flip class when space available', () => {
@@ -30,14 +40,13 @@ describe('base-select auto-flip', () => {
 
     // spaceBelow = 768 - 518 = 250, just clears the 200px estimate. Boundary-
     // sensitive: bumping MENU_HEIGHT_ESTIMATE to 300 would flip this RED.
-    el.getBoundingClientRect = () => ({
-      top: 478, bottom: 518, left: 0, right: 100, width: 100, height: 40,
-    });
+    stubRect(el, { top: 478, bottom: 518 });
     Object.defineProperty(window, 'innerHeight', { value: 768, configurable: true });
 
     el.open();
     expect(getMenu(el).classList.contains('flip')).toBe(false);
-    delete el.getBoundingClientRect;
+    // Drop the own-property stub so the prototype method is visible again.
+    Reflect.deleteProperty(el, 'getBoundingClientRect');
   });
 });
 
@@ -47,8 +56,9 @@ describe('base-select auto-flip', () => {
 describe('base-select intrinsic sizing', () => {
   afterEach(() => { document.body.innerHTML = ''; });
 
+  /** @param {HTMLElement} el */
   function getSizer(el) {
-    return el.shadowRoot.querySelector('.sizer');
+    return $(/** @type {ShadowRoot} */ (el.shadowRoot), '.sizer');
   }
 
   it('sizer mirrors every option label', () => {

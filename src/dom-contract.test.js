@@ -16,6 +16,7 @@ const LOOKUP_RE = /(?:getElementById|\$)\(\s*['"]([^'"]+)['"]\s*\)/g;
 // IDs the same file assigns (injected <style>, etc.) are not HTML contract.
 const CREATED_RE = /\.id\s*=\s*['"]([^'"]+)['"]/g;
 
+/** @param {string} filename */
 function referencedIds(filename) {
   const source = readFileSync(join(SRC, filename), 'utf8');
   const created = new Set([...source.matchAll(CREATED_RE)].map((m) => m[1]));
@@ -26,6 +27,7 @@ function referencedIds(filename) {
   return ids;
 }
 
+/** @param {string} filename */
 function htmlIds(filename) {
   const html = readFileSync(join(ROOT, filename), 'utf8');
   const doc = new JSDOM(html).window.document;
@@ -40,6 +42,10 @@ function homepageModules() {
   );
 }
 
+/**
+ * @param {Iterable<string>} required
+ * @param {Set<string>} present
+ */
 function missing(required, present) {
   return [...required].filter((id) => !present.has(id)).sort();
 }

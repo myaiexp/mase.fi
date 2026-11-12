@@ -5,9 +5,11 @@ import { readFileSync, readdirSync } from 'node:fs';
 import { join, relative } from 'node:path';
 import { mountShadow } from './mount-shadow.js';
 import { shadowStyles } from './shadow-styles.js';
+import { shadow } from '../../dom-test-helpers.js';
 
 const COMPONENTS_DIR = join(import.meta.dirname, '..');
 
+/** @param {string} html */
 function makeTemplate(html) {
   const template = document.createElement('template');
   template.innerHTML = html;
@@ -23,8 +25,8 @@ describe('mountShadow', () => {
     const template = makeTemplate('<span id="a"></span>');
     const host = document.createElement('div');
     mountShadow(host, shadowStyles(':host {}'), template);
-    expect(host.shadowRoot.mode).toBe('open');
-    expect(host.shadowRoot.querySelector('#a')).not.toBeNull();
+    expect(shadow(host).mode).toBe('open');
+    expect(shadow(host).querySelector('#a')).not.toBeNull();
     expect(template.content.querySelector('#a')).not.toBeNull();
   });
 
@@ -35,7 +37,7 @@ describe('mountShadow', () => {
     const b = document.createElement('div');
     mountShadow(a, styles, template);
     mountShadow(b, styles, template);
-    expect(a.shadowRoot.querySelector('span')).not.toBe(b.shadowRoot.querySelector('span'));
+    expect(shadow(a).querySelector('span')).not.toBe(shadow(b).querySelector('span'));
   });
 
   it('adopts the styles before the template content goes in', () => {
@@ -44,12 +46,13 @@ describe('mountShadow', () => {
     let childrenAtAdopt = -1;
     mountShadow(host, { adopt: (root) => { childrenAtAdopt = root.childNodes.length; } }, template);
     expect(childrenAtAdopt).toBe(0);
-    expect(host.shadowRoot.querySelector('span')).not.toBeNull();
+    expect(shadow(host).querySelector('span')).not.toBeNull();
   });
 
   it('passes a custom init through to attachShadow', () => {
     const attach = vi.spyOn(HTMLElement.prototype, 'attachShadow');
     const host = document.createElement('div');
+    /** @type {ShadowRootInit} */
     const init = { mode: 'open', delegatesFocus: true };
     mountShadow(host, shadowStyles(':host {}'), makeTemplate(''), init);
     expect(attach).toHaveBeenCalledWith(init);
@@ -65,7 +68,7 @@ describe('components', () => {
   });
 
   it('attach shadow roots only through mountShadow', () => {
-    const offenders = readdirSync(COMPONENTS_DIR, { recursive: true })
+    const offenders = readdirSync(COMPONENTS_DIR, { recursive: true, encoding: 'utf8' })
       .map((entry) => join(COMPONENTS_DIR, entry))
       .filter((path) => path.endsWith('.js') && !path.endsWith('.test.js'))
       .filter((path) => !path.endsWith('mount-shadow.js'))

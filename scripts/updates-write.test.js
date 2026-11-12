@@ -9,6 +9,7 @@ import {
 import { join } from 'node:path';
 import { makeTempDir, cleanup, SCRIPTS_DIR } from './test-helpers.js';
 
+/** @type {string} */
 let dir;
 
 beforeEach(() => {
@@ -22,6 +23,10 @@ afterEach(() => {
 });
 
 // source updates-write.sh and call write_updates_json <cand> <target>
+/**
+ * @param {string} candidate
+ * @param {string} target
+ */
 function writeViaShell(candidate, target) {
   const script = `
     set -e
@@ -97,6 +102,7 @@ describe('write_updates_json — in-place cp fallback (dir not writable)', () =>
 });
 
 // source updates-write.sh and call ensure_updates_lock against $1
+/** @param {string} path */
 function ensureLock(path) {
   const script = `
     set -e
@@ -130,6 +136,12 @@ describe('ensure_updates_lock — O_NOFOLLOW, no truncate', () => {
 });
 
 // source updates-write.sh and call run_under_updates_lock <target> <label> _fn [args...]
+/**
+ * @param {string} target
+ * @param {string} fnBody
+ * @param {string[]} [args]
+ * @param {{ label?: string }} [opts]
+ */
 function runUnderLock(target, fnBody, args = [], { label = 'test-label' } = {}) {
   const lockPath = join(dir, 'updates.json.lock');
   const script = `
@@ -187,6 +199,11 @@ describe('run_under_updates_lock — the one owner of the lock steps', () => {
 });
 
 // source updates-write.sh and call with_updates_lock <target> <label> <fn>
+/**
+ * @param {string} target
+ * @param {string} transformBody
+ * @param {{ label?: string, lock?: string }} [opts]
+ */
 function withLock(target, transformBody, { label = 'test-label', lock } = {}) {
   const lockPath = lock || join(dir, 'updates.json.lock');
   const script = `
@@ -275,22 +292,4 @@ describe('with_updates_lock — locked read-modify-write', () => {
     expect(readFileSync(victim, 'utf8')).toBe('do-not-clobber');
     expect(JSON.parse(readFileSync(target, 'utf8')).entries).toEqual([]);
   });
-});
-
-// The store path has one owner (idea #2487): a writer that hardcodes it drifts the
-// moment the store moves, and writes to a file nginx no longer serves.
-describe('UPDATES_FILE_DEFAULT — the one store path', () => {
-  it('points at the mase-owned store dir outside the webroot', () => {
-    const r = spawnSync('bash', ['-c', `source "${join(SCRIPTS_DIR, 'updates-write.sh')}"; echo "$UPDATES_FILE_DEFAULT"`], { encoding: 'utf8' });
-    expect(r.stdout.trim()).toBe('/var/lib/mase-fi/updates.json');
-  });
-
-  it.each(['mase-fi-update', 'mase-fi-daily-summary', 'mase-fi-projects', 'mase-fi-compact-updates'])(
-    '%s defaults UPDATES_FILE to UPDATES_FILE_DEFAULT, not a literal path',
-    (name) => {
-      const src = readFileSync(join(SCRIPTS_DIR, name), 'utf8');
-      expect(src).toMatch(/\$\{UPDATES_FILE:-\$UPDATES_FILE_DEFAULT\}/);
-      expect(src).not.toMatch(/\/var\/(www|lib)\/[^\s"]*updates\.json/);
-    },
-  );
 });

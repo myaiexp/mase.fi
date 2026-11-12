@@ -11,12 +11,17 @@ import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { playJitter, clearJitter } from './jitter.js';
 
 // jsdom does not implement matchMedia; bare matchMedia(...) would ReferenceError.
+/** @param {boolean} matches */
 function stubReducedMotion(matches) {
-  vi.stubGlobal('matchMedia', (query) => ({ matches, media: query }));
+  vi.stubGlobal('matchMedia', (/** @type {string} */ query) => ({ matches, media: query }));
 }
 
 // Build a feed row with the .msg / .nick children playJitter queries and mutates.
 // dataset.raw is the row's source of truth, as populateRow leaves it in feed.js.
+/**
+ * @param {string} msgText
+ * @param {string} nickText
+ */
 function makeRow(msgText, nickText) {
   const row = document.createElement('div');
   row.dataset.raw = msgText;
@@ -31,7 +36,9 @@ function makeRow(msgText, nickText) {
 }
 
 // Stand-in for feed.js's settle: rebuild .msg from the row's source of truth.
-const settle = (row) => { row.querySelector('.msg').textContent = row.dataset.raw; };
+const settle = (/** @type {HTMLElement} */ row) => {
+  /** @type {HTMLElement} */ (row.querySelector('.msg')).textContent = row.dataset.raw ?? null;
+};
 
 beforeEach(() => {
   vi.useFakeTimers();
@@ -135,6 +142,7 @@ describe('playJitter — motion allowed', () => {
   it('settles each row once, in stagger order', () => {
     stubReducedMotion(false);
     const made = [makeRow('one', 'a'), makeRow('two', 'b'), makeRow('three', 'c')];
+    /** @type {(string | undefined)[]} */
     const settled = [];
     playJitter(made.map(({ row }) => ({ row })), (row) => { settled.push(row.dataset.raw); settle(row); });
     vi.advanceTimersByTime(2000);

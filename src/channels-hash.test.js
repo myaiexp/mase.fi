@@ -4,42 +4,22 @@
 // an unknown hash and a late demos list. Routing/registry, navigate,
 // chHeat/chAccent, and initChannels tests live in channels.test.js.
 import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { appData, seedData, setupDom, byId, initCapturing } from './channels-test-helpers.js';
+/** @import { AppData } from './types.js' */
 
 vi.mock('./data.js', () => ({ entriesFor: vi.fn(() => []) }));
 vi.mock('./pinned.js', () => ({ renderPinned: vi.fn(), renderHeroLine: vi.fn() }));
 vi.mock('./feed.js', () => ({ renderFeed: vi.fn() }));
-vi.mock('./transition.js', () => ({ playSwitchTransition: vi.fn((cb) => cb && cb()) }));
+vi.mock('./transition.js', () => ({ playSwitchTransition: vi.fn((/** @type {(() => void) | undefined} */ cb) => cb && cb()) }));
 vi.mock('./sidebar.js', () => ({ setActiveChannel: vi.fn() }));
 
-let channels, pinned;
+/** @type {typeof import('./channels.js')} */
+let channels;
+/** @type {typeof import('./pinned.js')} */
+let pinned;
 
-function setupDom() {
-  document.body.replaceChildren();
-  for (const id of ['pane', 'topic-hash', 'topic-text', 'topic-meta']) {
-    const el = document.createElement('span');
-    el.id = id;
-    document.body.appendChild(el);
-  }
-}
-
-function seed() {
-  initCapturing({
-    projects: [{ channel: 'explorer', description: 'explorer topic', heat: 0.7 }],
-    entries: [],
-  });
-}
-
-// Call initChannels but capture (and discard) the hashchange handler instead of
-// registering it, so no real listener leaks across tests. Returns the handler.
-function initCapturing(data) {
-  let handler;
-  const spy = vi.spyOn(window, 'addEventListener').mockImplementation((type, fn) => {
-    if (type === 'hashchange') handler = fn;
-  });
-  channels.initChannels(data);
-  spy.mockRestore();
-  return handler;
-}
+const capture = (/** @type {AppData} */ data) => initCapturing(channels, data);
+const seed = () => capture(seedData());
 
 beforeEach(async () => {
   vi.resetModules();
@@ -96,15 +76,15 @@ describe('applyInitialChannel', () => {
     channels.applyInitialChannel();
     expect(channels.getCurrentChannelId()).toBe('home');
     expect(location.hash).toBe('#/home');
-    expect(document.getElementById('topic-hash').textContent).toBe('#home');
+    expect(byId('topic-hash').textContent).toBe('#home');
   });
 
   it('repairs a bad hash when home is already current, without re-rendering', () => {
     seed();
     channels.navigate('home');
     window.history.replaceState(null, '', '#/ghost');
-    pinned.renderHeroLine.mockClear();
-    pinned.renderPinned.mockClear();
+    vi.mocked(pinned.renderHeroLine).mockClear();
+    vi.mocked(pinned.renderPinned).mockClear();
     channels.navigate('ghost', { fromHash: true });
     expect(location.hash).toBe('#/home');
     expect(channels.getCurrentChannelId()).toBe('home');
@@ -115,15 +95,11 @@ describe('applyInitialChannel', () => {
 
 describe('applyLateDemos', () => {
   it('re-renders the open channel when the late list includes it', () => {
-    const data = {
-      projects: [{ channel: 'explorer', description: 'explorer topic', heat: 0.7 }],
-      entries: [],
-      demos: [],
-    };
-    initCapturing(data);
+    const data = seedData();
+    capture(data);
     channels.navigate('explorer');
-    pinned.renderHeroLine.mockClear();
-    pinned.renderPinned.mockClear();
+    vi.mocked(pinned.renderHeroLine).mockClear();
+    vi.mocked(pinned.renderPinned).mockClear();
     channels.applyLateDemos(['explorer']);
     expect(data.demos).toEqual(['explorer']);
     expect(pinned.renderHeroLine).toHaveBeenCalledWith('explorer', data);
@@ -131,22 +107,18 @@ describe('applyLateDemos', () => {
   });
 
   it('stores a late list that does not match the open channel without re-rendering', () => {
-    const data = {
-      projects: [{ channel: 'explorer', description: 'explorer topic', heat: 0.7 }],
-      entries: [],
-      demos: [],
-    };
-    initCapturing(data);
+    const data = seedData();
+    capture(data);
     channels.navigate('explorer');
-    pinned.renderPinned.mockClear();
+    vi.mocked(pinned.renderPinned).mockClear();
     channels.applyLateDemos(['other']);
     expect(data.demos).toEqual(['other']);
     expect(pinned.renderPinned).not.toHaveBeenCalled();
   });
 
   it('stores a late list before the first navigation without rendering', () => {
-    const data = { projects: [], entries: [], demos: [] };
-    initCapturing(data);
+    const data = appData();
+    capture(data);
     channels.applyLateDemos(['explorer']);
     expect(data.demos).toEqual(['explorer']);
     expect(pinned.renderPinned).not.toHaveBeenCalled();
@@ -154,9 +126,9 @@ describe('applyLateDemos', () => {
 
   it('ignores a non-list and a call before init', () => {
     expect(() => channels.applyLateDemos(['explorer'])).not.toThrow();
-    const data = { projects: [], entries: [], demos: [] };
-    initCapturing(data);
-    channels.applyLateDemos(null);
+    const data = appData();
+    capture(data);
+    channels.applyLateDemos(/** @type {any} */ (null)); // a non-list on purpose
     expect(data.demos).toEqual([]);
   });
 });

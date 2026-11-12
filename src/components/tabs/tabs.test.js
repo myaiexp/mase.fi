@@ -1,5 +1,13 @@
 // @vitest-environment jsdom
+// <base-tabs> tests: rendering, selection, keyboard nav, tab-change, ARIA panel wiring
 import { describe, it, expect, beforeAll, afterEach } from 'vitest';
+import {
+  createTabs,
+  shadowQ,
+  shadowAll,
+  tabButtons,
+  collectTabChanges,
+} from './tabs-test-helpers.js';
 
 beforeAll(async () => {
   await import('./tabs.js');
@@ -9,24 +17,6 @@ afterEach(() => {
   document.body.innerHTML = '';
 });
 
-// Helper: create a <base-tabs> with N <base-tab> children and append to body.
-// Returns { tabs, tabEls } where tabEls are the <base-tab> elements.
-function createTabs(defs = []) {
-  const tabs = document.createElement('base-tabs');
-  for (const def of defs) {
-    const tab = document.createElement('base-tab');
-    tab.setAttribute('label', def.label);
-    if (def.active) tab.setAttribute('active', '');
-    if (def.disabled) tab.setAttribute('disabled', '');
-    tab.textContent = def.content ?? def.label + ' content';
-    tabs.appendChild(tab);
-  }
-  document.body.appendChild(tabs);
-  // Trigger initial scan (slotchange does not fire in jsdom)
-  tabs._updateTabs();
-  return { tabs, tabEls: Array.from(tabs.querySelectorAll('base-tab')) };
-}
-
 describe('base-tabs', () => {
   it('renders tab buttons from child base-tab labels', () => {
     const { tabs } = createTabs([
@@ -34,13 +24,13 @@ describe('base-tabs', () => {
       { label: 'Beta' },
       { label: 'Gamma' },
     ]);
-    const bar = tabs.shadowRoot.querySelector('[role="tablist"]');
+    const bar = shadowQ(tabs, '[role="tablist"]');
     expect(bar).toBeTruthy();
-    const buttons = bar.querySelectorAll('button');
+    const buttons = tabButtons(tabs);
     expect(buttons.length).toBe(3);
-    expect(buttons[0].textContent.trim()).toBe('Alpha');
-    expect(buttons[1].textContent.trim()).toBe('Beta');
-    expect(buttons[2].textContent.trim()).toBe('Gamma');
+    expect((buttons[0].textContent ?? '').trim()).toBe('Alpha');
+    expect((buttons[1].textContent ?? '').trim()).toBe('Beta');
+    expect((buttons[2].textContent ?? '').trim()).toBe('Gamma');
   });
 
   it('first tab is active by default', () => {
@@ -49,7 +39,7 @@ describe('base-tabs', () => {
       { label: 'Two' },
     ]);
     expect(tabs.activeIndex).toBe(0);
-    const buttons = tabs.shadowRoot.querySelectorAll('[role="tablist"] button');
+    const buttons = tabButtons(tabs);
     expect(buttons[0].getAttribute('aria-selected')).toBe('true');
     expect(buttons[1].getAttribute('aria-selected')).toBe('false');
   });
@@ -59,7 +49,7 @@ describe('base-tabs', () => {
       { label: 'First', content: 'Panel 1' },
       { label: 'Second', content: 'Panel 2' },
     ]);
-    const buttons = tabs.shadowRoot.querySelectorAll('[role="tablist"] button');
+    const buttons = tabButtons(tabs);
     buttons[1].click();
     expect(tabs.activeIndex).toBe(1);
     expect(buttons[1].getAttribute('aria-selected')).toBe('true');
@@ -74,7 +64,7 @@ describe('base-tabs', () => {
     ]);
     tabs.selectTab(2);
     expect(tabs.activeIndex).toBe(2);
-    const buttons = tabs.shadowRoot.querySelectorAll('[role="tablist"] button');
+    const buttons = tabButtons(tabs);
     expect(buttons[2].getAttribute('aria-selected')).toBe('true');
     expect(buttons[0].getAttribute('aria-selected')).toBe('false');
   });
@@ -84,8 +74,7 @@ describe('base-tabs', () => {
       { label: 'X' },
       { label: 'Y' },
     ]);
-    const events = [];
-    tabs.addEventListener('tab-change', (e) => events.push(e.detail));
+    const events = collectTabChanges(tabs);
     tabs.selectTab(1);
     expect(events.length).toBe(1);
     expect(events[0].index).toBe(1);
@@ -100,7 +89,7 @@ describe('base-tabs', () => {
     tabs.selectTab(1);
     // Should remain on 0
     expect(tabs.activeIndex).toBe(0);
-    const buttons = tabs.shadowRoot.querySelectorAll('[role="tablist"] button');
+    const buttons = tabButtons(tabs);
     expect(buttons[0].getAttribute('aria-selected')).toBe('true');
   });
 
@@ -110,7 +99,7 @@ describe('base-tabs', () => {
       { label: 'Q' },
       { label: 'R' },
     ]);
-    const bar = tabs.shadowRoot.querySelector('[role="tablist"]');
+    const bar = shadowQ(tabs, '[role="tablist"]');
     // Start at 0, ArrowRight => 1
     bar.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowRight', bubbles: true }));
     expect(tabs.activeIndex).toBe(1);
@@ -133,10 +122,9 @@ describe('base-tabs', () => {
       { label: 'Q', disabled: true },
       { label: 'R', disabled: true },
     ]);
-    const bar = tabs.shadowRoot.querySelector('[role="tablist"]');
+    const bar = shadowQ(tabs, '[role="tablist"]');
     const before = tabs.activeIndex;
-    const events = [];
-    tabs.addEventListener('tab-change', (e) => events.push(e.detail));
+    const events = collectTabChanges(tabs);
 
     bar.dispatchEvent(new KeyboardEvent('keydown', { key, bubbles: true }));
 
@@ -149,17 +137,16 @@ describe('base-tabs', () => {
       { label: 'P' },
       { label: 'Q' },
     ]);
-    const bar = tabs.shadowRoot.querySelector('[role="tablist"]');
+    const bar = shadowQ(tabs, '[role="tablist"]');
     bar.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowRight', bubbles: true }));
-    const events = [];
-    tabs.addEventListener('tab-change', (e) => events.push(e.detail));
+    const events = collectTabChanges(tabs);
 
     const press = new KeyboardEvent('keydown', { key, bubbles: true, cancelable: true });
     bar.dispatchEvent(press);
 
     expect(events).toEqual([{ index: 1, label: 'Q' }]);
     expect(press.defaultPrevented).toBe(true);
-    const buttons = tabs.shadowRoot.querySelectorAll('[role="tablist"] button');
+    const buttons = tabButtons(tabs);
     expect(buttons[1].getAttribute('aria-selected')).toBe('true');
   });
 
@@ -170,7 +157,7 @@ describe('base-tabs', () => {
       { label: 'Third' },
     ]);
     expect(tabs.activeIndex).toBe(1);
-    const buttons = tabs.shadowRoot.querySelectorAll('[role="tablist"] button');
+    const buttons = tabButtons(tabs);
     expect(buttons[1].getAttribute('aria-selected')).toBe('true');
     expect(buttons[0].getAttribute('aria-selected')).toBe('false');
   });
@@ -184,7 +171,7 @@ describe('base-tabs', () => {
     ]);
     expect(tabs.activeIndex).toBe(1);
 
-    tabs.shadowRoot.querySelectorAll('[role="tablist"] button')[0].click();
+    tabButtons(tabs)[0].click();
     expect(tabs.activeIndex).toBe(0);
 
     // A host app edits an unrelated tab's label — this fires attributeChanged-
@@ -193,7 +180,7 @@ describe('base-tabs', () => {
     tabEls[2].setAttribute('label', 'Third!');
 
     expect(tabs.activeIndex).toBe(0);
-    const buttons = tabs.shadowRoot.querySelectorAll('[role="tablist"] button');
+    const buttons = tabButtons(tabs);
     expect(buttons[0].getAttribute('aria-selected')).toBe('true');
     expect(buttons[1].getAttribute('aria-selected')).toBe('false');
   });
@@ -205,7 +192,7 @@ describe('base-tabs ARIA panel wiring', () => {
       { label: 'Alpha' },
       { label: 'Beta' },
     ]);
-    const buttons = [...tabs.shadowRoot.querySelectorAll('[role="tab"]')];
+    const buttons = shadowAll(tabs, '[role="tab"]');
     expect(buttons).toHaveLength(2);
     buttons.forEach((btn, i) => {
       const panelId = btn.getAttribute('aria-controls');
@@ -221,13 +208,13 @@ describe('base-tabs ARIA panel wiring', () => {
     const { tabs, tabEls } = createTabs([{ label: 'Alpha' }, { label: 'Beta' }]);
     tabEls[0].id = 'custom-panel';
     tabs._updateTabs();
-    const btn = tabs.shadowRoot.querySelector('[role="tab"]');
+    const btn = shadowQ(tabs, '[role="tab"]');
     expect(tabEls[0].id).toBe('custom-panel');
     expect(btn.getAttribute('aria-controls')).toBe('custom-panel');
     expect(tabEls[0].getAttribute('aria-labelledby')).toBe(btn.id);
     const buttonId = btn.id;
     tabs._updateTabs();
-    const again = tabs.shadowRoot.querySelector('[role="tab"]');
+    const again = shadowQ(tabs, '[role="tab"]');
     expect(again.id).toBe(buttonId);
     expect(tabEls[0].getAttribute('aria-labelledby')).toBe(buttonId);
   });

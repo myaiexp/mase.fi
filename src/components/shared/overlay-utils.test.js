@@ -1,9 +1,13 @@
 // @vitest-environment jsdom
+// overlay-utils tests: outside-click and Escape close, deferred click attach, extra listeners, cleanup
 import { describe, it, expect, afterEach, vi } from 'vitest';
 import { addOverlayListeners, removeOverlayListeners } from './overlay-utils.js';
+/** @import { OverlayListener } from './overlay-utils.js' */
+/** @typedef {{ close: import('vitest').Mock<() => void>, _overlayListeners?: OverlayListener[] | null }} FakeOverlay */
 
 // A stand-in for an overlay component: the helper only ever touches `.close()`
 // and the `._overlayListeners` storage slot.
+/** @returns {FakeOverlay} */
 function makeComponent() {
   return { close: vi.fn() };
 }
@@ -14,7 +18,9 @@ function makeHost() {
   return host;
 }
 
+/** @type {FakeOverlay[]} */
 let active = [];
+/** @param {FakeOverlay} component */
 function track(component) {
   active.push(component);
   return component;
@@ -28,6 +34,7 @@ afterEach(() => {
   vi.restoreAllMocks();
 });
 
+/** @param {EventTarget} target */
 function clickOn(target) {
   target.dispatchEvent(new MouseEvent('click', { bubbles: true }));
 }
@@ -36,6 +43,7 @@ function clickOn(target) {
 // addOverlayListeners), so click-driven tests must flush one tick first.
 const tick = () => Promise.resolve();
 
+/** @param {string} key */
 function keydown(key) {
   document.dispatchEvent(new KeyboardEvent('keydown', { key, bubbles: true }));
 }
@@ -48,7 +56,7 @@ describe('overlay-utils', () => {
     addOverlayListeners(c, () => false);
 
     expect(Array.isArray(c._overlayListeners)).toBe(true);
-    const docListeners = c._overlayListeners.filter((l) => l.target === document);
+    const docListeners = (c._overlayListeners ?? []).filter((l) => l.target === document);
     const types = docListeners.map((l) => l.type);
     expect(types).toEqual(['click', 'keydown']);
   });
@@ -79,7 +87,7 @@ describe('overlay-utils', () => {
     host.appendChild(inside);
 
     const c = track(makeComponent());
-    addOverlayListeners(c, (e) => !host.contains(e.target));
+    addOverlayListeners(c, (e) => !host.contains(/** @type {Node} */ (e.target)));
     await tick();
 
     // Inside click — predicate false, stays open.
@@ -93,7 +101,7 @@ describe('overlay-utils', () => {
 
   it('passes the click event to the onClickOutside predicate', async () => {
     const c = track(makeComponent());
-    const predicate = vi.fn(() => false);
+    const predicate = vi.fn(/** @type {(e: Event) => boolean} */ (() => false));
     addOverlayListeners(c, predicate);
     await tick();
 
@@ -154,7 +162,7 @@ describe('overlay-utils', () => {
     window.dispatchEvent(new Event('scroll'));
     expect(onScroll).toHaveBeenCalledTimes(1);
     // And the extra is recorded in the registry alongside the doc listeners.
-    expect(c._overlayListeners.some((l) => l.target === window && l.type === 'scroll')).toBe(true);
+    expect((c._overlayListeners ?? []).some((l) => l.target === window && l.type === 'scroll')).toBe(true);
   });
 
   it('detaches extraListeners with their original options on removal', () => {
