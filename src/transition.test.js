@@ -19,8 +19,9 @@ const MIDPOINT_MS = 140; // just past 138.6
 const SAFETY_MS = 620;
 
 // jsdom does not implement matchMedia; bare matchMedia(...) would ReferenceError.
+/** @param {boolean} matches */
 function stubReducedMotion(matches) {
-  vi.stubGlobal('matchMedia', (query) => ({ matches, media: query }));
+  vi.stubGlobal('matchMedia', (/** @type {string} */ query) => ({ matches, media: query }));
 }
 
 // Build the #feed-overlay element the normal (animated) path reads and mutates.
@@ -86,7 +87,7 @@ describe('playSwitchTransition — normal animated path', () => {
     playSwitchTransition(onMid);
     vi.advanceTimersByTime(MIDPOINT_MS);
 
-    const scan = overlay.querySelector('.scan');
+    const scan = /** @type {HTMLElement} */ (overlay.querySelector('.scan'));
     scan.dispatchEvent(new Event('animationend'));
 
     // done() tore the overlay back down...
@@ -148,7 +149,7 @@ describe('playSwitchTransition — animationend + safety timer do not double-fir
     vi.advanceTimersByTime(MIDPOINT_MS);
 
     // animationend runs done(), which cancels the pending safety timer.
-    const scan = overlay.querySelector('.scan');
+    const scan = /** @type {HTMLElement} */ (overlay.querySelector('.scan'));
     scan.dispatchEvent(new Event('animationend'));
 
     // Advance well past the safety window: the cancelled timer must not re-run,

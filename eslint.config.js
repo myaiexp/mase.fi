@@ -1,3 +1,4 @@
+// ESLint flat config: recommended rules, browser globals for src/ and scripts/
 import js from '@eslint/js';
 
 export default [

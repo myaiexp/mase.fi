@@ -9,12 +9,24 @@ import { makeTempDir, cleanup, writeJson, readJson, runScript, todayHelsinki, wr
 // the VPS, and past vitest's 5s default once the other script suites run beside it.
 vi.setConfig({ testTimeout: 20_000 });
 
+/** @type {string} */
 let TODAY;
-let dir, file, extraFile;
+/** @type {string} */
+let dir;
+/** @type {string} */
+let file;
+/** @type {string} */
+let extraFile;
 
+/** @param {import('./test-helpers.js').Row[]} entries */
 const seed = (entries) => writeJson(file, { entries, projects: [] });
+/**
+ * @param {string} project
+ * @param {string} text
+ */
 const log = (project, text) => ({ date: TODAY, project, text, category: 'log' });
 const dailies = () => readJson(file).entries.filter((e) => e.category === 'daily');
+/** @param {Record<string, string>} [env] */
 const run = (env = {}) =>
   runScript('mase-fi-daily-summary', [], {
     UPDATES_FILE: file,

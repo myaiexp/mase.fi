@@ -7,11 +7,17 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { installFeedDom, removeFeedStubs, makeData } from './feed-test-helpers.js';
 
+/** @type {typeof import('./feed.js').renderFeed} */
 let renderFeed;
+/** @type {import('vitest').Mock<(feedEl: Element) => void>} */
 let relayoutAll;
+/** @type {HTMLElement} */
 let feed;
+/** @type {number} */
 let msgWidth;
+/** @type {{ cb: (entries: unknown[]) => void, targets: Element[] }[]} */
 let observers;
+/** @type {FrameRequestCallback[]} */
 let rafQueue;
 
 // Runs the queued animation frames, the way the browser would on the next frame.
@@ -21,9 +27,10 @@ function flushFrames() {
 }
 
 // Simulates a resize: the observer fires, then the next frame runs.
+/** @param {number} width */
 function resizeTo(width) {
   msgWidth = width;
-  observers.at(-1).cb([]);
+  observers.at(-1)?.cb([]);
   flushFrames();
 }
 
@@ -34,15 +41,22 @@ beforeEach(async () => {
   rafQueue = [];
   msgWidth = 300;
 
-  globalThis.ResizeObserver = class {
-    constructor(cb) { this.cb = cb; this.targets = []; observers.push(this); }
+  globalThis.ResizeObserver = /** @type {typeof ResizeObserver} */ (/** @type {unknown} */ (class {
+    /** @param {(entries: unknown[]) => void} cb */
+    constructor(cb) {
+      this.cb = cb;
+      /** @type {Element[]} */
+      this.targets = [];
+      observers.push(this);
+    }
+    /** @param {Element} el */
     observe(el) { this.targets.push(el); }
     unobserve() {}
     disconnect() {}
-  };
-  vi.stubGlobal('requestAnimationFrame', (cb) => rafQueue.push(cb));
+  }));
+  vi.stubGlobal('requestAnimationFrame', (/** @type {FrameRequestCallback} */ cb) => rafQueue.push(cb));
   vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect')
-    .mockImplementation(() => ({ width: msgWidth, height: 0, top: 0, left: 0, right: msgWidth, bottom: 0 }));
+    .mockImplementation(() => /** @type {DOMRect} */ ({ width: msgWidth, height: 0, top: 0, left: 0, right: msgWidth, bottom: 0 })); // layout fields the code reads
 
   relayoutAll = vi.fn();
   vi.doMock('./feed-layout.js', () => ({
@@ -73,7 +87,7 @@ describe('renderFeed resize relayout', () => {
     renderFeed('activity', makeData(20), { immediate: true, navigate: () => {} });
     renderFeed('activity', makeData(20), { immediate: true, navigate: () => {} });
     expect(observers).toHaveLength(1);
-    expect(observers[0].targets).toEqual([feed]);
+    expect(observers[0]?.targets).toEqual([feed]);
   });
 
   it('relays out and fires feed:relayout once when the .msg width changes', () => {
@@ -109,9 +123,9 @@ describe('renderFeed resize relayout', () => {
   it('coalesces observer callbacks within one frame into a single relayout', () => {
     const events = renderAndWatch();
     msgWidth = 400;
-    observers[0].cb([]);
-    observers[0].cb([]);
-    observers[0].cb([]);
+    observers[0]?.cb([]);
+    observers[0]?.cb([]);
+    observers[0]?.cb([]);
     expect(rafQueue).toHaveLength(1);
     flushFrames();
     expect(relayoutAll).toHaveBeenCalledOnce();

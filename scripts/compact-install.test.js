@@ -6,7 +6,9 @@ import { chmodSync, existsSync, mkdirSync, readFileSync, writeFileSync } from 'n
 import { join } from 'node:path';
 import { makeTempDir, cleanup, writeJson, readJson, runScript, SCRIPTS_DIR } from './test-helpers.js';
 
+/** @type {string} */
 let dir;
+/** @type {string[]} */
 const lockedDirs = [];
 
 beforeEach(() => {
@@ -22,6 +24,7 @@ afterEach(() => {
 
 // A dir (and file in it) the test user cannot write: write_updates_json has no
 // sibling rename there and its in-place cp fails, so the install is refused.
+/** @param {string} file */
 function readOnly(file) {
   chmodSync(file, 0o444);
   const parent = join(file, '..');
@@ -39,11 +42,17 @@ const FIXTURE = {
     { category: 'log', project: 'beta', text: 'undated' },
   ],
 };
+/** @param {string} file */
 const logTexts = (file) =>
   readJson(file).entries.filter((e) => e.category === 'log').map((e) => e.text).sort();
 
 // source updates-write.sh (write_updates_json) + updates-compact.sh and call
 // compact_and_install <hot> <archive> <cutoff>; exits with its return code.
+/**
+ * @param {string} hot
+ * @param {string} archive
+ * @param {string} [cutoff]
+ */
 function compactInstall(hot, archive, cutoff = CUTOFF) {
   const script = `
     source "${join(SCRIPTS_DIR, 'updates-write.sh')}"
@@ -139,6 +148,7 @@ describe('compact_and_install — degraded path, archive cannot be created (find
 });
 
 describe('mase-fi-compact-updates — exit status', () => {
+  /** @param {Record<string, string>} env */
   const run = (env) => runScript('mase-fi-compact-updates', [], { TODAY: '2026-08-30', ...env });
 
   it('exits 0 and reports the cutoff on a clean compact', () => {

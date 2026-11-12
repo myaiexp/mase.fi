@@ -1,99 +1,7 @@
 // <base-modal> — centered overlay dialog with slots, focus trap, and Escape/backdrop dismiss
 
 import { mountShadow } from '../shared/mount-shadow.js';
-import { shadowStyles } from '../shared/shadow-styles.js';
-
-const modalStyles = shadowStyles(`
-  :host {
-    display: contents;
-  }
-
-  [data-backdrop] {
-    display: none;
-    position: fixed;
-    inset: 0;
-    background: rgba(0, 0, 0, 0.6);
-    z-index: 1000;
-    align-items: center;
-    justify-content: center;
-    font-family: var(--font-mono, monospace);
-    font-size: 13px;
-  }
-
-  :host([open]) [data-backdrop] {
-    display: flex;
-  }
-
-  [data-content] {
-    position: relative;
-    background: var(--bg-raised, #18181b);
-    color: var(--text, #fafafa);
-    border: 1px solid var(--border-color, #3f3f46);
-    border-radius: 0;
-    width: 100%;
-    max-width: 500px;
-    max-height: 80vh;
-    display: flex;
-    flex-direction: column;
-    overflow: hidden;
-  }
-
-  [data-header] {
-    padding: 12px 16px;
-    border-bottom: 1px solid var(--border-color, #3f3f46);
-    background: var(--bg-surface, #09090b);
-    flex-shrink: 0;
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-  }
-
-  [data-body] {
-    padding: 16px;
-    overflow-y: auto;
-    flex: 1;
-  }
-
-  [data-footer] {
-    padding: 12px 16px;
-    border-top: 1px solid var(--border-color, #3f3f46);
-    background: var(--bg-surface, #09090b);
-    flex-shrink: 0;
-  }
-
-  button[data-close] {
-    background: none;
-    border: none;
-    color: var(--text-muted, #a1a1aa);
-    cursor: pointer;
-    font-family: var(--font-mono, monospace);
-    font-size: 13px;
-    padding: 2px 6px;
-    line-height: 1;
-  }
-
-  button[data-close]:hover {
-    color: var(--text, #fafafa);
-  }
-`);
-
-const modalTemplate = document.createElement('template');
-modalTemplate.innerHTML = `
-<div data-backdrop>
-  <div data-content>
-    <div data-header>
-      <slot name="header"></slot>
-      <button data-close aria-label="Close">[x]</button>
-    </div>
-    <div data-body>
-      <slot></slot>
-    </div>
-    <div data-footer>
-      <slot name="footer"></slot>
-    </div>
-  </div>
-</div>
-`;
+import { modalStyles, modalTemplate } from './modal-styles.js';
 
 const FOCUSABLE_SELECTORS = [
   'a[href]',
@@ -110,13 +18,18 @@ const FOCUSABLE_SELECTORS = [
 // Visibility is checked on the element itself (hidden attribute, display:none,
 // visibility:hidden/collapse) — the reliable signals in a layout-less DOM. The
 // browser-only "ancestor display:none / zero-size" case isn't caught here.
-function isFocusable(el) {
+/**
+ * @param {Element} element
+ * @returns {boolean}
+ */
+function isFocusable(element) {
+  const el = /** @type {HTMLElement & { disabled?: boolean }} */ (element);
   if (el.disabled || el.getAttribute('aria-disabled') === 'true') return false;
   // The native-control clauses match a control whatever its tabindex, and the
   // [tabindex] clause only rejects the literal "-1". The browser skips every
   // negative value on Tab, so one of those as the trap's first/last entry never
   // equals the focused element and Tab walks out of the dialog.
-  if (parseInt(el.getAttribute('tabindex'), 10) < 0) return false;
+  if (parseInt(/** @type {string} */ (el.getAttribute('tabindex')), 10) < 0) return false;
   if (el.hidden) return false;
   const style = getComputedStyle(el);
   if (style.display === 'none') return false;
@@ -131,6 +44,7 @@ class BaseModal extends HTMLElement {
   // `_getFocusableElements`, `_getLightFocusables`) are exercised directly by
   // modal.test.js and modal-focus.test.js — those stay `_`; everything else is #private.
   #open = false;
+  /** @type {((e: KeyboardEvent) => void) | null} */
   #onKeyDown = null;
 
   constructor() {
@@ -138,10 +52,11 @@ class BaseModal extends HTMLElement {
     mountShadow(this, modalStyles, modalTemplate);
 
     // Close button inside shadow root
-    this.shadowRoot.querySelector('[data-close]').addEventListener('click', () => this.close());
+    const root = /** @type {ShadowRoot} */ (this.shadowRoot);
+    /** @type {HTMLElement} */ (root.querySelector('[data-close]')).addEventListener('click', () => this.close());
 
     // Backdrop click — but not content clicks (stop propagation from content)
-    const backdrop = this.shadowRoot.querySelector('[data-backdrop]');
+    const backdrop = /** @type {HTMLElement} */ (root.querySelector('[data-backdrop]'));
     backdrop.addEventListener('click', (e) => {
       if (e.target === backdrop) {
         this.close();
@@ -149,7 +64,7 @@ class BaseModal extends HTMLElement {
     });
 
     // Prevent content clicks from reaching backdrop
-    this.shadowRoot.querySelector('[data-content]').addEventListener('click', (e) => {
+    /** @type {HTMLElement} */ (root.querySelector('[data-content]')).addEventListener('click', (e) => {
       e.stopPropagation();
     });
   }
@@ -166,7 +81,7 @@ class BaseModal extends HTMLElement {
 
     // Bind and register keydown handler
     this.#onKeyDown = (e) => this._handleKeyDown(e);
-    document.addEventListener('keydown', this.#onKeyDown);
+    document.addEventListener('keydown', /** @type {EventListener} */ (this.#onKeyDown));
 
     // Focus the first user-meaningful field (a slotted light-DOM control) if one
     // exists; otherwise fall back to the shadow-root close button. The trap's
@@ -175,7 +90,7 @@ class BaseModal extends HTMLElement {
     // never receive the initial focus.
     requestAnimationFrame(() => {
       const lightDom = this._getLightFocusables();
-      const target = lightDom[0] ?? this.shadowRoot.querySelector('[data-close]');
+      const target = lightDom[0] ?? /** @type {HTMLElement | null} */ ((/** @type {ShadowRoot} */ (this.shadowRoot)).querySelector('[data-close]'));
       if (target) target.focus();
     });
   }
@@ -192,6 +107,7 @@ class BaseModal extends HTMLElement {
     this.dispatchEvent(new CustomEvent('close', { bubbles: true, composed: true }));
   }
 
+  /** @param {KeyboardEvent} e */
   _handleKeyDown(e) {
     if (!this.#open) return;
 
@@ -214,7 +130,7 @@ class BaseModal extends HTMLElement {
       // the modal. shadowRoot.activeElement resolves focus *within* the shadow
       // tree; it is null for slotted light-DOM focus (those nodes live in the
       // document), so fall back to document.activeElement in that case.
-      const active = this.shadowRoot.activeElement ?? document.activeElement;
+      const active = /** @type {ShadowRoot} */ (this.shadowRoot).activeElement ?? document.activeElement;
 
       if (e.shiftKey) {
         // Shift+Tab: if on first, wrap to last
@@ -238,17 +154,19 @@ class BaseModal extends HTMLElement {
   // element matched solely by the [tabindex] clause, or a native control with a
   // negative tabindex still slips through; drop those — the trap must never park
   // focus on something the user can't see, use, or Tab to.
+  /** @returns {HTMLElement[]} */
   _getLightFocusables() {
-    return Array.from(this.querySelectorAll(FOCUSABLE_SELECTORS)).filter((el) => isFocusable(el));
+    return /** @type {HTMLElement[]} */ (Array.from(this.querySelectorAll(FOCUSABLE_SELECTORS)).filter((el) => isFocusable(el)));
   }
 
+  /** @returns {HTMLElement[]} */
   _getFocusableElements() {
     // Shadow-DOM focusables (the close button) come first: in the flattened Tab
     // order the close button is rendered ahead of the slotted content (it sits in
     // the header, after the non-interactive title slot). Keeping it first makes
     // the Tab/Shift+Tab wrap boundaries in _handleKeyDown match what the browser
     // actually does.
-    const shadowDom = Array.from(this.shadowRoot.querySelectorAll(FOCUSABLE_SELECTORS)).filter((el) => isFocusable(el));
+    const shadowDom = /** @type {HTMLElement[]} */ (Array.from(/** @type {ShadowRoot} */ (this.shadowRoot).querySelectorAll(FOCUSABLE_SELECTORS)).filter((el) => isFocusable(el)));
     return [...shadowDom, ...this._getLightFocusables()];
   }
 

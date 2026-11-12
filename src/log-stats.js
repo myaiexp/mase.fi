@@ -1,4 +1,5 @@
 // All-history entry and commit aggregates behind the pinned cards
+/** @import { AppData, Entry, Project } from './types.js' */
 import { dayOf, entryNow, parseEntryDate, utcDayStart } from './dates.js';
 import { entrySlug } from './data-normalize.js';
 
@@ -18,17 +19,24 @@ import { entrySlug } from './data-normalize.js';
  * still lands in the last bucket. The finite-date guard is a nested branch (not
  * `continue`) so a malformed date still counts toward totalCommits and the
  * first/last comparison — only the day bucket needs a parseable date.
+ * @param {AppData} data
+ * @param {number} [days]
  */
 export function logStats(data, days = 28) {
+  /** @type {number[]} */
   const buckets = new Array(days).fill(0);
   const today = utcDayStart(new Date(entryNow()));
+  /** @type {Record<string, number>} */
   const counts = {};
   let inMemoryLogs = 0;
+  /** @type {Entry | null} */
   let first = null;
+  /** @type {Entry | null} */
   let last = null;
   for (const e of data.entries) {
     if (e.category !== 'log') {
-      counts[e.category] = (counts[e.category] || 0) + 1;
+      const cat = String(e.category);
+      counts[cat] = (counts[cat] || 0) + 1;
       continue;
     }
     inMemoryLogs++;
@@ -56,22 +64,31 @@ export function logStats(data, days = 28) {
 //     stays live while deploys prepend logs between nightly compacts
 //   - neither: a compact from before archivedLogs existed, so its totalCommits
 //     snapshot; else inMemoryLogs (an uncompacted file holds every row)
+/** @param {AppData} data @param {number} inMemoryLogs @returns {number} */
 function allHistoryLogs(data, inMemoryLogs) {
   if (data.archiveLoaded) return inMemoryLogs;
-  if (Number.isFinite(data.stats.archivedLogs)) return data.stats.archivedLogs + inMemoryLogs;
-  if (Number.isFinite(data.stats.totalCommits)) return data.stats.totalCommits;
+  if (Number.isFinite(data.stats.archivedLogs)) return /** @type {number} */ (data.stats.archivedLogs) + inMemoryLogs;
+  if (Number.isFinite(data.stats.totalCommits)) return /** @type {number} */ (data.stats.totalCommits);
   return inMemoryLogs;
 }
+
+/** A present, non-empty day string (the truthiness filter logRange keeps).
+ *  @param {string | null | undefined} s @returns {s is string} */
+const isDay = (s) => !!s;
 
 // All-history first → last log day. The compact-time logFirst/logLast cover the
 // archive but go stale as deploys prepend logs, and memory holds only the hot
 // window until the archive merges, so each end takes the wider of the two.
 // YYYY-MM-DD strings order lexically.
+/**
+ * @param {AppData} data @param {Entry | null} first @param {Entry | null} last
+ * @returns {{ from: string, to: string } | null}
+ */
 function logRange(data, first, last) {
-  const froms = [data.stats.logFirst, first && dayOf(first.date)].filter(Boolean);
-  const tos = [data.stats.logLast, last && dayOf(last.date)].filter(Boolean);
+  const froms = [data.stats.logFirst, first && dayOf(first.date)].filter(isDay);
+  const tos = [data.stats.logLast, last && dayOf(last.date)].filter(isDay);
   if (!froms.length || !tos.length) return null;
-  return { from: froms.sort()[0], to: tos.sort().at(-1) };
+  return { from: froms.sort()[0], to: tos.sort()[tos.length - 1] };
 }
 
 /**
@@ -82,6 +99,9 @@ function logRange(data, first, last) {
  * the normalized project's routing slug (project.slug) the way normalizeEntry
  * routes rows. A compact from before archivedByProject existed falls back to
  * its commitsByProject snapshot, keyed by slug, then by channel.
+ * @param {Project} project
+ * @param {AppData} data
+ * @returns {number}
  */
 export function commitsForProject(project, data) {
   const inMemory = data.entries.filter((e) => e.channel === project.channel && e.category === 'log').length;
@@ -95,7 +115,7 @@ export function commitsForProject(project, data) {
     return total;
   }
   const byProject = data.stats.commitsByProject;
-  if (Number.isFinite(byProject?.[project.slug])) return byProject[project.slug];
-  if (Number.isFinite(byProject?.[project.channel])) return byProject[project.channel];
+  if (Number.isFinite(byProject?.[project.slug])) return /** @type {Record<string, number>} */ (byProject)[project.slug];
+  if (Number.isFinite(byProject?.[project.channel])) return /** @type {Record<string, number>} */ (byProject)[project.channel];
   return inMemory;
 }

@@ -1,6 +1,7 @@
 // BaseToast — singleton toast notification service. Look is base.css's .toast* classes.
 const TOAST_TYPES = new Set(['success', 'error', 'warning', 'info']);
 
+/** @type {HTMLDivElement | null} */
 let container = null;
 
 function getContainer() {
@@ -13,6 +14,11 @@ function getContainer() {
 }
 
 export class BaseToast {
+  /**
+   * @param {string} message
+   * @param {string} [type]
+   * @param {number} [duration]
+   */
   static show(message, type = 'info', duration = 5000) {
     const toast = document.createElement('div');
     const variant = TOAST_TYPES.has(type) ? type : 'info';

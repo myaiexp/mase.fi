@@ -14,10 +14,22 @@ import { makeTempDir, cleanup, writeJson, readJson, runScript, todayHelsinki, wr
 // the VPS, and past vitest's 5s default once the other script suites run beside it.
 vi.setConfig({ testTimeout: 20_000 });
 
+/** @type {string} */
 let TODAY;
-let dir, file, extraFile;
+/** @type {string} */
+let dir;
+/** @type {string} */
+let file;
+/** @type {string} */
+let extraFile;
 
+/** @param {import('./test-helpers.js').Row[]} entries */
 const seed = (entries) => writeJson(file, { entries, projects: [] });
+/**
+ * @param {string} project
+ * @param {string} text
+ * @param {string} [date]
+ */
 const log = (project, text, date = TODAY) => ({ date, project, text, category: 'log' });
 const dailies = () => readJson(file).entries.filter((e) => e.category === 'daily');
 
@@ -30,6 +42,7 @@ const baseEnv = () => ({
   HELM_ENV: join(dir, 'nonexistent.env'),
   NTFY_TOKEN: '',
 });
+/** @param {Record<string, string>} [env] */
 const run = (env = {}) => runScript('mase-fi-daily-summary', [], { ...baseEnv(), ...env });
 
 // Fake curl first on PATH: records ntfy pushes (argv and stdin, where the headers
@@ -45,6 +58,7 @@ case "$*" in *ntfy.test*) printf '%s\\n' "$*" >> ${JSON.stringify(argv)}; cat >>
 exit 7
 `);
   chmodSync(join(bin, 'curl'), 0o755);
+  /** @param {string} f */
   const read = (f) => (existsSync(f) ? readFileSync(f, 'utf8') : '');
   return {
     env: { PATH: `${bin}:${process.env.PATH}`, NTFY_TOKEN: 'test-token', NTFY_URL: 'http://ntfy.test/kelo' },
@@ -128,6 +142,7 @@ describe('mase-fi-daily-summary — compact alerts (finding #9443)', () => {
 // push is the only signal, since stdout goes to a journal nobody is reading.
 describe('mase-fi-daily-summary — degraded-run alerts', () => {
   const DEGRADED = /^Title: mase\.fi daily-summary degraded$/gm;
+  /** @param {ReturnType<typeof fakeCurl>} curl */
   const titles = (curl) => curl.stdin().match(DEGRADED) ?? [];
 
   it('pushes one alert with the fallback ratio when claude fails', () => {

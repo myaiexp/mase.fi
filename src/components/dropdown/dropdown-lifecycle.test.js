@@ -2,11 +2,13 @@
 // <base-dropdown> lifecycle: children rendered after upgrade (the MutationObserver
 // re-bind), a swapped trigger, and disconnect teardown of the overlay listeners.
 import { describe, it, expect, beforeAll, afterEach } from 'vitest';
+/** @import { DropdownEl } from './dropdown-test-helpers.js' */
 
 beforeAll(async () => {
   await import('./dropdown.js');
 });
 
+/** @param {string} text */
 function button(text) {
   const b = document.createElement('button');
   b.setAttribute('slot', 'trigger');
@@ -14,6 +16,7 @@ function button(text) {
   return b;
 }
 
+/** @param {string} value */
 function item(value) {
   const i = document.createElement('base-dropdown-item');
   i.setAttribute('value', value);
@@ -31,7 +34,7 @@ describe('base-dropdown lifecycle', () => {
   });
 
   it('an item added after connect is bound and fires select', async () => {
-    const el = document.createElement('base-dropdown');
+    const el = /** @type {DropdownEl} */ (document.createElement('base-dropdown'));
     el.appendChild(button('Open'));
     document.body.appendChild(el);
 
@@ -39,8 +42,9 @@ describe('base-dropdown lifecycle', () => {
     el.appendChild(late);
     await flushObserver();
 
+    /** @type {string[]} */
     const received = [];
-    el.addEventListener('select', (e) => received.push(e.detail.value));
+    el.addEventListener('select', (e) => received.push(/** @type {CustomEvent} */ (e).detail.value));
     el.open();
     late.click();
     expect(received).toEqual(['late']);
@@ -48,7 +52,7 @@ describe('base-dropdown lifecycle', () => {
   });
 
   it('a trigger added after connect opens the menu', async () => {
-    const el = document.createElement('base-dropdown');
+    const el = /** @type {DropdownEl} */ (document.createElement('base-dropdown'));
     el.appendChild(item('a'));
     document.body.appendChild(el);
 
@@ -61,7 +65,7 @@ describe('base-dropdown lifecycle', () => {
   });
 
   it('swapping the trigger unbinds the old one and binds the new one', async () => {
-    const el = document.createElement('base-dropdown');
+    const el = /** @type {DropdownEl} */ (document.createElement('base-dropdown'));
     const oldTrigger = button('Old');
     el.append(oldTrigger, item('a'));
     document.body.appendChild(el);
@@ -82,7 +86,7 @@ describe('base-dropdown lifecycle', () => {
   });
 
   it('disconnect removes document listeners — no leak on a detached element', async () => {
-    const el = document.createElement('base-dropdown');
+    const el = /** @type {DropdownEl} */ (document.createElement('base-dropdown'));
     el.append(button('Open'), item('a'));
     document.body.appendChild(el);
     el.open();
@@ -98,7 +102,7 @@ describe('base-dropdown lifecycle', () => {
   });
 
   it('disconnect stops the observer: children added while detached are not bound', async () => {
-    const el = document.createElement('base-dropdown');
+    const el = /** @type {DropdownEl} */ (document.createElement('base-dropdown'));
     el.appendChild(button('Open'));
     document.body.appendChild(el);
     el.remove();
@@ -107,8 +111,9 @@ describe('base-dropdown lifecycle', () => {
     el.appendChild(late);
     await flushObserver();
 
+    /** @type {string[]} */
     const received = [];
-    el.addEventListener('select', (e) => received.push(e.detail.value));
+    el.addEventListener('select', (e) => received.push(/** @type {CustomEvent} */ (e).detail.value));
     late.click();
     expect(received).toEqual([]);
   });

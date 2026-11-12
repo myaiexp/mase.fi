@@ -1,15 +1,19 @@
 // Shared jsdom harness for the smart-404 DOM-driver tests
 import { vi } from 'vitest';
+/** @import { Candidate, Route, Suggestion } from './notfound.js' */
 
 // jsdom has no matchMedia; bare matchMedia(...) would ReferenceError.
+/** @param {boolean} matches */
 export function stubReducedMotion(matches) {
-  vi.stubGlobal('matchMedia', (query) => ({ matches, media: query }));
+  vi.stubGlobal('matchMedia', (/** @type {string} */ query) => ({ matches, media: query }));
 }
 
 // A writable location stand-in: replace() is a spy and href writes are recorded
 // instead of navigating, so a test can assert on every redirect sink.
+/** @param {{ pathname?: string, search?: string, origin?: string }} [opts] */
 function stubLocation({ pathname = '/missing', search = '', origin = 'https://mase.fi' } = {}) {
   const replace = vi.fn();
+  /** @type {string[]} */
   const hrefWrites = [];
   const loc = {
     pathname,
@@ -20,12 +24,18 @@ function stubLocation({ pathname = '/missing', search = '', origin = 'https://ma
   Object.defineProperty(loc, 'href', {
     configurable: true,
     get() { return `${loc.origin}${loc.pathname}${loc.search}`; },
-    set(v) { hrefWrites.push(v); },
+    set(/** @type {string} */ v) { hrefWrites.push(v); },
   });
   vi.stubGlobal('location', loc);
   return { loc, replace, hrefWrites };
 }
 
+/**
+ * @param {string} tag
+ * @param {string} id
+ * @param {Record<string, unknown>} [extra]
+ * @returns {HTMLElement}
+ */
 function el(tag, id, extra = {}) {
   const n = document.createElement(tag);
   n.id = id;
@@ -73,7 +83,10 @@ export function mountDom() {
 
 // Document listeners added during a test. The page's keydown/click handlers
 // would otherwise leak into the next test and fire against its DOM.
+/** @type {[string, EventListenerOrEventListenerObject, boolean | AddEventListenerOptions | undefined][]} */
 const tracked = [];
+
+/** @typedef {ReturnType<typeof installNotFound>} NotFoundEnv */
 
 /** Stub location, matchMedia (motion allowed) and fetch (every request 404s),
  *  mount the page skeleton, and track document listeners. Returns the stubs. */
@@ -81,7 +94,9 @@ export function installNotFound() {
   tracked.length = 0;
   const { loc, replace, hrefWrites } = stubLocation();
   stubReducedMotion(false);
-  const fetchMock = vi.fn(async () => ({ ok: false, status: 404, json: async () => ({}) }));
+  /** @type {(url: string, opts?: RequestInit) => Promise<Record<string, unknown>>} */
+  const notFound = async () => ({ ok: false, status: 404, json: async () => ({}) });
+  const fetchMock = vi.fn(notFound);
   vi.stubGlobal('fetch', fetchMock);
   mountDom();
   const origAdd = document.addEventListener.bind(document);
@@ -99,4 +114,44 @@ export function removeNotFound() {
   vi.unstubAllGlobals();
   vi.useRealTimers();
   document.body.replaceChildren();
+}
+
+/**
+ * Element by id; throws when missing (the test asserts it exists).
+ * @param {string} id
+ * @returns {HTMLElement}
+ */
+export function byId(id) {
+  const node = document.getElementById(id);
+  if (!node) throw new Error(`#${id} is missing`);
+  return node;
+}
+
+/**
+ * First match of a selector; throws when missing (the test asserts it exists).
+ * @param {string} selector
+ * @param {ParentNode} [root]
+ * @returns {HTMLElement}
+ */
+export function pick(selector, root = document) {
+  const node = root.querySelector(selector);
+  if (!node) throw new Error(`${selector} is missing`);
+  return /** @type {HTMLElement} */ (node);
+}
+
+/** @type {Suggestion} The explorer suggestion the countdown/markup tests share. */
+export const PLAN = { target: '/explorer', targetLabel: '/explorer', targetCaption: 'map explorer' };
+
+/**
+ * A fuzzy candidate (path-kind unless told otherwise).
+ * @param {string} href
+ * @param {string} caption
+ * @param {number} distance
+ * @param {Route['kind']} [kind]
+ * @returns {Candidate}
+ */
+export function candidate(href, caption, distance, kind = 'path') {
+  /** @type {Route} */
+  const route = { href, label: href, caption, keys: [], kind };
+  return { route, distance };
 }

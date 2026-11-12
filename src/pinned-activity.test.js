@@ -4,6 +4,8 @@
 // shared cardHead/home coverage and jsdom harness note.
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { renderPinned } from './pinned.js';
+import { appData } from './data-test-helpers.js';
+import { $ } from './dom-test-helpers.js';
 
 beforeEach(() => {
   // Pin the clock: utcNoonDaysAgo builds fixtures from "now" and the recent-rate
@@ -24,7 +26,7 @@ afterEach(() => {
   document.body.replaceChildren();
 });
 
-const pinnedEl = () => document.getElementById('pinned');
+const pinnedEl = () => $('#pinned');
 
 // A normalized entry matching data.js fetchData() output: { channel, category, date, nick, text }.
 function logEntry(extra = {}) {
@@ -42,7 +44,7 @@ describe('renderPinned — activity', () => {
         { channel: 'home', category: 'daily', date: '2026-02-01T08:00', nick: 'mase', text: 'd' },
       ],
     };
-    renderPinned('activity', data);
+    renderPinned('activity', appData(data));
     const html = pinnedEl().innerHTML;
     expect(html).toContain('3 entries');               // data.entries.length (incl. daily)
     expect(html).toContain('2026-01-01 → 2026-03-15'); // first → last log entry
@@ -59,7 +61,7 @@ describe('renderPinned — activity', () => {
       ],
       stats: { archivedLogs: 11735, logFirst: '2026-03-05', logLast: '2026-09-02' },
     };
-    renderPinned('activity', data);
+    renderPinned('activity', appData(data));
     const html = pinnedEl().innerHTML;
     // 1 non-log in memory + (11735 archived + 1 hot log) = 11737
     expect(html).toContain('11737 entries');
@@ -68,7 +70,7 @@ describe('renderPinned — activity', () => {
   });
 
   it('shows an em-dash range when there are no log entries', () => {
-    renderPinned('activity', { projects: [], entries: [], stats: {} });
+    renderPinned('activity', appData({ projects: [], entries: [], stats: {} }));
     const html = pinnedEl().innerHTML;
     expect(html).toContain('0 entries');
     expect(html).toContain('<dt>range</dt><dd>—</dd>');
@@ -77,11 +79,11 @@ describe('renderPinned — activity', () => {
   // A UTC-noon date string N days ago. logStats buckets by UTC calendar day, so
   // building the string in UTC terms keeps the bucket index deterministic in any
   // runner timezone (noon keeps it clear of the window's start/end edges).
-  const utcNoonDaysAgo = (n) => {
+  const utcNoonDaysAgo = (/** @type {number} */ n) => {
     const d = new Date();
     d.setUTCHours(12, 0, 0, 0);
     d.setUTCDate(d.getUTCDate() - n);
-    const p = (x) => String(x).padStart(2, '0');
+    const p = (/** @type {number} */ x) => String(x).padStart(2, '0');
     return `${d.getUTCFullYear()}-${p(d.getUTCMonth() + 1)}-${p(d.getUTCDate())}T12:00`;
   };
 
@@ -99,7 +101,7 @@ describe('renderPinned — activity', () => {
         logEntry({ category: 'log', date: utcNoonDaysAgo(7) }),
       ],
     };
-    renderPinned('activity', data);
+    renderPinned('activity', appData(data));
     expect(pinnedEl().innerHTML).toContain('~3/day');
   });
 
@@ -110,7 +112,7 @@ describe('renderPinned — activity', () => {
       // Older than the 28-day window → no active days → '—', never a stale number.
       entries: [logEntry({ category: 'log', date: utcNoonDaysAgo(60) })],
     };
-    renderPinned('activity', data);
+    renderPinned('activity', appData(data));
     const html = pinnedEl().innerHTML;
     expect(html).toContain('<i>rate</i><b>—</b>');
   });
@@ -118,7 +120,7 @@ describe('renderPinned — activity', () => {
 
 describe('renderPinned — activity stream art (finding #11019)', () => {
   // The art's numbers, top to bottom: log, feature, daily.
-  const artCounts = () => [...pinnedEl().querySelector('pre.ascii').textContent.matchAll(/(\d+)\s+│/g)].map((m) => Number(m[1]));
+  const artCounts = () => [...$('pre.ascii', pinnedEl()).textContent.matchAll(/(\d+)\s+│/g)].map((m) => Number(m[1]));
 
   it('counts logs by the archive-cut rule, so log + feature + daily equals the total row', () => {
     const data = {
@@ -131,15 +133,15 @@ describe('renderPinned — activity stream art (finding #11019)', () => {
       ],
       stats: { archivedLogs: 11735 },
     };
-    renderPinned('activity', data);
+    renderPinned('activity', appData(data));
     expect(artCounts()).toEqual([11737, 1, 1]);
     expect(pinnedEl().innerHTML).toContain('11739 entries');
   });
 
   it('keeps the box borders aligned however wide the counts grow', () => {
     const data = { projects: [], entries: [logEntry()], stats: { archivedLogs: 123456 } };
-    renderPinned('activity', data);
-    const widths = pinnedEl().querySelector('pre.ascii').textContent.split('\n').map((l) => [...l].length);
+    renderPinned('activity', appData(data));
+    const widths = $('pre.ascii', pinnedEl()).textContent.split('\n').map((l) => [...l].length);
     expect(new Set(widths).size).toBe(1);
   });
 
@@ -150,14 +152,14 @@ describe('renderPinned — activity stream art (finding #11019)', () => {
       entries: [logEntry({ date: '2026-09-05T08:00' })],
       stats: { archivedLogs: 10, logFirst: '2026-03-05', logLast: '2026-09-02' },
     };
-    renderPinned('activity', data);
+    renderPinned('activity', appData(data));
     expect(pinnedEl().innerHTML).toContain('2026-03-05 → 2026-09-05');
   });
 
   // normalizeStats keeps any string logFirst/logLast from updates.json.
   it('escapes a stats log range instead of injecting it', () => {
     const data = { projects: [], entries: [], stats: { logFirst: '<s>first</s>', logLast: '<u>last</u>' } };
-    renderPinned('activity', data);
+    renderPinned('activity', appData(data));
     expect(pinnedEl().querySelector('s')).toBeNull();
     expect(pinnedEl().querySelector('u')).toBeNull();
     expect(pinnedEl().innerHTML).toContain('&lt;s&gt;first&lt;/s&gt; → &lt;u&gt;last&lt;/u&gt;');

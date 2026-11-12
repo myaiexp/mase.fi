@@ -16,26 +16,30 @@ const TIME_END = 16;    // HH:MM
  * ("YYYY-MM-DDTHH:MM", no zone suffix). dayOf / timeOf decode that shape;
  * keep parseEntryDate, normalizeDate, dayOf, and timeOf in step if it changes.
  */
+/** @param {string} d @returns {Date} */
 export function parseEntryDate(d) {
   return new Date(d + 'Z');
 }
 
 /** Calendar-day part ("YYYY-MM-DD") of a normalized entry date. */
+/** @param {unknown} [dateStr] */
 export function dayOf(dateStr) {
   return String(dateStr ?? '').slice(0, DAY_END);
 }
 
 /** Wall-clock time part ("HH:MM") of a normalized entry date. */
+/** @param {unknown} [dateStr] */
 export function timeOf(dateStr) {
   return String(dateStr ?? '').slice(TIME_START, TIME_END);
 }
 
+/** @param {number} n */
 function pad2(n) {
   return String(n).padStart(2, '0');
 }
 
 /** UTC calendar stamp matching normalizeDate's output shape. */
-function utcMinuteStamp(d) {
+function utcMinuteStamp(/** @type {Date} */ d) {
   return `${String(d.getUTCFullYear()).padStart(4, '0')}-${pad2(d.getUTCMonth() + 1)}-${pad2(d.getUTCDate())}T${pad2(d.getUTCHours())}:${pad2(d.getUTCMinutes())}`;
 }
 
@@ -45,15 +49,16 @@ function utcMinuteStamp(d) {
  * and round-tripped: a Tdd:dd buried in junk, or a calendar that isn't a real
  * UTC instant (month 13, Feb 30, T24:00), must not escape as a "date".
  */
+/** @param {unknown} s @returns {string} */
 export function normalizeDate(s) {
   if (typeof s !== 'string') return EPOCH;
-  s = s.trim();
-  if (!s) return EPOCH;
+  const str = s.trim();
+  if (!str) return EPOCH;
   let candidate;
-  if (/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}/.test(s)) {
-    candidate = s.slice(0, STAMP_LEN);
-  } else if (/^\d{4}-\d{2}-\d{2}$/.test(s)) {
-    candidate = s + 'T00:00';
+  if (/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}/.test(str)) {
+    candidate = str.slice(0, STAMP_LEN);
+  } else if (/^\d{4}-\d{2}-\d{2}$/.test(str)) {
+    candidate = str + 'T00:00';
   } else {
     return EPOCH;
   }
@@ -67,6 +72,7 @@ export function normalizeDate(s) {
  * to the same UTC day the feed's separators use (parseEntryDate → UTC), and makes
  * day differences exact and DST-immune — every UTC day is exactly 86400000 ms.
  */
+/** @param {Date} d @returns {number} */
 export function utcDayStart(d) {
   return Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate());
 }
@@ -89,7 +95,8 @@ const writerClock = new Intl.DateTimeFormat('en-CA', {
  * night the newest Helsinki day would sit one day in the future.
  */
 export function entryNow(now = Date.now()) {
+  /** @type {Partial<Record<Intl.DateTimeFormatPartTypes, number>>} */
   const p = {};
   for (const { type, value } of writerClock.formatToParts(now)) p[type] = Number(value);
-  return Date.UTC(p.year, p.month - 1, p.day, p.hour, p.minute, p.second);
+  return Date.UTC(p.year ?? NaN, (p.month ?? NaN) - 1, p.day, p.hour, p.minute, p.second);
 }

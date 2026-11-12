@@ -1,3 +1,4 @@
+// wrapIndex / nextEnabledIndex tests: wrap-around, disabled skipping, the one-lap bound
 import { describe, it, expect } from 'vitest';
 import { wrapIndex, nextEnabledIndex } from './menu-nav.js';
 
@@ -35,7 +36,7 @@ describe('wrapIndex', () => {
 });
 
 describe('nextEnabledIndex', () => {
-  const disabledAt = (...idxs) => (i) => idxs.includes(i);
+  const disabledAt = (/** @type {number[]} */ ...idxs) => (/** @type {number} */ i) => idxs.includes(i);
 
   it('returns the adjacent index when it is enabled', () => {
     expect(nextEnabledIndex(0, 1, 3, disabledAt())).toBe(1);
@@ -56,7 +57,9 @@ describe('nextEnabledIndex', () => {
   // The single-lap bound: without it an all-disabled list never returns, and the
   // Arrow key that asked hangs the page.
   it('returns -1 after one lap of an all-disabled list, in both directions', () => {
+    /** @param {number} direction @param {number} start */
     const probe = (direction, start) => {
+      /** @type {number[]} */
       const seen = [];
       const idx = nextEnabledIndex(start, direction, 3, (i) => { seen.push(i); return true; });
       return { idx, seen };

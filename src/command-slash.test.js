@@ -2,7 +2,7 @@
 // Slash commands: the easter-egg /help, /whoami, /clear, … surfaced in the "/"
 // popup (registry in slash-commands.js), driven through initCommand.
 import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { setupDom, setChannels, ch, type, items } from './command-test-helpers.js';
+import { appData, setupDom, setChannels, ch, type, items, byId, $ } from './command-test-helpers.js';
 
 vi.mock('./registry.js', () => ({
   getChannels: vi.fn(() => []),
@@ -15,7 +15,12 @@ vi.mock('./data.js', () => ({
   entriesFor: vi.fn(() => []),
 }));
 
-let command, registry, channels;
+/** @type {typeof import('./command.js')} */
+let command;
+/** @type {typeof import('./registry.js')} */
+let registry;
+/** @type {typeof import('./channels.js')} */
+let channels;
 
 beforeEach(async () => {
   vi.resetModules();
@@ -28,11 +33,11 @@ beforeEach(async () => {
 });
 
 describe('slash commands', () => {
-  const notices = () => [...document.getElementById('feed').querySelectorAll('.sys-notice')];
+  const notices = () => [...byId('feed').querySelectorAll('.sys-notice')];
 
   beforeEach(() => {
     setChannels(registry, [ch('home'), ch('explorer'), ch('activity')]);
-    command.initCommand({ meta: { server: 'irc.test', bootTime: Date.now() } });
+    command.initCommand(appData({ meta: { server: 'irc.test', bootTime: Date.now() } }));
   });
 
   it('surfaces a matching command in the "/" popup, tagged is-cmd', () => {
@@ -40,13 +45,13 @@ describe('slash commands', () => {
     const list = items();
     expect(list).toHaveLength(1);
     expect(list[0].classList.contains('is-cmd')).toBe(true);
-    expect(list[0].querySelector('.cc-ch').textContent).toContain('whoami');
+    expect($(list[0], '.cc-ch').textContent).toContain('whoami');
   });
 
   // Commands match by name prefix, not the fuzzy subsequence channels use.
   const cmdLabels = () => items()
     .filter((el) => el.classList.contains('is-cmd'))
-    .map((el) => el.querySelector('.cc-ch').textContent);
+    .map((el) => $(el, '.cc-ch').textContent);
 
   it('does not surface a command for a non-prefix subsequence ("/o" vs /whoami)', () => {
     type('/o');

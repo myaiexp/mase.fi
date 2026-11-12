@@ -6,6 +6,8 @@ import {
   isSafeRedirect,
 } from './notfound.js';
 import { sameOriginPath } from './same-origin.js';
+import { candidate } from './notfound-test-helpers.js';
+/** @import { ConfidentPlan } from './notfound.js' */
 
 // Shape mirrors the live /updates.json .projects entries.
 const UPDATES = {
@@ -59,7 +61,7 @@ describe('buildRoutes', () => {
     expect(explorer).toMatchObject({ label: '/explorer', kind: 'path' });
     const diet = routes.find((r) => r.label === 'diet.mase.fi');
     expect(diet).toMatchObject({ href: 'https://diet.mase.fi', kind: 'subdomain' });
-    expect(diet.keys).toContain('diet');
+    expect(diet?.keys).toContain('diet');
   });
   it('a lookalike host ending in "mase.fi" without the dot is not a subdomain route', () => {
     const r = buildRoutes({ projects: [{ name: 'Evil', slug: 'evil', url: 'https://evilmase.fi' }] });
@@ -73,7 +75,7 @@ describe('buildRoutes', () => {
     expect(buildRoutes(null)).toEqual(EXTRA_ROUTES.map((r) => expect.objectContaining({ href: r.href })));
   });
   it('captions a project route with its short desc, else its name', () => {
-    expect(routes.find((r) => r.href === '/explorer').caption).toBe('map explorer');
+    expect(routes.find((r) => r.href === '/explorer')?.caption).toBe('map explorer');
     const long = buildRoutes({ projects: [{ name: 'Wander', slug: 'wander', url: 'https://mase.fi/wander', desc: 'x'.repeat(49) }] });
     expect(long[0].caption).toBe('wander');
   });
@@ -108,7 +110,7 @@ describe('fuzzyCandidates', () => {
     expect(fuzzyCandidates('/zzzzzz', routes)).toEqual([]);
   });
   it('drops routes at the typed path or a parent prefix — both are known dead', () => {
-    const hrefs = (p) => fuzzyCandidates(p, routes).map((c) => c.route.href);
+    const hrefs = (/** @type {string} */ p) => fuzzyCandidates(p, routes).map((c) => c.route.href);
     expect(hrefs('/demos/')).not.toContain('/demos');
     expect(hrefs('/demos')).not.toContain('/demos');
     expect(hrefs('/games//sub/')).not.toContain('/games');
@@ -135,20 +137,17 @@ describe('decide', () => {
     expect(d).toMatchObject({ state: 'confident', target: '/explorer', diff: false });
   });
   it('moved app resolves confidently to its subdomain', () => {
-    const d = decide({ prefixHit: null, candidates: fuzzyCandidates('/diet', routes), path: '/diet' });
+    const d = /** @type {ConfidentPlan} */ (decide({ prefixHit: null, candidates: fuzzyCandidates('/diet', routes), path: '/diet' }));
     expect(d.state).toBe('confident');
     expect(d.target).toBe('https://diet.mase.fi');
     expect(d.targetCaption).toMatch(/moved/);
   });
   it('ambiguous candidates render as a pick-list', () => {
-    const close = [
-      { route: { href: '/a', label: '/a', caption: 'a', kind: 'path' }, distance: 2 },
-      { route: { href: '/b', label: '/b', caption: 'b', kind: 'path' }, distance: 2 },
-    ];
+    const close = [candidate('/a', 'a', 2), candidate('/b', 'b', 2)];
     expect(decide({ prefixHit: null, candidates: close, path: '/ab' }).state).toBe('fuzzy');
   });
   it('weak matches render as a pick-list, no auto-redirect', () => {
-    const weak = [{ route: { href: '/a', label: '/a', caption: 'a', kind: 'path' }, distance: 3 }];
+    const weak = [candidate('/a', 'a', 3)];
     expect(decide({ prefixHit: null, candidates: weak, path: '/abcdefgh' }).state).toBe('fuzzy');
   });
   it('nothing matches -> state none', () => {
@@ -158,9 +157,9 @@ describe('decide', () => {
 
 describe('reasonFor', () => {
   it('labels candidates for the pick-list', () => {
-    expect(reasonFor({ route: { kind: 'subdomain' }, distance: 0 })).toBe('moved');
-    expect(reasonFor({ route: { kind: 'path' }, distance: 1 })).toBe('1 char off');
-    expect(reasonFor({ route: { kind: 'path' }, distance: 3 })).toBe('fuzzy');
+    expect(reasonFor(candidate('https://x.mase.fi', '', 0, 'subdomain'))).toBe('moved');
+    expect(reasonFor(candidate('/a', '', 1))).toBe('1 char off');
+    expect(reasonFor(candidate('/a', '', 3))).toBe('fuzzy');
   });
 });
 
@@ -191,7 +190,7 @@ describe('isSafeRedirect', () => {
     expect(isSafeRedirect('http://[', ORIGIN)).toBe(false);
     expect(isSafeRedirect('/explorer', 'not a url')).toBe(false);
     expect(isSafeRedirect('/explorer', '')).toBe(false);
-    expect(isSafeRedirect('/explorer', undefined)).toBe(false);
+    expect(isSafeRedirect('/explorer', /** @type {any} */ (undefined))).toBe(false); // a missing origin on purpose
   });
   it('refuses a non-string target', () => {
     for (const target of [null, undefined, 42, {}, ['/explorer'], ['https://diet.mase.fi']]) {

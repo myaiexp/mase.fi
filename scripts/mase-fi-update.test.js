@@ -6,8 +6,19 @@ import { join } from 'node:path';
 import { readFileSync, writeFileSync, symlinkSync, mkdirSync, lstatSync, existsSync } from 'node:fs';
 import { makeTempDir, cleanup, writeJson, readJson, runScript, todayHelsinki, writeHelmStub, readHelmCalls } from './test-helpers.js';
 
-let dir, file;
+/** @type {string} */
+let dir;
+/** @type {string} */
+let file;
+/**
+ * @param {string[]} args
+ * @param {Record<string, string>} [env]
+ */
 const update = (args, env = {}) => runScript('mase-fi-update', args, { UPDATES_FILE: file, ...env });
+/**
+ * @param {import('./test-helpers.js').Row[]} [entries]
+ * @param {import('./test-helpers.js').Row[]} [projects]
+ */
 const seed = (entries = [], projects = []) => writeJson(file, { entries, projects });
 
 beforeEach(() => {

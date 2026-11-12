@@ -3,7 +3,7 @@
 import { describe, it, expect, vi, afterEach } from 'vitest';
 import { fetchData, entriesFor } from './data.js';
 import { loadArchive } from './data-archive.js';
-import { stubFetch } from './data-test-helpers.js';
+import { stubFetch, appData } from './data-test-helpers.js';
 
 afterEach(() => {
   vi.unstubAllGlobals();
@@ -105,7 +105,7 @@ describe('loadArchive with malformed rows', () => {
         { category: 'log', project: 'helm', date: '2026-01-02T10:00', text: 'old-log' },
       ],
     });
-    const data = { entries: [], projects: [{ channel: 'helm' }], hasArchive: true, archiveLoaded: false };
+    const data = appData({ projects: [{ channel: 'helm' }], hasArchive: true });
     await loadArchive(data);
     expect(data.archiveLoaded).toBe(true);
     expect(data.entries.map((e) => e.text)).toEqual(['old-log']);

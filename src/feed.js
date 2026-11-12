@@ -1,8 +1,10 @@
 // Feed rendering — day separators, IRC-style rows, windowed with lazy scroll-up
+/** @import { AppData, Entry } from './types.js' */
 import { entriesFor, loadArchive } from './data.js';
 import { dayOf } from './dates.js';
 import { playJitter, clearJitter } from './jitter.js';
 import { relayoutAll, relayoutRow, layoutRow, measureFeedMetrics } from './feed-layout.js';
+import { ensureChipNav, ensureResizeObserver } from './feed-wiring.js';
 import { buildRows } from './feed-rows.js';
 import { noticeLine } from './sys-notice.js';
 
@@ -18,25 +20,34 @@ const WINDOW_SIZE = 200;
 const HOT_FAILED = "couldn't load the log (/updates.json failed), so this pane is empty because of that, not a quiet day. reload to retry.";
 const ARCHIVE_FAILED = "older history didn't load (/updates-archive.json failed); the log goes back further than this. reopen #activity to retry.";
 
-// Per-feed-element wiring state, keyed by the $feed node rather than held in
-// module-level singletons. Keeping the state on the element means a fresh feed
-// element — a new render target, or a fresh DOM in a test — gets its own wiring
-// instead of inheriting a stale "already wired" flag. The state lives and dies
-// with the element it keys on, so no reset hook is needed between renders/tests.
-const chipNavWired = new WeakSet();
-const resizeObservers = new WeakMap();
 // Per-feed windowing state: the full ascending entry list for the current
 // channel, how many newest rows are materialized (always the last `shown` of
 // that list, which onWindowExhausted restores after a merge), the channel id, the
 // live top-sentinel IntersectionObserver, and whether this render's archive load
 // is in flight / settled. Reset wholesale on every renderFeed.
+/**
+ * @typedef {object} WindowState
+ * @property {Entry[]} entries
+ * @property {number} shown
+ * @property {string} channelId
+ * @property {IntersectionObserver | null} io
+ * @property {AppData} data
+ * @property {boolean} loadingArchive
+ * @property {boolean} archiveSettled
+ */
+/** @type {WeakMap<HTMLElement, WindowState>} */
 const windowState = new WeakMap();
 
-/** Render the feed for the given channel. Replaces #feed content. */
+/**
+ * Render the feed for the given channel. Replaces #feed content.
+ * @param {string} id
+ * @param {AppData} data
+ * @param {{ immediate?: boolean, navigate?: (id: string) => void }} [opts]
+ */
 export function renderFeed(id, data, { immediate = false, navigate } = {}) {
   clearJitter();
   const entries = entriesFor(id, data);
-  const $feed = document.getElementById('feed');
+  const $feed = /** @type {HTMLElement} */ (document.getElementById('feed'));
 
   // Drop the previous channel's lazy-load observer before rebuilding, so a rapid
   // switch can't leak observers or fire a reveal against the new channel's rows.
@@ -64,6 +75,7 @@ export function renderFeed(id, data, { immediate = false, navigate } = {}) {
   $feed.scrollTop = $feed.scrollHeight;
 
   const needsArchive = id === 'activity' && data.hasArchive && !data.archiveLoaded;
+  /** @type {WindowState} */
   const state = { entries, shown, channelId: id, io: null, data, loadingArchive: false, archiveSettled: false };
   windowState.set($feed, state);
   if (shown < entries.length || needsArchive) ensureWindow($feed, state, sentinel);
@@ -84,6 +96,11 @@ export function renderFeed(id, data, { immediate = false, navigate } = {}) {
 // Watch the top sentinel; when it nears the top of the scroll viewport and older
 // entries remain, prepend the next older batch. rootMargin prefetches a batch
 // before the user hits the very top so the reveal feels seamless.
+/**
+ * @param {HTMLElement} $feed
+ * @param {WindowState} state
+ * @param {HTMLElement} sentinel
+ */
 function ensureWindow($feed, state, sentinel) {
   const io = new IntersectionObserver((records) => {
     if (records.some(r => r.isIntersecting)) revealOlder($feed, state, sentinel);
@@ -95,6 +112,11 @@ function ensureWindow($feed, state, sentinel) {
 // Prepend the WINDOW_SIZE entries just older than the current window, anchoring
 // scroll so the viewport stays put as content grows above it. Only the newly
 // added rows are laid out, so a reveal costs one batch, not the full history.
+/**
+ * @param {HTMLElement} $feed
+ * @param {WindowState} state
+ * @param {HTMLElement} sentinel
+ */
 function revealOlder($feed, state, sentinel) {
   const { entries, shown, channelId } = state;
   if (shown >= entries.length) {
@@ -133,6 +155,11 @@ function revealOlder($feed, state, sentinel) {
 
 // Every in-memory entry is on screen. #activity asks for the archive once per
 // render; any other channel has nothing older, so the sentinel is retired.
+/**
+ * @param {HTMLElement} $feed
+ * @param {WindowState} state
+ * @param {HTMLElement} sentinel
+ */
 function onWindowExhausted($feed, state, sentinel) {
   const { channelId, data } = state;
   if (channelId !== 'activity' || !data.hasArchive || state.archiveSettled) {
@@ -171,6 +198,10 @@ function onWindowExhausted($feed, state, sentinel) {
 
 // A notice above the oldest row — where the history stops — with the scroll
 // anchored so the rows in view do not move down under the reader.
+/**
+ * @param {HTMLElement} $feed
+ * @param {string} text
+ */
 function prependNotice($feed, text) {
   const prevHeight = $feed.scrollHeight;
   $feed.prepend(noticeLine(text, 'load-notice'));
@@ -181,6 +212,11 @@ function prependNotice($feed, text) {
 // entriesFor and the archive merge keep entry identity, so a difference means an
 // archived row sorted among the materialized rows (an EPOCH-dated hot row, or a
 // commit with an old date in the hot file).
+/**
+ * @param {Entry[]} a
+ * @param {Entry[]} b
+ * @param {number} shown
+ */
 function sameTail(a, b, shown) {
   for (let i = 1; i <= shown; i++) if (a[a.length - i] !== b[b.length - i]) return false;
   return true;
@@ -190,6 +226,11 @@ function sameTail(a, b, shown) {
 // index math holds again. A row this pushes out of the window returns in its sorted
 // place on a later reveal. Bottom-anchored because the newest rows stay put; server
 // notices are not rows and stay at the end of the feed.
+/**
+ * @param {HTMLElement} $feed
+ * @param {WindowState} state
+ * @param {HTMLElement} sentinel
+ */
 function rebuildWindow($feed, state, sentinel) {
   clearJitter();
   const fromBottom = $feed.scrollHeight - $feed.scrollTop;
@@ -203,53 +244,11 @@ function rebuildWindow($feed, state, sentinel) {
 }
 
 // No older rows can appear: stop observing the top sentinel and remove it.
+/**
+ * @param {WindowState} state
+ * @param {HTMLElement} sentinel
+ */
 function dropSentinel(state, sentinel) {
   state.io?.disconnect();
   sentinel.remove();
-}
-
-// Click-delegate proj-pill chips that carry a data-target-channel — those are the
-// chips whose slug resolves to a sidebar channel. Unmapped chips have no
-// data-target-channel and fall through to no-op. One listener per feed element.
-// navigate is injected by the caller (channels.js) rather than imported, so the
-// feed doesn't take an import edge back into the routing orchestrator.
-function ensureChipNav($feed, navigate) {
-  if (chipNavWired.has($feed)) return;
-  chipNavWired.add($feed);
-  $feed.addEventListener('click', (e) => {
-    const chip = e.target.closest('.proj-pill[data-target-channel]');
-    if (!chip || !$feed.contains(chip)) return;
-    e.preventDefault();
-    navigate?.(chip.dataset.targetChannel);
-  });
-}
-
-// Re-lay out feed rows when the available .msg column width changes (e.g. the
-// pane reflowed on viewport resize). One observer per feed element — installed
-// lazily on first render. rAF-debounced so we don't thrash during drag-resize.
-// The per-observer width/rAF state lives in this closure (not module scope), so
-// each feed element's observer tracks its own width independently. relayoutAll
-// only touches the materialized (windowed) rows, so the cost stays bounded.
-function ensureResizeObserver($feed) {
-  if (resizeObservers.has($feed)) return;
-  // Seed with the post-initial-layout width so the observer's first auto-fire
-  // doesn't trigger a redundant relayout right after renderFeed finishes.
-  const seedProbe = $feed.querySelector('.feed-row .msg');
-  let lastMsgWidth = seedProbe ? seedProbe.getBoundingClientRect().width : 0;
-  let resizeRaf = 0;
-  const obs = new ResizeObserver(() => {
-    if (resizeRaf) return;
-    resizeRaf = requestAnimationFrame(() => {
-      resizeRaf = 0;
-      const probe = $feed.querySelector('.feed-row .msg');
-      const w = probe ? probe.getBoundingClientRect().width : 0;
-      if (!w || w === lastMsgWidth) return;
-      lastMsgWidth = w;
-      relayoutAll($feed);
-      // Notify listeners (e.g. command.js search) so they can re-decorate.
-      $feed.dispatchEvent(new CustomEvent('feed:relayout'));
-    });
-  });
-  resizeObservers.set($feed, obs);
-  obs.observe($feed);
 }

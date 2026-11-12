@@ -24,8 +24,8 @@ describe('buildSlugToChannel channel alias', () => {
       { category: 'feature', project: 'ISEPS-solver', date: '2026-01-01', text: 'x' },
       map,
     );
-    expect(row.channel).toBe('iseps');
-    expect(row.projectSlug).toBe('iseps-solver');
+    expect(row?.channel).toBe('iseps');
+    expect(row?.projectSlug).toBe('iseps-solver');
   });
 
   it('routes a daily stamped with the channel name to the project, not #home', () => {
@@ -34,7 +34,7 @@ describe('buildSlugToChannel channel alias', () => {
       { category: 'daily', project: 'iseps', date: '2026-01-01', summary: 'shipped' },
       map,
     );
-    expect(row.channel).toBe('iseps');
+    expect(row?.channel).toBe('iseps');
   });
 
   it('does not let a channel alias steal another project\'s slug', () => {
@@ -48,7 +48,7 @@ describe('buildSlugToChannel channel alias', () => {
       { category: 'feature', project: 'porssi', date: '2026-01-01', text: 'x' },
       map,
     );
-    expect(row.channel).toBe('other');
+    expect(row?.channel).toBe('other');
   });
 
   // Entry projects are free text: a plain-object map would resolve these
@@ -58,7 +58,7 @@ describe('buildSlugToChannel channel alias', () => {
       const map = buildSlugToChannel(iseps);
       expect(normalizeEntry({ category: 'feature', project, date: '2026-01-01', text: 'x' }, map)).toBeNull();
       const daily = normalizeEntry({ category: 'daily', project, date: '2026-01-01', summary: 'x' }, map);
-      expect(daily.channel).toBe('home');
-      expect(daily.projectChannel).toBeUndefined();
+      expect(daily?.channel).toBe('home');
+      expect(daily?.projectChannel).toBeUndefined();
     });
 });

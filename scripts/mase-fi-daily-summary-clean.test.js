@@ -8,10 +8,22 @@ import { join } from 'node:path';
 import { writeFileSync } from 'node:fs';
 import { makeTempDir, cleanup, writeJson, readJson, runScript, todayHelsinki, writeClaudeStub } from './test-helpers.js';
 
+/** @type {string} */
 let TODAY;
-let dir, file, extraFile;
+/** @type {string} */
+let dir;
+/** @type {string} */
+let file;
+/** @type {string} */
+let extraFile;
 
+/** @param {import('./test-helpers.js').Row[]} entries */
 const seed = (entries) => writeJson(file, { entries, projects: [] });
+/**
+ * @param {string} project
+ * @param {string} text
+ * @param {string} [date]
+ */
 const log = (project, text, date = TODAY) => ({ date, project, text, category: 'log' });
 const dailies = () => readJson(file).entries.filter((e) => e.category === 'daily');
 
@@ -25,6 +37,7 @@ const baseEnv = () => ({
   HELM_ENV: join(dir, 'nonexistent.env'),
   NTFY_TOKEN: '',
 });
+/** @param {Record<string, string>} [env] */
 const run = (env = {}) => runScript('mase-fi-daily-summary', [], { ...baseEnv(), ...env });
 
 beforeEach(() => {
@@ -109,7 +122,7 @@ describe('mase-fi-daily-summary — clean_lines drop rules', () => {
     expect(long.length).toBeGreaterThan(110);
     const CLAUDE_BIN = writeClaudeStub(dir, { output: long });
     run({ CLAUDE_BIN });
-    const { summary } = dailies()[0];
+    const summary = String(dailies()[0].summary);
     expect(summary).not.toMatch(/\([^)]*$/); // no unclosed paren at end
     expect(summary.length).toBeLessThanOrEqual(111);
   });

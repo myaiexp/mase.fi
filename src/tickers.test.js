@@ -8,7 +8,7 @@ import { initTickers } from './tickers.js';
 const NOW = new Date('2026-06-13T12:00:00Z').getTime();
 const TICK_MS = 1200;
 
-const text = (id) => document.getElementById(id).textContent;
+const text = (/** @type {string} */ id) => /** @type {HTMLElement} */ (document.getElementById(id)).textContent;
 
 beforeEach(() => {
   vi.useFakeTimers();

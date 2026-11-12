@@ -1,4 +1,6 @@
 // Slash-command registry — easter-egg commands surfaced in the "/" autocomplete.
+/** @import { AppData } from './types.js' */
+/** @typedef {{ name: string, desc: string, run: () => string | string[] | null }} SlashCommand */
 import { fakePing, formatUptime } from './uptime.js';
 
 // describeAgent: terse "Browser on OS" label from a userAgent (+ platform
@@ -23,10 +25,11 @@ export function describeAgent(ua = '', platform = '') {
 }
 
 // formatServerTime: terse "Wed 24 Jun 2026 · 14:32:05" — deterministic given a Date.
+/** @param {Date} d @returns {string} */
 export function formatServerTime(d) {
   const days = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
   const mons = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-  const p2 = (n) => String(n).padStart(2, '0');
+  const p2 = (/** @type {number} */ n) => String(n).padStart(2, '0');
   return `${days[d.getDay()]} ${p2(d.getDate())} ${mons[d.getMonth()]} ${d.getFullYear()}` +
     ` \xb7 ${p2(d.getHours())}:${p2(d.getMinutes())}:${p2(d.getSeconds())}`;
 }
@@ -39,8 +42,11 @@ export function formatServerTime(d) {
  *   - clearNotices: remove existing server-notice lines from the feed
  * Each command's `run()` returns a string or string[] to print as notice
  * line(s), or null/undefined for side-effect-only commands.
+ * @param {{ data?: Partial<AppData>, clearSearch?: () => void, clearNotices?: () => void }} [ctx]
+ * @returns {SlashCommand[]}
  */
 export function buildCommands({ data = {}, clearSearch = () => {}, clearNotices = () => {} } = {}) {
+  /** @type {SlashCommand[]} */
   const cmds = [];
 
   cmds.push({

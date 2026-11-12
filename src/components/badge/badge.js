@@ -54,12 +54,13 @@ class BaseBadge extends HTMLElement {
   // Member convention (library-wide — see docs/base-components.md): `#member` is
   // hard-private internal state; `_member` is deliberately reachable by a friend
   // module or test. This component has no friend module, so every member is #.
-  #span = null;
+  /** @type {HTMLSpanElement} */
+  #span;
 
   constructor() {
     super();
     mountShadow(this, styles, template);
-    this.#span = this.shadowRoot.querySelector('span');
+    this.#span = /** @type {HTMLSpanElement} */ (/** @type {ShadowRoot} */ (this.shadowRoot).querySelector('span'));
   }
 
   attributeChangedCallback() {
@@ -72,12 +73,14 @@ class BaseBadge extends HTMLElement {
     const colorOverride = this.getAttribute('color');
     const size = this.getAttribute('size');
 
+    /** @type {string | null} */
     let color = null;
     let tint = 8;
 
     if (colorOverride) {
       color = colorOverride;
     } else if (variant) {
+      /** @type {Record<string, { color: string, tint: number } | undefined>} */
       const map = type === 'status' ? STATUS_VARIANTS : TAG_VARIANTS;
       const entry = map[variant];
       if (entry) {

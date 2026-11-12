@@ -1,38 +1,20 @@
 // @vitest-environment jsdom
+// <base-dropdown> open/close, select events, disabled items, flip and divider
 import { describe, it, expect, beforeAll, afterEach } from 'vitest';
+import {
+  createDropdown,
+  getTrigger,
+  q,
+  sq,
+  menuOf,
+  collectSelects,
+  stubRect,
+  unstubRect,
+} from './dropdown-test-helpers.js';
 
 beforeAll(async () => {
   await import('./dropdown.js');
 });
-
-function createDropdown({ items = [], triggerText = 'Open' } = {}) {
-  const el = document.createElement('base-dropdown');
-
-  const trigger = document.createElement('button');
-  trigger.setAttribute('slot', 'trigger');
-  trigger.textContent = triggerText;
-  el.appendChild(trigger);
-
-  for (const item of items) {
-    if (item === 'divider') {
-      el.appendChild(document.createElement('base-dropdown-divider'));
-    } else {
-      const i = document.createElement('base-dropdown-item');
-      i.setAttribute('value', item.value);
-      if (item.variant) i.setAttribute('variant', item.variant);
-      if (item.disabled) i.setAttribute('disabled', '');
-      i.textContent = item.label ?? item.value;
-      el.appendChild(i);
-    }
-  }
-
-  document.body.appendChild(el);
-  return el;
-}
-
-function getTrigger(el) {
-  return el.querySelector('[slot="trigger"]');
-}
 
 describe('base-dropdown', () => {
   afterEach(() => {
@@ -42,7 +24,7 @@ describe('base-dropdown', () => {
   it('menu is hidden by default', () => {
     const el = createDropdown({ items: [{ value: 'a', label: 'A' }] });
     expect(el.isOpen).toBe(false);
-    const menu = el.shadowRoot.querySelector('[part="menu"]');
+    const menu = menuOf(el);
     expect(menu.hidden).toBe(true);
   });
 
@@ -50,7 +32,7 @@ describe('base-dropdown', () => {
     const el = createDropdown({ items: [{ value: 'a', label: 'A' }] });
     getTrigger(el).click();
     expect(el.isOpen).toBe(true);
-    const menu = el.shadowRoot.querySelector('[part="menu"]');
+    const menu = menuOf(el);
     expect(menu.hidden).toBe(false);
   });
 
@@ -58,10 +40,9 @@ describe('base-dropdown', () => {
     const el = createDropdown({ items: [{ value: 'foo', label: 'Foo' }] });
     getTrigger(el).click();
 
-    const received = [];
-    el.addEventListener('select', (e) => received.push(e.detail));
+    const received = collectSelects(el);
 
-    const item = el.querySelector('base-dropdown-item');
+    const item = q(el, 'base-dropdown-item');
     item.click();
 
     expect(received).toHaveLength(1);
@@ -73,7 +54,7 @@ describe('base-dropdown', () => {
     getTrigger(el).click();
     expect(el.isOpen).toBe(true);
 
-    el.querySelector('base-dropdown-item').click();
+    q(el, 'base-dropdown-item').click();
     expect(el.isOpen).toBe(false);
   });
 
@@ -96,114 +77,13 @@ describe('base-dropdown', () => {
     expect(el.isOpen).toBe(false);
   });
 
-  // Tab leaves the focused item for the next real tab stop. The menu must close
-  // with it, and the key must not be swallowed or focus never moves. Shift+Tab
-  // is the same key in the other direction.
-  it.each([false, true])('Tab on the focused item closes the menu (shiftKey=%s)', (shiftKey) => {
-    const el = createDropdown({
-      items: [{ value: 'a', label: 'A' }, { value: 'b', label: 'B' }],
-    });
-    getTrigger(el).click();
-    expect(el.isOpen).toBe(true);
-
-    const item = el.querySelector('base-dropdown-item');
-    expect(document.activeElement).toBe(item);
-    const press = new KeyboardEvent('keydown', { key: 'Tab', shiftKey, bubbles: true, cancelable: true });
-    item.dispatchEvent(press);
-
-    expect(el.isOpen).toBe(false);
-    expect(el.shadowRoot.querySelector('[part="menu"]').hidden).toBe(true);
-    expect(press.defaultPrevented).toBe(false);
-  });
-
-  it('ArrowDown moves focus to next item', () => {
-    const el = createDropdown({
-      items: [
-        { value: 'a', label: 'A' },
-        { value: 'b', label: 'B' },
-      ],
-    });
-    getTrigger(el).click();
-
-    const items = [...el.querySelectorAll('base-dropdown-item')];
-    expect(document.activeElement).toBe(items[0]);
-
-    items[0].dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowDown', bubbles: true }));
-    expect(document.activeElement).toBe(items[1]);
-  });
-
-  it('ArrowUp moves focus to previous item', () => {
-    const el = createDropdown({
-      items: [
-        { value: 'a', label: 'A' },
-        { value: 'b', label: 'B' },
-      ],
-    });
-    getTrigger(el).click();
-
-    const items = [...el.querySelectorAll('base-dropdown-item')];
-    items[1].focus();
-    items[1].dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowUp', bubbles: true }));
-    expect(document.activeElement).toBe(items[0]);
-  });
-
-  it('ArrowDown wraps from the last item to the first', () => {
-    const el = createDropdown({
-      items: [
-        { value: 'a', label: 'A' },
-        { value: 'b', label: 'B' },
-      ],
-    });
-    getTrigger(el).click();
-
-    const items = [...el.querySelectorAll('base-dropdown-item')];
-    items[1].focus();
-    items[1].dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowDown', bubbles: true }));
-    expect(document.activeElement).toBe(items[0]);
-  });
-
-  it('ArrowUp wraps from the first item to the last', () => {
-    const el = createDropdown({
-      items: [
-        { value: 'a', label: 'A' },
-        { value: 'b', label: 'B' },
-      ],
-    });
-    getTrigger(el).click();
-
-    const items = [...el.querySelectorAll('base-dropdown-item')];
-    expect(document.activeElement).toBe(items[0]);
-    items[0].dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowUp', bubbles: true }));
-    expect(document.activeElement).toBe(items[1]);
-  });
-
-  it('arrow nav skips disabled items when wrapping', () => {
-    const el = createDropdown({
-      items: [
-        { value: 'a', label: 'A' },
-        { value: 'b', label: 'B', disabled: true },
-        { value: 'c', label: 'C' },
-      ],
-    });
-    getTrigger(el).click();
-
-    const items = [...el.querySelectorAll('base-dropdown-item')];
-    // Enabled set is [A, C] — ArrowDown from A skips the disabled B.
-    items[0].dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowDown', bubbles: true }));
-    expect(document.activeElement).toBe(items[2]);
-    // ...and wraps from C back to A rather than stopping at the end.
-    items[2].dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowDown', bubbles: true }));
-    expect(document.activeElement).toBe(items[0]);
-  });
-
   it('Enter on focused item fires select and closes menu', () => {
     const el = createDropdown({ items: [{ value: 'enter-val', label: 'Enter' }] });
     getTrigger(el).click();
 
-    const received = [];
-    el.addEventListener('select', (e) => received.push(e.detail));
+    const received = collectSelects(el);
 
-    const item = el.querySelector('base-dropdown-item');
+    const item = q(el, 'base-dropdown-item');
     item.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
 
     expect(received).toHaveLength(1);
@@ -215,42 +95,41 @@ describe('base-dropdown', () => {
     const el = createDropdown({ items: [{ value: 'nope', label: 'Nope', disabled: true }] });
     getTrigger(el).click();
 
-    const received = [];
-    el.addEventListener('select', (e) => received.push(e.detail));
+    const received = collectSelects(el);
 
-    el.querySelector('base-dropdown-item').click();
+    q(el, 'base-dropdown-item').click();
     expect(received).toHaveLength(0);
   });
 
   it('disabled item stays open on click', () => {
     const el = createDropdown({ items: [{ value: 'nope', label: 'Nope', disabled: true }] });
     getTrigger(el).click();
-    el.querySelector('base-dropdown-item').click();
+    q(el, 'base-dropdown-item').click();
     expect(el.isOpen).toBe(true);
   });
 
   it('variant="danger" item has danger class on inner span', () => {
     const el = createDropdown({ items: [{ value: 'del', label: 'Delete', variant: 'danger' }] });
-    const item = el.querySelector('base-dropdown-item');
+    const item = q(el, 'base-dropdown-item');
     expect(item.getAttribute('variant')).toBe('danger');
-    const span = item.shadowRoot.querySelector('span');
+    const span = sq(item, 'span');
     expect(span.classList.contains('danger')).toBe(true);
   });
 
   it('adds flip class when menu would overflow viewport bottom', () => {
     const el = createDropdown({ items: [{ value: 'x', label: 'X' }] });
 
-    el.getBoundingClientRect = () => ({
+    stubRect(el, {
       top: 900, bottom: 940, left: 0, right: 100, width: 100, height: 40,
     });
 
     Object.defineProperty(window, 'innerHeight', { value: 768, configurable: true });
 
     getTrigger(el).click();
-    const menu = el.shadowRoot.querySelector('[part="menu"]');
+    const menu = menuOf(el);
     expect(menu.classList.contains('flip')).toBe(true);
 
-    delete el.getBoundingClientRect;
+    unstubRect(el);
   });
 
   it('no flip class when menu fits below trigger', () => {
@@ -258,17 +137,17 @@ describe('base-dropdown', () => {
 
     // spaceBelow = 768 - 518 = 250, just clears the 200px estimate. Boundary-
     // sensitive: bumping MENU_HEIGHT_ESTIMATE to 300 would flip this RED.
-    el.getBoundingClientRect = () => ({
+    stubRect(el, {
       top: 478, bottom: 518, left: 0, right: 100, width: 100, height: 40,
     });
 
     Object.defineProperty(window, 'innerHeight', { value: 768, configurable: true });
 
     getTrigger(el).click();
-    const menu = el.shadowRoot.querySelector('[part="menu"]');
+    const menu = menuOf(el);
     expect(menu.classList.contains('flip')).toBe(false);
 
-    delete el.getBoundingClientRect;
+    unstubRect(el);
   });
 
   it('divider renders a separator element', () => {
@@ -276,9 +155,9 @@ describe('base-dropdown', () => {
       items: [{ value: 'a', label: 'A' }, 'divider', { value: 'b', label: 'B' }],
     });
 
-    const divider = el.querySelector('base-dropdown-divider');
+    const divider = q(el, 'base-dropdown-divider');
     expect(divider).toBeTruthy();
-    const hr = divider.shadowRoot.querySelector('hr');
+    const hr = sq(divider, 'hr');
     expect(hr).toBeTruthy();
   });
 

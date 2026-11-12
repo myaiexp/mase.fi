@@ -8,7 +8,10 @@ import { selectStyles } from './select-styles.js';
 import { buildMenu, markSelected, filterMenu, resetFilter } from './select-menu.js';
 import { createLetterJump } from './letter-jump.js';
 import { upgradeProperties } from '../shared/upgrade-properties.js';
+import { createTrigger, makePlaceholderSpan } from './select-trigger.js';
 import './select-option.js';
+
+/** @typedef {import('./select-option.js').BaseOption} BaseOption */
 
 const selectTemplate = document.createElement('template');
 selectTemplate.innerHTML = `<div part="trigger-wrap"></div>
@@ -24,16 +27,22 @@ class BaseSelect extends HTMLElement {
   #open = false;
   #highlightIdx = -1;
   #typeahead = createLetterJump();
-  #triggerWrap = null;
+  /** @type {HTMLElement} */
+  #triggerWrap;
+  /** @type {MutationObserver | null} */
   #observer = null;
+  /** @type {HTMLInputElement | HTMLButtonElement | null} */
   #trigger = null;
+  /** @type {HTMLSpanElement | null} */
   #sizer = null;
 
   constructor() {
     super();
     mountShadow(this, selectStyles, selectTemplate, { mode: 'open', delegatesFocus: true });
-    this._menu = this.shadowRoot.querySelector('[part="menu"]');
-    this.#triggerWrap = this.shadowRoot.querySelector('[part="trigger-wrap"]');
+    const root = /** @type {ShadowRoot} */ (this.shadowRoot);
+    /** @type {HTMLElement} */
+    this._menu = /** @type {HTMLElement} */ (root.querySelector('[part="menu"]'));
+    this.#triggerWrap = /** @type {HTMLElement} */ (root.querySelector('[part="trigger-wrap"]'));
   }
 
   connectedCallback() {
@@ -55,6 +64,7 @@ class BaseSelect extends HTMLElement {
     this.#observer?.disconnect();
   }
 
+  /** @param {string} name */
   attributeChangedCallback(name) {
     if (name === 'value') this.#syncTriggerText();
     if (name === 'placeholder') { this.#syncTriggerText(); this.#syncSizer(); }
@@ -65,6 +75,7 @@ class BaseSelect extends HTMLElement {
   // --- Public API ---
 
   get value() { return this.getAttribute('value') ?? ''; }
+  /** @param {string} v */
   set value(v) { this.setAttribute('value', v); markSelected(this); }
 
   get selectedOption() {
@@ -73,7 +84,7 @@ class BaseSelect extends HTMLElement {
     // querySelector and break #syncTriggerText mid-_selectOption (menu stuck
     // open, no change event, no trigger label).
     const v = this.value;
-    return [...this.querySelectorAll('base-option')].find(o => o.value === v) ?? null;
+    return [.../** @type {NodeListOf<BaseOption>} */ (this.querySelectorAll('base-option'))].find(o => o.value === v) ?? null;
   }
 
   get isOpen() { return this.#open; }
@@ -122,37 +133,11 @@ class BaseSelect extends HTMLElement {
     this.#sizer.setAttribute('aria-hidden', 'true');
     this.#triggerWrap.appendChild(this.#sizer);
     this.#syncSizer();
-    if (this.#searchable) {
-      const input = document.createElement('input');
-      input.setAttribute('type', 'text');
-      input.setAttribute('part', 'trigger');
-      // A filter input must never be an autofill target. Password managers
-      // (Bitwarden et al.) traverse open shadow roots, attach inline-menu
-      // observers to this persistent text field, and thrash field-heavy pages.
-      input.setAttribute('autocomplete', 'off');
-      input.setAttribute('data-bwignore', 'true'); // Bitwarden
-      input.setAttribute('data-lpignore', 'true'); // LastPass
-      input.setAttribute('data-1p-ignore', ''); // 1Password
-      input.setAttribute('data-form-type', 'other'); // Dashlane
-      input.addEventListener('click', () => { if (!this.#open) this.open(); });
-      input.addEventListener('focus', () => { if (!this.#open) this.open(); });
-      input.addEventListener('input', () => this.#onFilter());
-      input.addEventListener('keydown', (e) => this.#onKeydown(e));
-      this.#triggerWrap.appendChild(input);
-      this.#trigger = input;
-    } else {
-      const btn = document.createElement('button');
-      btn.setAttribute('type', 'button');
-      btn.setAttribute('part', 'trigger');
-      btn.addEventListener('click', (e) => {
-        e.stopPropagation();
-        if (this.hasAttribute('disabled')) return;
-        this.#open ? this.close() : this.open();
-      });
-      btn.addEventListener('keydown', (e) => this.#onKeydown(e));
-      this.#triggerWrap.appendChild(btn);
-      this.#trigger = btn;
-    }
+    this.#trigger = createTrigger(this, this.#searchable, {
+      onFilter: () => this.#onFilter(),
+      onKeydown: (e) => this.#onKeydown(e),
+    });
+    this.#triggerWrap.appendChild(this.#trigger);
     this.#applySize();
     this.#syncTriggerText();
   }
@@ -174,14 +159,7 @@ class BaseSelect extends HTMLElement {
 
     const ph = this.getAttribute('placeholder') ?? '';
     this.#trigger.textContent = '';
-    if (ph) this.#trigger.appendChild(this.#makePlaceholderSpan(ph));
-  }
-
-  #makePlaceholderSpan(text) {
-    const span = document.createElement('span');
-    span.className = 'placeholder';
-    span.textContent = text;
-    return span;
+    if (ph) this.#trigger.appendChild(makePlaceholderSpan(ph));
   }
 
   // Mirror every option label (plus the placeholder) into the hidden sizer, so the
@@ -189,7 +167,7 @@ class BaseSelect extends HTMLElement {
   #syncSizer() {
     if (!this.#sizer) return;
     this.#sizer.textContent = '';
-    const labels = [...this.querySelectorAll('base-option')].map((o) => o.label);
+    const labels = [...this.querySelectorAll('base-option')].map((o) => /** @type {BaseOption} */ (o).label);
     const ph = this.getAttribute('placeholder');
     if (ph) labels.push(ph);
     for (const label of labels) {
@@ -208,11 +186,12 @@ class BaseSelect extends HTMLElement {
 
   // --- Selection ---
 
+  /** @param {HTMLElement} div */
   _selectOption(div) {
     if (div.classList.contains('disabled')) return;
     const value = div.dataset.value;
     const label = div.dataset.label;
-    this.setAttribute('value', value);
+    this.setAttribute('value', /** @type {string} */ (value));
     markSelected(this);
     this.#syncTriggerText();
     this.dispatchEvent(new CustomEvent('change', { bubbles: true, detail: { value, label } }));
@@ -221,6 +200,7 @@ class BaseSelect extends HTMLElement {
 
   // --- Keyboard ---
 
+  /** @param {KeyboardEvent} e */
   #onKeydown(e) {
     if (!this.#open && (e.key === 'ArrowDown' || e.key === 'ArrowUp')) {
       e.preventDefault();
@@ -254,7 +234,7 @@ class BaseSelect extends HTMLElement {
         this._selectOption(opts[this.#highlightIdx]);
       }
     } else if (!this.#searchable && e.key.length === 1 && /[a-z]/i.test(e.key)) {
-      const idx = this.#typeahead.jump(e.key, opts.map((o) => o.dataset.label));
+      const idx = this.#typeahead.jump(e.key, opts.map((o) => /** @type {string} */ (o.dataset.label)));
       if (idx >= 0) {
         this.#highlightIdx = idx;
         this.#applyHighlight();
@@ -262,10 +242,11 @@ class BaseSelect extends HTMLElement {
     }
   }
 
+  /** @returns {HTMLElement[]} */
   #enabledOptionDivs() {
     return [...this._menu.querySelectorAll('.option:not(.disabled)')].filter(
-      d => d.style.display !== 'none'
-    );
+      d => /** @type {HTMLElement} */ (d).style.display !== 'none'
+    ).map(d => /** @type {HTMLElement} */ (d));
   }
 
   #applyHighlight() {
@@ -283,7 +264,7 @@ class BaseSelect extends HTMLElement {
   // first still-visible option (or clear it). The DOM filtering itself lives in
   // select-menu.js; the highlight is this component's keyboard concern.
   #onFilter() {
-    filterMenu(this, this.#trigger.value.toLowerCase());
+    filterMenu(this, /** @type {HTMLInputElement} */ (this.#trigger).value.toLowerCase());
     const enabled = this.#enabledOptionDivs();
     this.#highlightIdx = enabled.length ? 0 : -1;
     this.#applyHighlight();
@@ -292,7 +273,7 @@ class BaseSelect extends HTMLElement {
   // --- Document listeners ---
 
   #addDocListeners() {
-    addOverlayListeners(this, (e) => !this.contains(e.target) && !this.shadowRoot.contains(e.target));
+    addOverlayListeners(this, (e) => !this.contains(/** @type {Node} */ (e.target)) && !(/** @type {ShadowRoot} */ (this.shadowRoot)).contains(/** @type {Node} */ (e.target)));
   }
 }
 

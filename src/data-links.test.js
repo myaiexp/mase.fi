@@ -13,6 +13,7 @@ afterEach(() => {
 });
 
 describe('fetchData project links', () => {
+  /** @param {unknown} url */
   async function linksFor(url) {
     stubFetch({ projects: [{ name: 'P', channel: 'p', url }], entries: [] });
     const data = await fetchData();

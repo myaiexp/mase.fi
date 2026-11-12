@@ -7,13 +7,16 @@
 // idea #2467's conversion: a tint frozen as an rgba/hex literal silently ignores a
 // [data-theme] or per-project override of the colour it is supposed to tint.
 import { describe, it, expect } from 'vitest';
-import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
+import { inlineBaseCss } from '../scripts/build-base-css.js';
 
-const css = readFileSync(fileURLToPath(new URL('./base.css', import.meta.url)), 'utf8');
+// The published sheet, not the @import index: the declarations live in src/base/*.css.
+const css = inlineBaseCss(fileURLToPath(new URL('./base.css', import.meta.url)));
 
 /** Every `--name: value;` declaration in the file, last-wins like the cascade. */
+/** @param {string} source */
 function declarations(source) {
+  /** @type {Map<string, string>} */
   const out = new Map();
   for (const m of source.matchAll(/^\s*(--[a-z0-9-]+)\s*:\s*([^;]+);/gim)) {
     out.set(m[1], m[2].trim());

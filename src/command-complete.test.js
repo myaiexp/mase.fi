@@ -5,7 +5,16 @@ import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { createAutocomplete } from './command-complete.js';
 import { buildRegistry } from './registry.js';
 
-let $input, $popup, onChoose, ac;
+/** @import { AppData } from './types.js' */
+
+/** @type {HTMLInputElement} */
+let $input;
+/** @type {HTMLElement} */
+let $popup;
+/** @type {import('vitest').Mock<(match: import('./command-complete.js').Match) => void>} */
+let onChoose;
+/** @type {ReturnType<typeof createAutocomplete>} */
+let ac;
 
 const rows = () => [...$popup.querySelectorAll('.cc-item')];
 
@@ -14,7 +23,8 @@ beforeEach(() => {
   $input = document.createElement('input');
   $popup = document.createElement('div');
   document.body.append($input, $popup);
-  buildRegistry({ projects: [{ channel: 'explorer' }, { channel: 'excalibur' }] });
+  // Channel-only projects: the registry reads nothing else, so the bare shape is on purpose.
+  buildRegistry(/** @type {AppData} */ (/** @type {unknown} */ ({ projects: [{ channel: 'explorer' }, { channel: 'excalibur' }] })));
   onChoose = vi.fn();
   ac = createAutocomplete({
     getCommands: () => [],
@@ -52,7 +62,7 @@ describe('showHelp', () => {
   it('replaces slash matches with help rows in one call', () => {
     ac.render('ex');
     ac.showHelp();
-    expect($popup.querySelector('.cc-head').textContent).toBe('help');
+    expect(/** @type {HTMLElement} */ ($popup.querySelector('.cc-head')).textContent).toBe('help');
     expect(rows().length).toBeGreaterThan(0);
     expect(rows().some(r => r.hasAttribute('role'))).toBe(false);
   });

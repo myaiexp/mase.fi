@@ -20,38 +20,11 @@ import {
   walkRichInlineLineRanges,
   materializeRichInlineLineRange,
 } from '@chenglou/pretext/rich-inline';
-import { layoutRow, measureFeedMetrics, relayoutAll } from './feed-layout.js';
+import { layoutRow } from './feed-layout.js';
+import { makeRow, setNormalPath } from './feed-layout-test-helpers.js';
+import { q } from './feed-test-helpers.js';
 
 const FONT = '13px monospace';
-
-// Build a .feed-row with a .msg child and the dataset attrs buildItems reads.
-function makeRow({ raw = '', project = '', target = '', feature = false } = {}) {
-  const row = document.createElement('div');
-  row.className = 'feed-row';
-  if (feature) row.classList.add('cat-feature');
-  if (raw) row.dataset.raw = raw;
-  if (project) row.dataset.projectSlug = project;
-  if (target) row.dataset.targetChannel = target;
-  const msg = document.createElement('span');
-  msg.className = 'msg';
-  row.appendChild(msg);
-  return row;
-}
-
-// Drive the pretext mocks down the success path: prepareRichInline returns an
-// opaque token, walkRichInlineLineRanges emits one range per line, and
-// materializeRichInlineLineRange returns the supplied fragments for each line
-// (cycling so multi-row relayout reuses the same fragment list).
-function setNormalPath(fragmentsPerLine) {
-  prepareRichInline.mockReturnValue({ ok: true });
-  walkRichInlineLineRanges.mockImplementation((prepared, width, cb) => {
-    for (let i = 0; i < fragmentsPerLine.length; i++) cb({ line: i });
-  });
-  let i = 0;
-  materializeRichInlineLineRange.mockImplementation(() => ({
-    fragments: fragmentsPerLine[i++ % fragmentsPerLine.length],
-  }));
-}
 
 beforeEach(() => {
   vi.clearAllMocks();
@@ -61,7 +34,7 @@ beforeEach(() => {
 describe('layoutRow — normal (pretext) path', () => {
   it('renders a flat list of .line spans with proj-pill and bare-text fragments, no star on feature rows', () => {
     const row = makeRow({ raw: 'shipped a thing', project: 'explorer', target: '/explorer', feature: true });
-    const msg = row.querySelector('.msg');
+    const msg = q(row, '.msg');
     msg.textContent = 'stale content'; // proves replaceChildren() wipes prior content
     document.body.appendChild(row);
 
@@ -76,7 +49,7 @@ describe('layoutRow — normal (pretext) path', () => {
     const lines = msg.querySelectorAll('.line');
     expect(lines.length).toBe(1);
 
-    const pill = msg.querySelector('.line .proj-pill');
+    const pill = q(msg, '.line .proj-pill');
     expect(pill).not.toBeNull();
     expect(pill.textContent).toBe('#explorer');
     expect(pill.dataset.targetChannel).toBe('/explorer');
@@ -89,14 +62,14 @@ describe('layoutRow — normal (pretext) path', () => {
 
     // pretext fed the buildItems output at the requested width
     expect(prepareRichInline).toHaveBeenCalledTimes(1);
-    const items = prepareRichInline.mock.calls[0][0];
-    expect(items.map(i => i.text)).toEqual(['#explorer', 'shipped a thing']);
-    expect(walkRichInlineLineRanges.mock.calls[0][1]).toBe(300);
+    const items = vi.mocked(prepareRichInline).mock.calls[0]?.[0];
+    expect(items?.map(i => i.text)).toEqual(['#explorer', 'shipped a thing']);
+    expect(vi.mocked(walkRichInlineLineRanges).mock.calls[0]?.[1]).toBe(300);
   });
 
   it('renders a gapBefore fragment as a span with margin-left', () => {
     const row = makeRow({ raw: 'body text', project: 'explorer' });
-    const msg = row.querySelector('.msg');
+    const msg = q(row, '.msg');
     document.body.appendChild(row);
 
     // itemIndex 1 = body item: not a pill (no '#'), gapBefore>0 -> span
@@ -104,7 +77,7 @@ describe('layoutRow — normal (pretext) path', () => {
 
     layoutRow(row, 300, FONT);
 
-    const span = msg.querySelector('.line span');
+    const span = q(msg, '.line span');
     expect(span).not.toBeNull();
     expect(span.className).toBe(''); // not a proj-pill
     expect(span.textContent).toBe('body');
@@ -113,21 +86,21 @@ describe('layoutRow — normal (pretext) path', () => {
 
   it('omits data-target-channel on the pill when the row has no target', () => {
     const row = makeRow({ raw: 'no target', project: 'explorer' });
-    const msg = row.querySelector('.msg');
+    const msg = q(row, '.msg');
     document.body.appendChild(row);
 
     setNormalPath([[{ itemIndex: 0, text: '#explorer', gapBefore: 0 }]]);
 
     layoutRow(row, 300, FONT);
 
-    const pill = msg.querySelector('.proj-pill');
+    const pill = q(msg, '.proj-pill');
     expect(pill).not.toBeNull();
     expect(pill.dataset.targetChannel).toBeUndefined();
   });
 
   it('emits one .line span per range the walker yields', () => {
     const row = makeRow({ raw: 'two lines', project: 'explorer' });
-    const msg = row.querySelector('.msg');
+    const msg = q(row, '.msg');
     document.body.appendChild(row);
 
     setNormalPath([
@@ -146,12 +119,12 @@ describe('layoutRow — zero/negative-width fallback (pretext not invoked)', () 
   for (const width of [0, -10, NaN, undefined]) {
     it(`renders plain-text fallback at width=${String(width)} without calling pretext`, () => {
       const row = makeRow({ raw: 'fallback body', project: 'explorer', target: '/explorer', feature: true });
-      const msg = row.querySelector('.msg');
+      const msg = q(row, '.msg');
       document.body.appendChild(row);
 
-      layoutRow(row, width, FONT);
+      layoutRow(row, /** @type {number} */ (width), FONT); // undefined width on purpose
 
-      const pill = msg.querySelector('.proj-pill');
+      const pill = q(msg, '.proj-pill');
       expect(pill).not.toBeNull();
       expect(pill.textContent).toBe('#explorer');
       expect(pill.dataset.targetChannel).toBe('/explorer');
@@ -167,7 +140,7 @@ describe('layoutRow — zero/negative-width fallback (pretext not invoked)', () 
 
   it('omits the pill when the row has no project', () => {
     const row = makeRow({ raw: 'plain line' });
-    const msg = row.querySelector('.msg');
+    const msg = q(row, '.msg');
     document.body.appendChild(row);
 
     layoutRow(row, 0, FONT);
@@ -179,12 +152,12 @@ describe('layoutRow — zero/negative-width fallback (pretext not invoked)', () 
 
 describe('layoutRow — pretext-throws fallback (caught -> renderFallback)', () => {
   it('falls back to plain text when prepareRichInline throws, without walking ranges', () => {
-    prepareRichInline.mockImplementation(() => {
+    vi.mocked(prepareRichInline).mockImplementation(() => {
       throw new Error('pretext boom');
     });
 
     const row = makeRow({ raw: 'caught body', project: 'explorer' });
-    const msg = row.querySelector('.msg');
+    const msg = q(row, '.msg');
     document.body.appendChild(row);
 
     expect(() => layoutRow(row, 300, FONT)).not.toThrow();
@@ -194,7 +167,7 @@ describe('layoutRow — pretext-throws fallback (caught -> renderFallback)', () 
     expect(walkRichInlineLineRanges).not.toHaveBeenCalled();
     expect(materializeRichInlineLineRange).not.toHaveBeenCalled();
 
-    const pill = msg.querySelector('.proj-pill');
+    const pill = q(msg, '.proj-pill');
     expect(pill).not.toBeNull();
     expect(pill.textContent).toBe('#explorer');
     expect(msg.textContent).toContain('caught body');
@@ -215,7 +188,7 @@ describe('layoutRow — early returns', () => {
 
   it('clears .msg and skips pretext when there is no text to lay out', () => {
     const row = makeRow(); // no project, no raw -> only an empty body item
-    const msg = row.querySelector('.msg');
+    const msg = q(row, '.msg');
     msg.textContent = 'leftover';
     document.body.appendChild(row);
 
@@ -223,70 +196,5 @@ describe('layoutRow — early returns', () => {
 
     expect(msg.textContent).toBe('');
     expect(prepareRichInline).not.toHaveBeenCalled();
-  });
-});
-
-describe('measureFeedMetrics', () => {
-  it('returns null when the feed has no .feed-row .msg probe', () => {
-    const feed = document.createElement('div');
-    document.body.appendChild(feed);
-    expect(measureFeedMetrics(feed)).toBeNull();
-  });
-
-  it('returns the probe font and measured column width', () => {
-    const feed = document.createElement('div');
-    feed.appendChild(makeRow({ raw: 'probe' }));
-    document.body.appendChild(feed);
-
-    const probe = feed.querySelector('.feed-row .msg');
-    probe.getBoundingClientRect = () => ({ width: 250 });
-
-    const m = measureFeedMetrics(feed);
-    expect(m).not.toBeNull();
-    expect(m.msgWidth).toBe(250);
-    expect(typeof m.font).toBe('string');
-  });
-});
-
-describe('relayoutAll', () => {
-  it('returns early without laying out when there is no probe', () => {
-    const feed = document.createElement('div');
-    document.body.appendChild(feed);
-
-    relayoutAll(feed);
-    expect(prepareRichInline).not.toHaveBeenCalled();
-  });
-
-  it('returns early when the measured width is zero', () => {
-    const feed = document.createElement('div');
-    feed.appendChild(makeRow({ raw: 'a' }));
-    document.body.appendChild(feed);
-
-    const probe = feed.querySelector('.feed-row .msg');
-    probe.getBoundingClientRect = () => ({ width: 0 });
-
-    relayoutAll(feed);
-    expect(prepareRichInline).not.toHaveBeenCalled();
-  });
-
-  it('lays out every feed row at the uniform measured width', () => {
-    const feed = document.createElement('div');
-    feed.appendChild(makeRow({ raw: 'first' }));
-    feed.appendChild(makeRow({ raw: 'second' }));
-    document.body.appendChild(feed);
-
-    const probe = feed.querySelector('.feed-row .msg');
-    probe.getBoundingClientRect = () => ({ width: 300 });
-
-    setNormalPath([[{ itemIndex: 0, text: 'x', gapBefore: 0 }]]);
-
-    relayoutAll(feed);
-
-    // one layoutRow -> one walk per row
-    expect(walkRichInlineLineRanges).toHaveBeenCalledTimes(2);
-    expect(walkRichInlineLineRanges.mock.calls[0][1]).toBe(300);
-    for (const msg of feed.querySelectorAll('.feed-row .msg')) {
-      expect(msg.querySelector('.line')).not.toBeNull();
-    }
   });
 });

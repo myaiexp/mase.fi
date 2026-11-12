@@ -2,6 +2,7 @@
 // Tests for shadowStyles: adopted-sheet path (CSP-safe), <style> fallback, per-component coverage
 import { describe, it, expect, beforeAll, afterEach, vi } from 'vitest';
 import { shadowStyles } from './shadow-styles.js';
+import { $, shadow } from '../../dom-test-helpers.js';
 
 // Every shadow-DOM tag the library defines. Toast is not here: it has no
 // shadow root and styles through the CSSOM (element.style), which CSP allows.
@@ -29,14 +30,16 @@ function stubAdoptedStyleSheets({ throwOnSet = false } = {}) {
 }
 
 afterEach(() => {
-  delete ShadowRoot.prototype.adoptedStyleSheets;
+  // Drops the own-property stub installed above; the real accessor lives on Document/ShadowRoot.
+  Reflect.deleteProperty(ShadowRoot.prototype, 'adoptedStyleSheets');
   vi.restoreAllMocks();
 });
 
 // Styles are adopted in the constructor, so the element never needs connecting
 // (text-fit's connectedCallback wants a ResizeObserver jsdom lacks).
+/** @param {string} tag */
 function shadowOf(tag) {
-  return document.createElement(tag).shadowRoot;
+  return shadow(document.createElement(tag));
 }
 
 describe('components under adoptedStyleSheets (browser path)', () => {
@@ -61,8 +64,8 @@ describe('components under adoptedStyleSheets (browser path)', () => {
 describe('components without adoptedStyleSheets (fallback path)', () => {
   it.each(TAGS)('%s falls back to a leading <style>', (tag) => {
     const root = shadowOf(tag);
-    expect(root.firstChild.nodeName).toBe('STYLE');
-    expect(root.firstChild.textContent).toContain(':host');
+    expect(root.firstChild?.nodeName).toBe('STYLE');
+    expect(root.firstChild?.textContent).toContain(':host');
   });
 });
 
@@ -84,7 +87,7 @@ describe('shadowStyles', () => {
     const host = document.createElement('div');
     const root = host.attachShadow({ mode: 'open' });
     shadowStyles(':host { display: block; }').adopt(root);
-    expect(root.querySelector('style').textContent).toBe(':host { display: block; }');
+    expect($('style', root).textContent).toBe(':host { display: block; }');
     expect(warn).toHaveBeenCalledOnce();
   });
 });

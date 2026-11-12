@@ -1,0 +1,72 @@
+/* base.css partial: flex and gap utilities, borders, the flagged edge, status dots */
+/* ===== Flex Utilities ===== */
+
+.flex       { display: flex; }
+.flex-col   { display: flex; flex-direction: column; }
+.items-center { align-items: center; }
+.justify-between { justify-content: space-between; }
+.justify-center { justify-content: center; }
+.flex-1     { flex: 1; }
+.flex-wrap  { flex-wrap: wrap; }
+/* Full 6-step ramp so the "prefer gap over margin" rule can express every
+   rhythm level — including between-sections (5) and between-landmarks (6).
+   See the spacing card for which step maps to which relationship. */
+.gap-1      { gap: var(--space-1); }
+.gap-2      { gap: var(--space-2); }
+.gap-3      { gap: var(--space-3); }
+.gap-4      { gap: var(--space-4); }
+.gap-5      { gap: var(--space-5); }
+.gap-6      { gap: var(--space-6); }
+
+/* ===== Borders & Dividers ===== */
+
+.border-b { border-bottom: 1px solid var(--border); }
+.border-t { border-top: 1px solid var(--border); }
+.border-r { border-right: 1px solid var(--border); }
+.border-l { border-left: 1px solid var(--border); }
+
+/* ===== Flagged — attention edge =====
+   A persistent "look at this" marker on a card or row: a --ring-flag (1px) --accent
+   outline on all four edges. Amber, not red — it asks for a look, not immediate
+   action. Use this, never a thick left-edge accent bar. Spec + do/don't:
+   docs/design-cards/flagged/.
+   An outline, not a border, so flagging never shifts layout; inset by its own width
+   so it sits on the element's edge — inside any overflow:hidden parent, not in the
+   gap to a neighbour. Pair it with a text cue (a label, title or status badge): the
+   edge alone is colour-only and screen readers never see it. */
+
+.flagged {
+  outline: var(--ring-flag) solid var(--accent);
+  outline-offset: calc(-1 * var(--ring-flag));
+}
+/* Same specificity as :focus-visible and later in the file, so .flagged would
+   otherwise replace the focus ring; restate the focus ring for a focused flag. */
+.flagged:focus-visible {
+  outline-width: var(--ring-focus);
+  outline-offset: 1px;
+}
+
+/* ===== Status Dots ===== */
+
+.dot {
+  display: inline-block;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--text-muted);
+}
+
+.dot-green  { background: var(--green); }
+.dot-red    { background: var(--red); }
+.dot-orange { background: var(--orange); }
+.dot-accent { background: var(--accent); }
+
+.dot-pulse {
+  animation: pulse 2s ease-in-out infinite;
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.4; }
+}
+

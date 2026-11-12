@@ -1,10 +1,13 @@
 // @vitest-environment jsdom
+// <base-badge> tests: slotted text, status dot vs tag, variants, size, reactive attributes
 import { describe, it, expect, beforeAll } from 'vitest';
+import { $, shadow } from '../../dom-test-helpers.js';
 
 beforeAll(async () => {
   await import('./badge.js');
 });
 
+/** @param {Record<string, string>} [attrs] @param {string} [text] */
 function createBadge(attrs = {}, text = '') {
   const el = document.createElement('base-badge');
   for (const [k, v] of Object.entries(attrs)) el.setAttribute(k, v);
@@ -16,25 +19,25 @@ function createBadge(attrs = {}, text = '') {
 describe('base-badge', () => {
   it('renders slotted text content', () => {
     const el = createBadge({}, 'Active');
-    const slot = el.shadowRoot.querySelector('slot');
+    const slot = shadow(el).querySelector('slot');
     expect(slot).toBeTruthy();
   });
 
   it('defaults to tag (no dot)', () => {
     const el = createBadge({ variant: 'feature' });
-    const span = el.shadowRoot.querySelector('span');
+    const span = $('span', shadow(el));
     expect(span.classList.contains('dot')).toBe(false);
   });
 
   it('type="status" renders a dot', () => {
     const el = createBadge({ type: 'status', variant: 'running' });
-    const span = el.shadowRoot.querySelector('span');
+    const span = $('span', shadow(el));
     expect(span.classList.contains('dot')).toBe(true);
   });
 
   it('type="tag" omits the dot', () => {
     const el = createBadge({ type: 'tag', variant: 'feature' });
-    const span = el.shadowRoot.querySelector('span');
+    const span = $('span', shadow(el));
     expect(span.classList.contains('dot')).toBe(false);
   });
 
@@ -72,13 +75,13 @@ describe('base-badge', () => {
 
   it('size="sm" applies smaller styling', () => {
     const el = createBadge({ size: 'sm' });
-    const span = el.shadowRoot.querySelector('span');
+    const span = $('span', shadow(el));
     expect(span.classList.contains('sm')).toBe(true);
   });
 
   it('type change toggles the dot reactively', () => {
     const el = createBadge({ type: 'tag', variant: 'feature' });
-    const span = el.shadowRoot.querySelector('span');
+    const span = $('span', shadow(el));
     expect(span.classList.contains('dot')).toBe(false);
     el.setAttribute('type', 'status');
     el.setAttribute('variant', 'running');

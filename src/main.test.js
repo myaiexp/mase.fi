@@ -4,10 +4,13 @@
 // resolves. Every collaborator is mocked; each case re-imports main.js fresh so
 // its top-level code runs against that case's boot decision and media query.
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
+import { appData, byId } from './channels-test-helpers.js';
 
 const m = vi.hoisted(() => {
+  /** @type {string[]} */
   const order = [];
-  const spy = (name, impl) => vi.fn((...args) => { order.push(name); return impl?.(...args); });
+  /** @param {string} name */
+  const spy = (name) => vi.fn(() => { order.push(name); });
   return {
     order,
     navigate: () => {},
@@ -44,19 +47,21 @@ vi.mock('./tickers.js', () => ({ initTickers: m.initTickers }));
 vi.mock('./styles/index.css', () => ({}));
 
 const INIT_ORDER = ['initChannels', 'renderChanlist', 'initCommand', 'initTickers', 'applyInitialChannel'];
-const data = { meta: { bootTime: 1234 }, entries: [], projects: [] };
-let resolveData;
+const data = appData([], { meta: { server: 'test', bootTime: 1234 } });
+/** @type {() => void} */
+let resolveData = () => {};
 
-const app = () => document.getElementById('app');
+const app = () => byId('app');
 const boot = () => document.getElementById('boot');
 const initCalls = () => m.order.filter((n) => INIT_ORDER.includes(n));
 // init() awaits the data promise; let its continuation run.
 const settle = () => new Promise((r) => setTimeout(r, 0));
 
 /** Import main.js fresh under one boot decision and reduced-motion setting. */
+/** @param {{ skip: boolean, reduced?: boolean }} opts */
 async function loadMain({ skip, reduced = false }) {
   m.shouldSkipBoot.mockReturnValue(skip);
-  vi.stubGlobal('matchMedia', vi.fn((q) => ({
+  vi.stubGlobal('matchMedia', vi.fn((/** @type {string} */ q) => ({
     matches: q === '(prefers-reduced-motion: reduce)' && reduced,
     media: q,
   })));
@@ -118,7 +123,7 @@ describe('main.js skip-boot path', () => {
   });
 
   it('tolerates a page without #boot', async () => {
-    boot().remove();
+    boot()?.remove();
     await expect(loadMain({ skip: true })).resolves.toBeUndefined();
     expect(app().hidden).toBe(false);
   });
@@ -149,7 +154,8 @@ describe('main.js boot path', () => {
 
 describe('main.js late demos', () => {
   it('applies a manifest that resolves after the first render', async () => {
-    let resolveDemos;
+    /** @type {(demos: string[]) => void} */
+    let resolveDemos = () => {};
     const late = {
       ...data,
       demos: [],

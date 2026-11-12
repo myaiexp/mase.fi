@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 // <base-select> action options: the '...' button, option-action event, clean labels
 import { describe, it, expect, beforeAll, afterEach } from 'vitest';
-import { createSelect, getTrigger, getOptions } from './select-test-helpers.js';
+import { createSelect, getTrigger, getOptions, $ } from './select-test-helpers.js';
 
 beforeAll(async () => {
   await import('./select.js');
@@ -16,7 +16,7 @@ describe('base-select action options', () => {
     const el = createSelect({ options: [{ value: 'foo', label: 'Foo', action: true }] });
     const div = getOptions(el)[0];
     expect(div.classList.contains('has-action')).toBe(true);
-    const btn = div.querySelector('.action-btn');
+    const btn = $(div, '.action-btn');
     expect(btn).toBeTruthy();
     expect(btn.tagName).toBe('BUTTON');
   });
@@ -32,10 +32,11 @@ describe('base-select action options', () => {
     const el = createSelect({ options: [{ value: 'foo', label: 'Foo', action: true }] });
     getTrigger(el).click();
 
+    /** @type {CustomEvent[]} */
     const received = [];
-    el.addEventListener('option-action', (e) => received.push(e));
+    el.addEventListener('option-action', (e) => received.push(/** @type {CustomEvent} */ (e)));
 
-    const btn = getOptions(el)[0].querySelector('.action-btn');
+    const btn = $(getOptions(el)[0], '.action-btn');
     btn.click();
 
     expect(received).toHaveLength(1);
@@ -47,8 +48,9 @@ describe('base-select action options', () => {
     const el = createSelect({ options: [{ value: 'foo', label: 'Foo', action: true }] });
     getTrigger(el).click();
 
+    /** @type {unknown[]} */
     const changes = [];
-    el.addEventListener('change', (e) => changes.push(e.detail));
+    el.addEventListener('change', (e) => changes.push(/** @type {CustomEvent} */ (e).detail));
 
     // Click the option div itself (not the action-btn) to select it normally.
     getOptions(el)[0].click();
@@ -63,10 +65,11 @@ describe('base-select action options', () => {
     const el = createSelect({ options: [{ value: 'foo', label: 'Foo', action: true }] });
     getTrigger(el).click();
 
+    /** @type {unknown[]} */
     const changes = [];
-    el.addEventListener('change', (e) => changes.push(e.detail));
+    el.addEventListener('change', (e) => changes.push(/** @type {CustomEvent} */ (e).detail));
 
-    getOptions(el)[0].querySelector('.action-btn').click();
+    $(getOptions(el)[0], '.action-btn').click();
 
     expect(changes).toHaveLength(0);
     expect(el.value).toBe('');

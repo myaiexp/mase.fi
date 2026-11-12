@@ -6,7 +6,14 @@ import { writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { makeTempDir, cleanup, writeJson, runScript } from './test-helpers.js';
 
-let dir, file, archive, apiFile;
+/** @type {string} */
+let dir;
+/** @type {string} */
+let file;
+/** @type {string} */
+let archive;
+/** @type {string} */
+let apiFile;
 
 beforeEach(() => {
   dir = makeTempDir();
@@ -16,6 +23,7 @@ beforeEach(() => {
 });
 afterEach(() => cleanup(dir));
 
+/** @param {string[]} names */
 const run = (names) => {
   writeFileSync(apiFile, JSON.stringify({ private: names.map((name) => ({ name })) }));
   return runScript('mase-fi-purge-private', [], {
@@ -27,8 +35,17 @@ const run = (names) => {
     LOG_HOT_DAYS: '90',
   });
 };
+/**
+ * @param {string} date
+ * @param {string} summary
+ */
 const daily = (date, summary) => ({ date, category: 'daily', project: 'home', summary });
+/**
+ * @param {string} date
+ * @param {string} text
+ */
 const log = (date, text) => ({ date, category: 'log', project: 'helm', text });
+/** @param {{ stdout: string }} r */
 const mentioned = (r) => r.stdout.split('\n').filter((l) => l.startsWith('still mentioned: ')).sort();
 
 describe('mase-fi-purge-private — mention report', () => {

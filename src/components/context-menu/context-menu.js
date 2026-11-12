@@ -1,61 +1,46 @@
 // <base-context-menu> — singleton right-click context menu with zone-based registration
 
-import { MENU_DISABLED_CSS, MENU_DIVIDER_CSS, MENU_ITEM_CSS, MENU_SURFACE_CSS } from '../shared/menu-styles.js';
 import { nextEnabledIndex } from '../shared/menu-nav.js';
 import { addOverlayListeners, removeOverlayListeners } from '../shared/overlay-utils.js';
 import { mountShadow } from '../shared/mount-shadow.js';
-import { shadowStyles } from '../shared/shadow-styles.js';
-
-const contextMenuStyles = shadowStyles(`
-  :host {
-    display: contents;
-  }
-  [part="menu"] {
-    position: fixed;
-    z-index: 1000;
-    min-width: 140px;
-    max-width: 260px;${MENU_SURFACE_CSS}
-  }
-  [part="menu"][hidden] {
-    display: none;
-  }
-  .item {${MENU_ITEM_CSS}
-  }
-  .item.highlighted {
-    background: var(--bg-hover, #27272a);
-  }
-  .item.disabled {
-    color: var(--text-muted, #52525b);${MENU_DISABLED_CSS}
-  }
-  .item.disabled.highlighted {
-    background: transparent;
-  }
-  /* A finger is not a mouse pointer: 4px rows at 13px are a target you miss. */
-  @media (pointer: coarse) {
-    .item {
-      padding: 10px 14px;
-      font-size: 15px;
-    }
-  }
-  hr {${MENU_DIVIDER_CSS}
-  }
-`);
+import { contextMenuStyles } from './context-menu-styles.js';
 
 const contextMenuTemplate = document.createElement('template');
 contextMenuTemplate.innerHTML = '<div part="menu" hidden></div>';
+
+/**
+ * @typedef {object} MenuItem
+ * @property {string} [label]
+ * @property {boolean} [separator]
+ * @property {boolean} [disabled]
+ * @property {() => void} [action]
+ */
+/** @typedef {{ x: number, y: number, pointerType: 'touch' | 'mouse' }} MenuContext */
+/**
+ * @typedef {object} ZoneOptions
+ * @property {string} selector
+ * @property {(target: Element, selection: string, ctx: MenuContext) => MenuItem[] | null | undefined} items
+ * @property {boolean} [touch]
+ */
 
 class BaseContextMenu extends HTMLElement {
   // Member convention (library-wide — see docs/base-components.md): `#member` is
   // hard-private internal state; `_member` is deliberately reachable by a friend
   // module or test. This component has no friend module, so every member is #.
+  /** @type {Map<string, { selector: string, items: ZoneOptions['items'], touch: boolean }>} */
   #zones = new Map();
   #open = false;
   #highlightIdx = -1;
+  /** @type {MenuItem[]} */
   #items = [];
+  /** @type {((e: MouseEvent) => void) | null} */
   #onContextMenu = null;
+  /** @type {((e: PointerEvent) => void) | null} */
   #onPointerDown = null;
+  /** @type {(() => void) | null} */
   #onKeyDown = null;
-  #menu = null;
+  /** @type {HTMLElement} */
+  #menu;
   // Whether the gesture that will produce the next `contextmenu` came from a
   // finger — see #isTouchGesture for why that has to be known before we
   // preventDefault().
@@ -64,7 +49,7 @@ class BaseContextMenu extends HTMLElement {
   constructor() {
     super();
     mountShadow(this, contextMenuStyles, contextMenuTemplate);
-    this.#menu = this.shadowRoot.querySelector('[part="menu"]');
+    this.#menu = /** @type {HTMLElement} */ (/** @type {ShadowRoot} */ (this.shadowRoot).querySelector('[part="menu"]'));
   }
 
   connectedCallback() {
@@ -97,16 +82,26 @@ class BaseContextMenu extends HTMLElement {
     this.close();
   }
 
+  /**
+   * @param {string} id
+   * @param {ZoneOptions} zone
+   */
   register(id, { selector, items, touch }) {
     // Map preserves insertion order, and re-setting an existing key keeps its
     // original position — so zone iteration order is derived, never duplicated.
     this.#zones.set(id, { selector, items, touch: !!touch });
   }
 
+  /** @param {string} id */
   unregister(id) {
     this.#zones.delete(id);
   }
 
+  /**
+   * @param {number} x
+   * @param {number} y
+   * @param {MenuItem[]} items
+   */
   show(x, y, items) {
     this.#items = items;
     this.#highlightIdx = -1;
@@ -117,13 +112,13 @@ class BaseContextMenu extends HTMLElement {
       const item = items[i];
       if (item.separator) {
         const hr = document.createElement('hr');
-        hr.dataset.index = i;
+        hr.dataset.index = String(i);
         this.#menu.appendChild(hr);
       } else {
         const span = document.createElement('span');
         span.className = 'item';
-        span.textContent = item.label;
-        span.dataset.index = i;
+        span.textContent = /** @type {string} */ (item.label);
+        span.dataset.index = String(i);
         if (item.disabled) span.classList.add('disabled');
         span.addEventListener('click', (e) => {
           e.stopPropagation();
@@ -175,6 +170,7 @@ class BaseContextMenu extends HTMLElement {
   // exposes mozInputSource and WebKit dispatches a plain MouseEvent — so the
   // preceding pointerdown is the portable signal, and the event's own fields win
   // when present.
+  /** @param {MouseEvent & { pointerType?: string, mozInputSource?: number }} e */
   #isTouchGesture(e) {
     if (e.pointerType) return e.pointerType === 'touch';
     if (typeof e.mozInputSource === 'number') {
@@ -183,19 +179,22 @@ class BaseContextMenu extends HTMLElement {
     return this.#lastPointerWasTouch;
   }
 
+  /** @param {MouseEvent} e */
   #handleContextMenu(e) {
     if (this.#open) this.close();
 
     const isTouch = this.#isTouchGesture(e);
+    /** @type {MenuContext} */
     const ctx = { x: e.clientX, y: e.clientY, pointerType: isTouch ? 'touch' : 'mouse' };
 
+    const target = /** @type {Element} */ (e.target);
     for (const zone of this.#zones.values()) {
       if (isTouch && !zone.touch) continue;
-      const matched = e.target.closest(zone.selector);
+      const matched = target.closest(zone.selector);
       if (!matched) continue;
 
-      const selection = window.getSelection().toString();
-      const result = zone.items(e.target, selection, ctx);
+      const selection = /** @type {Selection} */ (window.getSelection()).toString();
+      const result = zone.items(target, selection, ctx);
       if (result && result.length > 0) {
         e.preventDefault();
         this.show(e.clientX, e.clientY, result);
@@ -205,10 +204,11 @@ class BaseContextMenu extends HTMLElement {
     // No match — native menu shows
   }
 
+  /** @param {number} index */
   #onItemClick(index) {
     const item = this.#items[index];
     if (!item || item.separator || item.disabled) return;
-    item.action();
+    /** @type {() => void} */ (item.action)();
     this.close();
   }
 
@@ -220,7 +220,7 @@ class BaseContextMenu extends HTMLElement {
       this,
       (e) => !e.composedPath().includes(this.#menu),
       [
-        { target: document, type: 'keydown', handler: (e) => this.#onNavKeydown(e) },
+        { target: document, type: 'keydown', handler: (e) => this.#onNavKeydown(/** @type {KeyboardEvent} */ (e)) },
         { target: window, type: 'scroll', handler: () => this.close(), options: { passive: true, capture: true } },
         { target: window, type: 'blur', handler: () => this.close() },
       ],
@@ -228,6 +228,7 @@ class BaseContextMenu extends HTMLElement {
   }
 
   // Escape is handled by overlay-utils; this covers menu navigation only.
+  /** @param {KeyboardEvent} e */
   #onNavKeydown(e) {
     if (e.key === 'ArrowDown') {
       e.preventDefault();
@@ -243,6 +244,7 @@ class BaseContextMenu extends HTMLElement {
     }
   }
 
+  /** @param {number} direction */
   #moveHighlight(direction) {
     const items = this.#items;
     if (!items.length) return;
@@ -260,9 +262,9 @@ class BaseContextMenu extends HTMLElement {
   }
 
   #updateHighlight() {
-    const spans = this.#menu.querySelectorAll('.item');
+    const spans = /** @type {NodeListOf<HTMLElement>} */ (this.#menu.querySelectorAll('.item'));
     for (const span of spans) {
-      const i = parseInt(span.dataset.index, 10);
+      const i = parseInt(/** @type {string} */ (span.dataset.index), 10);
       span.classList.toggle('highlighted', i === this.#highlightIdx);
     }
   }

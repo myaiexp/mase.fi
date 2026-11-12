@@ -57,6 +57,7 @@ export const PROJECT_ART = {
 };
 
 // activity sparkbar — 28 cells mapping to daily commits
+/** @param {number[]} values @param {number} max @returns {string} */
 export function sparkbar(values, max) {
   const bars = "▁▂▃▄▅▆▇█";
   return values.map(v => {
@@ -66,6 +67,7 @@ export function sparkbar(values, max) {
 }
 
 // scramble a string — each char has `p` chance of being replaced by noise
+/** @param {string} str @param {number} [p] @returns {string} */
 export function scramble(str, p = 0.6) {
   let out = "";
   for (const ch of str) {

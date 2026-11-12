@@ -2,11 +2,20 @@
 // light children, marks the selected row, and applies/clears the search filter.
 // Each function takes the host <base-select> and operates on its `_menu`.
 
+/**
+ * The <base-select> host as select-menu sees it: its menu node, value and the
+ * option-click callback.
+ * @typedef {HTMLElement & { _menu: HTMLElement, value: string, _selectOption: (div: HTMLElement) => void }} SelectHost
+ */
+/** @typedef {import('./select-option.js').BaseOption} BaseOption */
+/** @typedef {import('./select-option.js').BaseOptionGroup} BaseOptionGroup */
+
 // Build the menu DOM from the select's light-DOM options and option-groups.
+/** @param {SelectHost} select */
 export function buildMenu(select) {
   const menu = select._menu;
   menu.textContent = '';
-  const children = select.querySelectorAll(':scope > base-option, :scope > base-option-group');
+  const children = /** @type {NodeListOf<BaseOption | BaseOptionGroup>} */ (select.querySelectorAll(':scope > base-option, :scope > base-option-group'));
   for (const child of children) {
     if (child.tagName === 'BASE-OPTION-GROUP') {
       const header = document.createElement('div');
@@ -14,11 +23,11 @@ export function buildMenu(select) {
       header.textContent = child.label;
       header.dataset.groupFor = child.label;
       menu.appendChild(header);
-      for (const opt of child.querySelectorAll('base-option')) {
+      for (const opt of /** @type {NodeListOf<BaseOption>} */ (child.querySelectorAll('base-option'))) {
         menu.appendChild(createOptionDiv(select, opt, child.label));
       }
     } else {
-      menu.appendChild(createOptionDiv(select, child, null));
+      menu.appendChild(createOptionDiv(select, /** @type {BaseOption} */ (child), null));
     }
   }
   const noMatch = document.createElement('div');
@@ -30,6 +39,12 @@ export function buildMenu(select) {
   markSelected(select);
 }
 
+/**
+ * @param {SelectHost} select
+ * @param {BaseOption} opt
+ * @param {string | null} groupLabel
+ * @returns {HTMLDivElement}
+ */
 function createOptionDiv(select, opt, groupLabel) {
   const div = document.createElement('div');
   div.className = 'option';
@@ -67,9 +82,10 @@ function createOptionDiv(select, opt, groupLabel) {
 }
 
 // Toggle the .selected class onto the option div matching the current value.
+/** @param {SelectHost} select */
 export function markSelected(select) {
   const v = select.value;
-  for (const div of select._menu.querySelectorAll('.option')) {
+  for (const div of /** @type {NodeListOf<HTMLElement>} */ (select._menu.querySelectorAll('.option'))) {
     div.classList.toggle('selected', div.dataset.value === v);
   }
 }
@@ -77,15 +93,19 @@ export function markSelected(select) {
 // Hide options that don't match `query` (lowercased), hide group headers whose
 // options are all hidden, and toggle the no-matches row. The caller resets the
 // keyboard highlight afterward.
+/**
+ * @param {SelectHost} select
+ * @param {string} query
+ */
 export function filterMenu(select, query) {
   const menu = select._menu;
-  const opts = [...menu.querySelectorAll('.option')];
-  const headers = [...menu.querySelectorAll('.group-header')];
-  const noMatch = menu.querySelector('.no-matches');
+  const opts = [.../** @type {NodeListOf<HTMLElement>} */ (menu.querySelectorAll('.option'))];
+  const headers = [.../** @type {NodeListOf<HTMLElement>} */ (menu.querySelectorAll('.group-header'))];
+  const noMatch = /** @type {HTMLElement | null} */ (menu.querySelector('.no-matches'));
   let anyVisible = false;
 
   for (const opt of opts) {
-    const match = !query || opt.dataset.label.toLowerCase().includes(query);
+    const match = !query || /** @type {string} */ (opt.dataset.label).toLowerCase().includes(query);
     opt.style.display = match ? '' : 'none';
     if (match) anyVisible = true;
   }
@@ -102,10 +122,11 @@ export function filterMenu(select, query) {
 
 // Inverse of filterMenu — show every option/header and hide the no-matches row.
 // Used when a search is abandoned (close) rather than applied.
+/** @param {SelectHost} select */
 export function resetFilter(select) {
   const menu = select._menu;
-  for (const opt of menu.querySelectorAll('.option')) opt.style.display = '';
-  for (const header of menu.querySelectorAll('.group-header')) header.style.display = '';
-  const noMatch = menu.querySelector('.no-matches');
+  for (const opt of /** @type {NodeListOf<HTMLElement>} */ (menu.querySelectorAll('.option'))) opt.style.display = '';
+  for (const header of /** @type {NodeListOf<HTMLElement>} */ (menu.querySelectorAll('.group-header'))) header.style.display = '';
+  const noMatch = /** @type {HTMLElement | null} */ (menu.querySelector('.no-matches'));
   if (noMatch) noMatch.style.display = 'none';
 }

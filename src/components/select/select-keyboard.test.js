@@ -19,8 +19,9 @@ describe('base-select keyboard', () => {
       { value: 'b', label: 'B' },
       { value: 'c', label: 'C' },
     ] });
+    /** @type {{ value: string, label: string }[]} */
     const received = [];
-    el.addEventListener('change', (e) => received.push(e.detail));
+    el.addEventListener('change', (e) => received.push(/** @type {CustomEvent} */ (e).detail));
     expect(el.isOpen).toBe(false);
 
     const press = new KeyboardEvent('keydown', { key, bubbles: true, cancelable: true });
@@ -102,8 +103,10 @@ describe('base-select keyboard', () => {
     const el = createSelect({ options: [{ value: 'a', label: 'A' }, { value: 'b', label: 'B' }] });
     el.open();
 
+    /** @type {{ value: string, label: string }[]} */
+
     const received = [];
-    el.addEventListener('change', (e) => received.push(e.detail));
+    el.addEventListener('change', (e) => received.push(/** @type {CustomEvent} */ (e).detail));
 
     getTrigger(el).dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowDown', bubbles: true }));
     getTrigger(el).dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));

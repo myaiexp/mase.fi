@@ -7,6 +7,7 @@ afterEach(() => {
   vi.restoreAllMocks();
 });
 
+/** @param {boolean} ok @param {unknown} body */
 function stubDemosResponse(ok, body) {
   vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok, json: async () => body }));
 }
@@ -48,6 +49,6 @@ describe('fetchDemos', () => {
     const fetchMock = vi.fn().mockResolvedValue({ ok: true, json: async () => [] });
     vi.stubGlobal('fetch', fetchMock);
     await fetchDemos();
-    expect(fetchMock.mock.calls[0][1]?.signal).toBeInstanceOf(AbortSignal);
+    expect(fetchMock.mock.calls[0]?.[1]?.signal).toBeInstanceOf(AbortSignal);
   });
 });

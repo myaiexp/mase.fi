@@ -9,8 +9,9 @@ afterEach(() => {
   vi.restoreAllMocks();
 });
 
+/** @param {{ updates: () => Promise<unknown>, manifest: () => Promise<unknown> }} fns */
 function stubSplitFetch({ updates, manifest }) {
-  vi.stubGlobal('fetch', vi.fn((url) => {
+  vi.stubGlobal('fetch', vi.fn((/** @type {unknown} */ url) => {
     if (String(url).includes('/demos/')) return manifest();
     return updates();
   }));
@@ -19,6 +20,7 @@ function stubSplitFetch({ updates, manifest }) {
 describe('fetchData late demos manifest', () => {
   it('keeps a manifest that resolves just after the grace window', async () => {
     vi.useFakeTimers();
+    /** @type {(() => void) | undefined} */
     let releaseManifest;
     stubSplitFetch({
       updates: () => Promise.resolve({
@@ -36,7 +38,7 @@ describe('fetchData late demos manifest', () => {
 
     expect(data.demos).toEqual([]);
     expect(data.pendingDemos).toBeInstanceOf(Promise);
-    releaseManifest();
+    releaseManifest?.();
     await expect(data.pendingDemos).resolves.toEqual(['explorer']);
     // The caller applies the list. fetchData does not mutate demos out of band.
     expect(data.demos).toEqual([]);
@@ -45,6 +47,7 @@ describe('fetchData late demos manifest', () => {
   it('keeps the late manifest when updates.json itself fails', async () => {
     vi.useFakeTimers();
     vi.spyOn(console, 'warn').mockImplementation(() => {});
+    /** @type {(() => void) | undefined} */
     let releaseManifest;
     stubSplitFetch({
       updates: () => Promise.reject(new Error('down')),
@@ -59,7 +62,7 @@ describe('fetchData late demos manifest', () => {
 
     expect(data.entries).toEqual([]);
     expect(data.demos).toEqual([]);
-    releaseManifest();
+    releaseManifest?.();
     await expect(data.pendingDemos).resolves.toEqual(['explorer']);
   });
 

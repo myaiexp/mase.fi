@@ -7,16 +7,19 @@ import { prefersReducedMotion } from './motion.js';
 //                its jitter) over the freshly-navigated one. Cancel it on re-entry.
 //  - safetyTimer: the cleanup fallback. Cancel it so it can't tear down the
 //                overlay we're about to rebuild.
+/** @type {ReturnType<typeof setTimeout> | 0} */
 let midTimer = 0;
+/** @type {ReturnType<typeof setTimeout> | 0} */
 let safetyTimer = 0;
 
 /** Play the scanline transition; calls onMid ~a third of the way in, where content should swap. */
+/** @param {() => void} onMid */
 export function playSwitchTransition(onMid) {
   if (prefersReducedMotion()) {
     onMid();
     return;
   }
-  const $overlay = document.getElementById('feed-overlay');
+  const $overlay = /** @type {HTMLElement} */ (document.getElementById('feed-overlay'));
 
   // A rapid re-switch can land mid-sweep; cancel the previous run's pending
   // mid-sweep swap (so it can't render the now-stale channel) and its cleanup

@@ -16,13 +16,33 @@
 // `removeOverlayListeners` can detach exactly what was attached. A batch still
 // live from an earlier open()/show() is detached first: the storage slot holds
 // one batch, so overwriting it would orphan the old listeners on document/window.
+/**
+ * @typedef {{ target: EventTarget, type: string, handler: EventListener, options?: AddEventListenerOptions | boolean, deferred?: boolean }} OverlayListener
+ */
+
+/**
+ * The component's own `_overlayListeners` storage slot.
+ * @param {object} component
+ * @returns {{ _overlayListeners?: OverlayListener[] | null }}
+ */
+function slot(component) {
+  return component;
+}
+
+/**
+ * @param {{ close: () => void }} component
+ * @param {(e: Event) => boolean} onClickOutside
+ * @param {OverlayListener[]} [extraListeners]
+ */
 export function addOverlayListeners(component, onClickOutside, extraListeners = []) {
   removeOverlayListeners(component);
+  /** @type {EventListener} */
   const onDocClick = (e) => {
     if (onClickOutside(e)) component.close();
   };
+  /** @type {EventListener} */
   const onDocKeydown = (e) => {
-    if (e.key === 'Escape') component.close();
+    if ((/** @type {KeyboardEvent} */ (e)).key === 'Escape') component.close();
   };
 
   // The document 'click' listener is attached on the NEXT microtask, not now.
@@ -33,6 +53,7 @@ export function addOverlayListeners(component, onClickOutside, extraListeners = 
   // refuse to stay open). Deferring lets the opening click finish first. The
   // keydown/extra listeners attach synchronously — only an opening *click* can
   // self-close, so only it needs the delay.
+  /** @type {OverlayListener[]} */
   const registered = [
     { target: document, type: 'click', handler: onDocClick, deferred: true },
     { target: document, type: 'keydown', handler: onDocKeydown },
@@ -41,7 +62,7 @@ export function addOverlayListeners(component, onClickOutside, extraListeners = 
 
   // Store the batch immediately so removeOverlayListeners can detach it (and so
   // the deferred attach below can tell whether this batch is still the live one).
-  component._overlayListeners = registered;
+  slot(component)._overlayListeners = registered;
 
   for (const descriptor of registered) {
     if (descriptor.deferred) {
@@ -50,7 +71,7 @@ export function addOverlayListeners(component, onClickOutside, extraListeners = 
         // _overlayListeners no longer points at THIS batch — skip the attach so
         // a closed overlay never holds a live listener and a re-open never
         // double-binds.
-        if (component._overlayListeners !== registered) return;
+        if (slot(component)._overlayListeners !== registered) return;
         descriptor.target.addEventListener(descriptor.type, descriptor.handler, descriptor.options);
       });
     } else {
@@ -59,11 +80,14 @@ export function addOverlayListeners(component, onClickOutside, extraListeners = 
   }
 }
 
+/**
+ * @param {object} component
+ */
 export function removeOverlayListeners(component) {
-  const registered = component._overlayListeners;
+  const registered = slot(component)._overlayListeners;
   if (!registered) return;
   for (const { target, type, handler, options } of registered) {
     target.removeEventListener(type, handler, options);
   }
-  component._overlayListeners = null;
+  slot(component)._overlayListeners = null;
 }

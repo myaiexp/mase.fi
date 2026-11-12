@@ -1,53 +1,13 @@
 // <base-tabs> + <base-tab> — accessible tab panel component with keyboard navigation
 import { nextEnabledIndex } from '../shared/menu-nav.js';
 import { mountShadow } from '../shared/mount-shadow.js';
-import { shadowStyles } from '../shared/shadow-styles.js';
+import { tabsStyles, tabsTemplate } from './tabs-styles.js';
 import { upgradeProperties } from '../shared/upgrade-properties.js';
-
-const tabsStyles = shadowStyles([
-  ':host { display: block; }',
-  '[role="tablist"] {',
-  '  display: flex;',
-  '  flex-direction: row;',
-  '  border-bottom: 1px solid var(--border-color, #27272a);',
-  '  background: var(--bg-surface, #18181b);',
-  '  margin: 0;',
-  '  padding: 0;',
-  '  gap: 0;',
-  '}',
-  'button {',
-  '  background: none;',
-  '  border: none;',
-  '  border-bottom: 2px solid transparent;',
-  '  color: var(--text-dim, #a1a1aa);',
-  '  font-family: var(--font-mono, monospace);',
-  '  font-size: 13px;',
-  '  padding: 6px 12px;',
-  '  cursor: pointer;',
-  '  border-radius: 0;',
-  '  outline: none;',
-  '  margin-bottom: -1px;',
-  '  transition: color 0.1s, border-color 0.1s;',
-  '}',
-  'button:hover:not(:disabled) {',
-  '  color: var(--text, #fafafa);',
-  '}',
-  'button[aria-selected="true"] {',
-  '  color: var(--accent, #e8a308);',
-  '  border-bottom-color: var(--accent, #e8a308);',
-  '}',
-  'button:disabled {',
-  '  opacity: 0.4;',
-  '  cursor: not-allowed;',
-  '}',
-  '.panel-container {',
-  '  padding: 0;',
-  '}',
-].join('\n'));
 
 // Panels need a stable id for aria-controls. An author-set id wins; otherwise
 // one is assigned once and kept, so a tablist rebuild does not retarget AT.
 let tabPanelSeq = 0;
+/** @param {HTMLElement} tabEl */
 function ensurePanelId(tabEl) {
   if (!tabEl.id) {
     tabPanelSeq += 1;
@@ -56,20 +16,16 @@ function ensurePanelId(tabEl) {
   return tabEl.id;
 }
 
-const tabsTemplate = document.createElement('template');
-tabsTemplate.innerHTML = [
-  '<div role="tablist"></div>',
-  '<div class="panel-container"><slot></slot></div>',
-].join('');
-
 class BaseTabs extends HTMLElement {
   // Member convention (library-wide — see docs/base-components.md): `#member` is
   // hard-private internal state; `_member` is deliberately reachable by a friend
   // module or test. Here `_updateTabs` is reached by the sibling BaseTab class
   // (on attribute changes) and by tabs.test.js — it stays `_`; everything else
   // is #private.
-  #tablist = null;
+  /** @type {HTMLElement} */
+  #tablist;
   #activeIndex = 0;
+  /** @type {HTMLElement[]} */
   #tabs = [];
   // Set while selectTab is moving the `active` attribute between tabs, so the
   // resulting BaseTab.attributeChangedCallback → _updateTabs re-entry is skipped:
@@ -80,11 +36,12 @@ class BaseTabs extends HTMLElement {
   constructor() {
     super();
     mountShadow(this, tabsStyles, tabsTemplate);
-    this.#tablist = this.shadowRoot.querySelector('[role="tablist"]');
+    const root = /** @type {ShadowRoot} */ (this.shadowRoot);
+    this.#tablist = /** @type {HTMLElement} */ (root.querySelector('[role="tablist"]'));
 
-    this.#tablist.addEventListener('keydown', (e) => this.#onKeydown(e));
+    this.#tablist.addEventListener('keydown', (e) => this.#onKeydown(/** @type {KeyboardEvent} */ (e)));
 
-    const slot = this.shadowRoot.querySelector('slot');
+    const slot = root.querySelector('slot');
     if (slot) {
       slot.addEventListener('slotchange', () => this._updateTabs());
     }
@@ -100,6 +57,7 @@ class BaseTabs extends HTMLElement {
     return this.#activeIndex;
   }
 
+  /** @param {number} i */
   set activeIndex(i) {
     this.selectTab(i);
   }
@@ -108,7 +66,7 @@ class BaseTabs extends HTMLElement {
     // Ignore the re-entrant call selectTab provokes when it moves `active`.
     if (this.#syncingActiveAttr) return;
 
-    const children = Array.from(this.children).filter(
+    const children = /** @type {HTMLElement[]} */ (Array.from(this.children)).filter(
       (el) => el.tagName && el.tagName.toLowerCase() === 'base-tab'
     );
     this.#tabs = children;
@@ -147,6 +105,7 @@ class BaseTabs extends HTMLElement {
     this.#applyActive();
   }
 
+  /** @param {number} index */
   selectTab(index) {
     if (index < 0 || index >= this.#tabs.length) return;
     const tabEls = this.#tabs;
@@ -183,7 +142,7 @@ class BaseTabs extends HTMLElement {
   }
 
   #applyActive() {
-    const buttons = this.#tablist.querySelectorAll('button');
+    const buttons = /** @type {NodeListOf<HTMLButtonElement>} */ (this.#tablist.querySelectorAll('button'));
     buttons.forEach((btn, idx) => {
       const isActive = idx === this.#activeIndex;
       btn.setAttribute('aria-selected', isActive ? 'true' : 'false');
@@ -196,6 +155,7 @@ class BaseTabs extends HTMLElement {
     });
   }
 
+  /** @param {KeyboardEvent} e */
   #onKeydown(e) {
     if (this.#tabs.length === 0) return;
 
@@ -213,6 +173,7 @@ class BaseTabs extends HTMLElement {
 
   // Step the active tab by `direction`, wrapping and skipping disabled tabs via
   // the shared bounded-lap helper (all-disabled terminates instead of spinning).
+  /** @param {number} direction */
   #moveActive(direction) {
     const idx = nextEnabledIndex(
       this.#activeIndex,
@@ -233,7 +194,7 @@ class BaseTab extends HTMLElement {
 
   attributeChangedCallback() {
     // Notify parent to re-evaluate if needed
-    const parent = this.closest('base-tabs');
+    const parent = /** @type {BaseTabs | null} */ (this.closest('base-tabs'));
     if (parent && typeof parent._updateTabs === 'function') {
       parent._updateTabs();
     }

@@ -4,6 +4,12 @@
 // `len` items. Shared by base-select and base-context-menu so the off-by-one
 // edge handling lives in one tested place. Callers guarantee len > 0; an
 // initial idx of -1 (nothing highlighted) lands on the first/last item.
+/**
+ * @param {number} idx
+ * @param {number} direction
+ * @param {number} len
+ * @returns {number}
+ */
 export function wrapIndex(idx, direction, len) {
   let next = idx + direction;
   if (next < 0) next = len - 1;
@@ -17,6 +23,13 @@ export function wrapIndex(idx, direction, len) {
 // returns -1 instead of spinning forever. Shared by base-context-menu (skip
 // separators/disabled items) and base-tabs (skip disabled tabs) so the
 // termination guarantee lives in one tested place. Callers pass len > 0.
+/**
+ * @param {number} current
+ * @param {number} direction
+ * @param {number} len
+ * @param {(idx: number) => unknown} isDisabledAt
+ * @returns {number}
+ */
 export function nextEnabledIndex(current, direction, len, isDisabledAt) {
   let idx = current;
   for (let step = 0; step < len; step++) {

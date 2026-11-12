@@ -2,7 +2,7 @@
 // <base-modal> focus handling: the initial focus on open() and the Tab trap's
 // focusable list (what counts as a Tab stop) and wrap boundaries.
 import { describe, it, expect, beforeAll, afterEach, vi } from 'vitest';
-import { createModal, appendButton } from './modal-test-helpers.js';
+import { createModal, appendButton, shadowEl } from './modal-test-helpers.js';
 
 beforeAll(async () => {
   await import('./modal.js');
@@ -19,7 +19,7 @@ describe('base-modal focus', () => {
     const modal = createModal();
     const field = appendButton(modal, 'First field');
     appendButton(modal, 'Second field');
-    const closeBtn = modal.shadowRoot.querySelector('[data-close]');
+    const closeBtn = shadowEl(modal, '[data-close]');
     const fieldSpy = vi.spyOn(field, 'focus');
     const closeSpy = vi.spyOn(closeBtn, 'focus');
     modal.open();
@@ -30,7 +30,7 @@ describe('base-modal focus', () => {
 
   it('open() falls back to the close button when no light-DOM focusable exists', async () => {
     const modal = createModal();
-    const closeBtn = modal.shadowRoot.querySelector('[data-close]');
+    const closeBtn = shadowEl(modal, '[data-close]');
     const closeSpy = vi.spyOn(closeBtn, 'focus');
     modal.open();
     await new Promise((resolve) => requestAnimationFrame(resolve));
@@ -47,12 +47,12 @@ describe('base-modal focus', () => {
     modal.open();
 
     const focusable = modal._getFocusableElements();
-    const closeBtn = modal.shadowRoot.querySelector('[data-close]');
+    const closeBtn = shadowEl(modal, '[data-close]');
     expect(focusable[0]).toBe(closeBtn); // close button leads the Tab order
     const last = focusable[focusable.length - 1];
 
     closeBtn.focus();
-    expect(modal.shadowRoot.activeElement).toBe(closeBtn);
+    expect(/** @type {ShadowRoot} */ (modal.shadowRoot).activeElement).toBe(closeBtn);
 
     const lastFocusSpy = vi.spyOn(last, 'focus');
     modal._handleKeyDown(new KeyboardEvent('keydown', { key: 'Tab', shiftKey: true }));
@@ -137,7 +137,7 @@ describe('base-modal focus', () => {
     appendButton(modal, 'Not a stop').setAttribute('tabindex', '-1');
     modal.open();
 
-    const closeBtn = modal.shadowRoot.querySelector('[data-close]');
+    const closeBtn = shadowEl(modal, '[data-close]');
     const wrapSpy = vi.spyOn(closeBtn, 'focus');
     lastStop.focus();
     expect(document.activeElement).toBe(lastStop);

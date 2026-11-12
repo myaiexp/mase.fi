@@ -20,4 +20,8 @@ nginx (`$shared_cc` in `conf.d/cache-control-map.conf`) keys on `$status:$arg_v`
 
 ## The `/fonts/` exception
 
-`base.css` references `jetbrains-mono.woff2?v=<content hash>`, so a font change is a new URL. `fonts.json` + `~/Projects/helm/scripts/webfonts` regenerate `src/fonts/` (then paste the new hash into `base.css`); the build copies `src/fonts/` into `dist/fonts/`, and nginx's `location ^~ /fonts/` adds the CORS header fonts need cross-origin (`base.css` itself only needs it for SRI). Cache-Control there is `$shared_cc`, not `$asset_cc`.
+`base.css` references `jetbrains-mono.woff2?v=<content hash>`, so a font change is a new URL. `fonts.json` + `~/Projects/helm/scripts/webfonts` regenerate `src/fonts/` (then paste the new hash into `src/base/tokens.css`); the build copies `src/fonts/` into `dist/fonts/`, and nginx's `location ^~ /fonts/` adds the CORS header fonts need cross-origin (`base.css` itself only needs it for SRI). Cache-Control there is `$shared_cc`, not `$asset_cc`.
+
+## Source layout
+
+`src/base.css` is an ordered `@import` index of the section partials in `src/base/*.css`. Local consumers (the design-card prototypes, helm's design server) link the index and the browser follows the imports. The build's `scripts/build-base-css.js` replaces each import line with its partial and drops the partial's one-line header comment, so the published `dist/base.css` is one request and its bytes depend only on the CSS: an SRI pin goes stale when the design system changes, never because of how the source is split. A new partial needs a one-line `/* … */` first line and an `@import url('./base/<name>.css');` line in the index; any other import shape fails the build.

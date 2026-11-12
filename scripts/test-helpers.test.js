@@ -14,7 +14,7 @@ const LIVE_VARS = [
 // A name that resolves to no script: if the guard ever regresses, bash fails on the
 // missing file instead of a real pipeline script running against the live store.
 const NO_SCRIPT = 'no-such-script-for-harness-test';
-const saved =Object.fromEntries(LIVE_VARS.map((k) => [k, process.env[k]]));
+const saved = Object.fromEntries(LIVE_VARS.map((k) => [k, process.env[k]]));
 
 afterEach(() => {
   for (const [k, v] of Object.entries(saved)) {
@@ -34,27 +34,38 @@ describe('runScript', () => {
   });
 });
 
+/**
+ * Narrow an env value the test expects to be set.
+ * @param {string | undefined} v
+ * @returns {string}
+ */
+function def(v) {
+  if (v === undefined) throw new Error('expected env var to be set');
+  return v;
+}
+
 describe('scriptEnv', () => {
+  /** @param {Record<string, string>} [overrides] */
   const env = (overrides = {}) => scriptEnv({ UPDATES_FILE: '/x/updates.json', ...overrides });
 
   it('points every live endpoint at a dead or throwaway target when the test omits it', () => {
     const e = env();
     expect(e.SHOWCASE_API).toBe('http://127.0.0.1:1/');
     expect(e.PRIVATE_API).toBe('http://127.0.0.1:1/');
-    expect(e.BACKUP_DIR.startsWith(tmpdir())).toBe(true);
+    expect(def(e.BACKUP_DIR).startsWith(tmpdir())).toBe(true);
     expect(e.BACKUP_DIR).not.toContain('/var/lib/mase-fi');
-    expect(spawnSync(e.PURGE_BIN, [], { encoding: 'utf8' }).status).toBe(0);
+    expect(spawnSync(def(e.PURGE_BIN), [], { encoding: 'utf8' }).status).toBe(0);
     expect(e.NTFY_URL).toBe('http://127.0.0.1:1/');
     expect(e.NTFY_TOKEN).toBe('');
-    expect(existsSync(e.HELM_ENV)).toBe(false);
-    expect(e.UPDATES_LOCK.startsWith(tmpdir())).toBe(true);
-    expect(e.HELM_BIN.startsWith(tmpdir())).toBe(true);
-    expect(e.CLAUDE_BIN.startsWith(tmpdir())).toBe(true);
+    expect(existsSync(def(e.HELM_ENV))).toBe(false);
+    expect(def(e.UPDATES_LOCK).startsWith(tmpdir())).toBe(true);
+    expect(def(e.HELM_BIN).startsWith(tmpdir())).toBe(true);
+    expect(def(e.CLAUDE_BIN).startsWith(tmpdir())).toBe(true);
     expect('ARCHIVE_FILE' in e).toBe(false); // the script derives it beside UPDATES_FILE
   });
 
   it('the default CLAUDE_BIN fails loudly instead of answering', () => {
-    const r = spawnSync(env().CLAUDE_BIN, ['-p'], { encoding: 'utf8' });
+    const r = spawnSync(def(env().CLAUDE_BIN), ['-p'], { encoding: 'utf8' });
     expect(r.status).not.toBe(0);
     expect(r.stdout).toBe('');
   });

@@ -6,7 +6,17 @@ import { chmodSync, existsSync, mkdirSync, readdirSync, renameSync, statSync, ut
 import { join } from 'node:path';
 import { makeTempDir, cleanup, writeJson, readJson, runScript } from './test-helpers.js';
 
-let dir, file, archive, apiFile, backup;
+/** @type {string} */
+let dir;
+/** @type {string} */
+let file;
+/** @type {string} */
+let archive;
+/** @type {string} */
+let apiFile;
+/** @type {string} */
+let backup;
+/** @type {string[]} */
 const locked = [];
 
 beforeEach(() => {
@@ -23,10 +33,12 @@ afterEach(() => {
   cleanup(dir);
 });
 
+/** @param {unknown} value */
 const setApi = (value) => {
   writeFileSync(apiFile, typeof value === 'string' ? value : JSON.stringify(value));
   return `file://${apiFile}`;
 };
+/** @param {Record<string, string>} [env] */
 const run = (env = {}) => runScript('mase-fi-purge-private', [], {
   UPDATES_FILE: file,
   ARCHIVE_FILE: archive,
@@ -38,6 +50,7 @@ const run = (env = {}) => runScript('mase-fi-purge-private', [], {
 
 // A file (and its parent) the test user cannot write: write_updates_json's
 // sibling rename needs a writable dir, and its in-place cp needs a writable file.
+/** @param {string} path */
 function readOnly(path) {
   const parent = join(path, '..');
   chmodSync(path, 0o444);
@@ -46,6 +59,10 @@ function readOnly(path) {
 }
 
 // A pre-purge copy whose mtime says it was written `days` ago.
+/**
+ * @param {string} name
+ * @param {number} days
+ */
 function agedCopy(name, days) {
   mkdirSync(backup, { recursive: true });
   const path = join(backup, name);
@@ -99,8 +116,8 @@ describe('mase-fi-purge-private', () => {
     const hot = readJson(file);
     expect(hot.entries).toEqual([KEPT_LOG, KEPT_FEATURE, MENTION, NOT_A_WORD]);
     expect(hot.projects).toEqual([BETA_PROJECT]);
-    expect(hot.stats.totalCommits).toBe(2);
-    expect(hot.stats.commitsByProject).toEqual({ beta: 2 });
+    expect(hot.stats?.totalCommits).toBe(2);
+    expect(hot.stats?.commitsByProject).toEqual({ beta: 2 });
     expect(readJson(archive).entries).toEqual([ARCH_KEPT]);
   });
 
@@ -132,7 +149,7 @@ describe('mase-fi-purge-private', () => {
     expect(hotCopies.some((n) => n.includes('20200101T000000Z'))).toBe(false);
     expect(hotCopies.some((n) => n.includes('20200101T000001Z'))).toBe(false);
     expect(hotCopies.some((n) => n.includes('20200101T000002Z'))).toBe(true);
-    expect(statSync(join(backup, hotCopies.at(-1))).mode & 0o777).toBe(0o600);
+    expect(statSync(join(backup, /** @type {string} */ (hotCopies.at(-1)))).mode & 0o777).toBe(0o600);
     expect(statSync(backup).mode & 0o777).toBe(0o700);
     const archCopies = readdirSync(backup).filter((n) => n.startsWith('updates-archive.json.pre-purge.'));
     expect(archCopies).toHaveLength(1);
@@ -153,6 +170,7 @@ describe('mase-fi-purge-private', () => {
         unrelated: agedCopy(UNRELATED, 400),
       };
     }
+    /** @param {ReturnType<typeof seedCopies>} paths */
     function expectExpired({ oldHot, oldArch, recent, unrelated }) {
       expect(existsSync(oldHot)).toBe(false);
       expect(existsSync(oldArch)).toBe(false);

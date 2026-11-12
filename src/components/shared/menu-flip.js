@@ -9,6 +9,10 @@ export const MENU_HEIGHT_ESTIMATE = 200;
 // Toggle the `flip` class on `menu` when there isn't room for an estimated
 // MENU_HEIGHT_ESTIMATE-tall menu below `host`. `host` supplies trigger geometry
 // via getBoundingClientRect(); `menu` is the menu element being positioned.
+/**
+ * @param {Element} host
+ * @param {Element} menu
+ */
 export function applyMenuFlip(host, menu) {
   const rect = host.getBoundingClientRect();
   const spaceBelow = window.innerHeight - rect.bottom;

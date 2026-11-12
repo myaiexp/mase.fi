@@ -2,10 +2,13 @@
 
 import { fakePing, formatUptime } from './uptime.js';
 
-/** Start the 1.2s interval that updates #uptime and #ping in the sidebar header. */
+/**
+ * Start the 1.2s interval that updates #uptime and #ping in the sidebar header.
+ * @param {number} bootTime
+ */
 export function initTickers(bootTime) {
-  const $uptime = document.getElementById('uptime');
-  const $ping   = document.getElementById('ping');
+  const $uptime = /** @type {HTMLElement} */ (document.getElementById('uptime'));
+  const $ping   = /** @type {HTMLElement} */ (document.getElementById('ping'));
 
   function tick() {
     $uptime.textContent = formatUptime(Date.now() - bootTime);

@@ -3,17 +3,12 @@
 // that 404.html's stylesheet targets, one state at a time.
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { renderConfident, renderFuzzy, renderNone } from './notfound-page.js';
-import { installNotFound, removeNotFound } from './notfound-test-helpers.js';
+import { installNotFound, removeNotFound, byId as $, PLAN, candidate } from './notfound-test-helpers.js';
 
-const $ = (id) => document.getElementById(id);
 const HOME = '<a href="/">mase.fi</a>';
-const PLAN = { target: '/explorer', targetLabel: '/explorer', targetCaption: 'map explorer' };
 const BIG = '<a class="big" href="/explorer"><span class="arr">→</span><span class="bu">/explorer</span>'
   + '<span class="bname">map explorer</span></a>';
-const CANDIDATES = [
-  { route: { href: '/explorer', label: '/explorer', caption: 'map explorer', kind: 'path' }, distance: 1 },
-  { route: { href: '/games', label: '/games', kind: 'path' }, distance: 2 },
-];
+const CANDIDATES = [candidate('/explorer', 'map explorer', 1), candidate('/games', '', 2)];
 
 beforeEach(() => {
   installNotFound();
@@ -24,7 +19,7 @@ afterEach(removeNotFound);
 
 describe('smart 404 markup', () => {
   it('confident state: label, suggestion, tail note and both hint rows', () => {
-    renderConfident('/explorer/operator', { ...PLAN, tail: '/operator', diff: true });
+    renderConfident('/explorer/operator', { ...PLAN, state: 'confident', tail: '/operator', diff: true });
 
     expect($('sugg').innerHTML).toBe(`<div class="label">did you mean</div>${BIG}`);
     expect($('tailnote').innerHTML).toBe('the tail <b>/operator</b> matched nothing · the head resolves');
@@ -35,7 +30,7 @@ describe('smart 404 markup', () => {
   });
 
   it('a suggestion without a caption has no caption span', () => {
-    renderConfident('/explorer/x', { ...PLAN, targetCaption: '', tail: '/x', diff: false });
+    renderConfident('/explorer/x', { ...PLAN, state: 'confident', targetCaption: '', tail: '/x', diff: false });
     expect($('sugg').querySelector('.bname')).toBeNull();
   });
 
@@ -70,7 +65,7 @@ describe('smart 404 markup', () => {
   });
 
   it('cancelling the countdown leaves the note and the short hints', () => {
-    renderConfident('/explorer/x', { ...PLAN, tail: '/x', diff: false });
+    renderConfident('/explorer/x', { ...PLAN, state: 'confident', tail: '/x', diff: false });
     $('staybtn').click();
 
     expect($('cancelnote').innerHTML).toBe(

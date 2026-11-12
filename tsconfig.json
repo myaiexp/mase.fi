@@ -1,0 +1,33 @@
+{
+  "compilerOptions": {
+    "target": "ES2023",
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "lib": [
+      "ES2023",
+      "DOM",
+      "DOM.Iterable"
+    ],
+    "types": [
+      "vite/client",
+      "node"
+    ],
+    "allowJs": true,
+    "checkJs": true,
+    "strict": true,
+    "noEmit": true,
+    "skipLibCheck": true,
+    "isolatedModules": true,
+    "noUnusedLocals": false
+  },
+  "include": [
+    "src/**/*.js",
+    "src/**/*.d.ts",
+    "scripts/**/*.js",
+    "*.config.js"
+  ],
+  "exclude": [
+    "dist",
+    "node_modules"
+  ]
+}

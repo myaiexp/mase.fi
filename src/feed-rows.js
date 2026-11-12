@@ -3,14 +3,18 @@ import { dayOf, entryNow, timeOf } from './dates.js';
 
 const NICK_COLORS = { git: '#06b6d4', mase: '#e8a308' };
 
+/** @import { Entry } from './types.js' */
+
+/** @param {string} nick */
 export function nickColor(nick) {
-  if (Object.hasOwn(NICK_COLORS, nick)) return NICK_COLORS[nick];
+  if (Object.hasOwn(NICK_COLORS, nick)) return NICK_COLORS[/** @type {keyof typeof NICK_COLORS} */ (nick)];
   const palette = ['#e8a308', '#ffbe2a', '#f59e0b', '#eab308', '#a16207', '#fcd34d', '#fbbf24'];
   let h = 0;
   for (const c of nick) h = ((h << 5) - h + c.charCodeAt(0)) | 0;
   return palette[Math.abs(h) % palette.length];
 }
 
+/** @param {string} date */
 export function dayLabel(date) {
   const d = dayOf(date);
   // Writers' "today" (entryNow), not the viewer's UTC day — see dates.js.
@@ -22,6 +26,11 @@ export function dayLabel(date) {
   return d;
 }
 
+/**
+ * @param {HTMLElement} row
+ * @param {Entry} e
+ * @param {string} channelId
+ */
 function populateRow(row, e, channelId) {
   const time = timeOf(e.date);
   const nickC = nickColor(e.nick);
@@ -50,6 +59,7 @@ function populateRow(row, e, channelId) {
 }
 
 // A day-separator header element for the given ISO date.
+/** @param {string} date */
 function dayHeader(date) {
   const day = document.createElement('div');
   day.className = 'feed-day';
@@ -63,9 +73,16 @@ function dayHeader(date) {
 // Build day-separated feed rows for `entries` (ascending) into a fragment. A
 // day header is emitted whenever the calendar day changes within the batch.
 // Returns the fragment plus row descriptors (for jitter / targeted relayout).
+/**
+ * @param {Entry[]} entries
+ * @param {string} channelId
+ * @returns {{ frag: DocumentFragment, rowEls: { row: HTMLElement, entry: Entry }[] }}
+ */
 export function buildRows(entries, channelId) {
   const frag = document.createDocumentFragment();
+  /** @type {{ row: HTMLElement, entry: Entry }[]} */
   const rowEls = [];
+  /** @type {string | null} */
   let lastDay = null;
   for (const e of entries) {
     const d = dayOf(e.date);

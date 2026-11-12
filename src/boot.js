@@ -1,6 +1,13 @@
 // Boot sequence — fake TTY POST, 3 phases, skip-on-click
 import { LOGO } from './ascii.js';
 
+/**
+ * @typedef {Window & typeof globalThis & {
+ *   MASE_FORCE_BOOT?: boolean,
+ *   __maseReplayBoot?: () => void,
+ * }} BootWindow
+ */
+
 const BOOT_TTL_MS = 7 * 24 * 3600 * 1000;
 const BOOT_STAMP_KEY = 'mase.boot.last';
 
@@ -38,7 +45,7 @@ function clearBootStamp() {
 export function shouldSkipBoot(prefersReducedMotion) {
   const lastBoot = readBootStamp();
   const ttlExpired = Date.now() - lastBoot > BOOT_TTL_MS;
-  const forceReplay = window.MASE_FORCE_BOOT === true;
+  const forceReplay = /** @type {BootWindow} */ (window).MASE_FORCE_BOOT === true;
 
   if (!ttlExpired && !forceReplay) return true;
   if (prefersReducedMotion) return true;
@@ -50,8 +57,8 @@ export function shouldSkipBoot(prefersReducedMotion) {
  * reveal #app, remove #boot, and dispatch a 'mase:booted' event on window.
  */
 export function runBoot() {
-  const boot = document.getElementById('boot');
-  const app  = document.getElementById('app');
+  const boot = /** @type {HTMLElement} */ (document.getElementById('boot'));
+  const app  = /** @type {HTMLElement} */ (document.getElementById('app'));
 
   let done = false;
   // Single reveal path for skip() and natural completion. Must stay
@@ -95,13 +102,14 @@ export function runBoot() {
     ['', 'dim'],
   ];
 
+  /** @type {[text: string, kind: string, delay: number][]} */
   const script = [
-    ...POST.map(x => [...x, 30]),
+    ...POST.map(x => /** @type {[string, string, number]} */ ([...x, 30])),
     ['', 'dim', 120],
-    ...SERVICES.map(x => [...x, 55]),
+    ...SERVICES.map(x => /** @type {[string, string, number]} */ ([...x, 55])),
     ['', 'dim', 180],
-    ...BANNER.map(x => [...x, 200]),
-    ...TAIL.map(x => [...x, 40]),
+    ...BANNER.map(x => /** @type {[string, string, number]} */ ([...x, 200])),
+    ...TAIL.map(x => /** @type {[string, string, number]} */ ([...x, 40])),
   ];
 
   boot.addEventListener('click', finish);
@@ -165,7 +173,7 @@ export function runBoot() {
  * Expose window.__maseReplayBoot for console use.
  */
 export function initReplayBoot() {
-  window.__maseReplayBoot = () => {
+  /** @type {BootWindow} */ (window).__maseReplayBoot = () => {
     clearBootStamp();
     location.reload();
   };

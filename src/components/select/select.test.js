@@ -29,8 +29,10 @@ describe('base-select', () => {
     const el = createSelect({ options: [{ value: 'foo', label: 'Foo' }] });
     getTrigger(el).click();
 
+    /** @type {{ value: string, label: string }[]} */
+
     const received = [];
-    el.addEventListener('change', (e) => received.push(e.detail));
+    el.addEventListener('change', (e) => received.push(/** @type {CustomEvent} */ (e).detail));
 
     getOptions(el)[0].click();
     expect(received).toHaveLength(1);
@@ -91,11 +93,12 @@ describe('base-select', () => {
     });
 
     el.open();
+    /** @type {{ value: string, label: string }[]} */
     const received = [];
-    el.addEventListener('change', (e) => received.push(e.detail));
+    el.addEventListener('change', (e) => received.push(/** @type {CustomEvent} */ (e).detail));
 
     const opt = getOptions(el).find((o) => o.dataset.value === tricky);
-    expect(opt).toBeTruthy();
+    if (!opt) throw new Error('tricky option missing');
     opt.click();
 
     expect(received).toEqual([{ value: tricky, label: 'Tricky Label' }]);

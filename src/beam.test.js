@@ -13,7 +13,7 @@ const BEAM_X = 100;
 
 // Returns destructionAt for a char whose signed distance from the beam is `d`
 // (d>0 = char behind the beam / already swept, d<0 = char ahead of the beam).
-const at = (d) => destructionAt(BEAM_X - d, BEAM_X);
+const at = (/** @type {number} */ d) => destructionAt(BEAM_X - d, BEAM_X);
 
 describe('destructionAt', () => {
   it('is pristine (0) for a char far ahead of the beam', () => {
@@ -66,6 +66,10 @@ describe('destructionAt', () => {
 // Drain MutationObserver records synchronously — paintChar either assigns
 // textContent/className or it doesn't, and takeRecords() sees that without
 // waiting on a microtask.
+/**
+ * @param {HTMLElement} el
+ * @param {() => void} fn
+ */
 function mutationsDuring(el, fn) {
   const obs = new MutationObserver(() => {});
   obs.observe(el, { childList: true, characterData: true, subtree: true, attributes: true });

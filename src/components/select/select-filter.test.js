@@ -2,6 +2,8 @@
 // <base-select> search filter and letter-jump match on the option label only —
 // an action option's '...' button text must never match.
 import { describe, it, expect, beforeAll, afterEach } from 'vitest';
+import { getTrigger, getOptions } from './select-test-helpers.js';
+/** @import { SelectEl } from './select-test-helpers.js' */
 
 beforeAll(async () => {
   await import('./select.js');
@@ -9,8 +11,12 @@ beforeAll(async () => {
 
 afterEach(() => { document.body.innerHTML = ''; });
 
+/**
+ * @param {{ value: string, label: string, action?: boolean }[]} options
+ * @param {{ searchable?: boolean }} [opts]
+ */
 function createSelect(options, { searchable = false } = {}) {
-  const el = document.createElement('base-select');
+  const el = /** @type {SelectEl} */ (document.createElement('base-select'));
   if (searchable) el.setAttribute('searchable', '');
   for (const opt of options) {
     const o = document.createElement('base-option');
@@ -23,8 +29,9 @@ function createSelect(options, { searchable = false } = {}) {
   return el;
 }
 
-const trigger = (el) => el.shadowRoot.querySelector('[part="trigger"]');
-const visibleLabels = (el) => [...el.shadowRoot.querySelectorAll('[part="menu"] .option')]
+const trigger = getTrigger;
+/** @param {SelectEl} el */
+const visibleLabels = (el) => getOptions(el)
   .filter((o) => o.style.display !== 'none')
   .map((o) => o.dataset.label);
 
@@ -60,7 +67,7 @@ describe('base-select label matching', () => {
     ]);
     el.open();
     trigger(el).dispatchEvent(new KeyboardEvent('keydown', { key: 'b', bubbles: true }));
-    const highlighted = el.shadowRoot.querySelector('[part="menu"] .option.active');
+    const highlighted = getOptions(el).find((o) => o.classList.contains('active'));
     expect(highlighted?.dataset.label).toBe('Banana');
   });
 });

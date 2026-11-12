@@ -5,7 +5,7 @@ class BaseOption extends HTMLElement {
   get value() { return this.getAttribute('value') ?? ''; }
   get disabled() { return this.hasAttribute('disabled'); }
   get action() { return this.hasAttribute('action'); }
-  get label() { return this.textContent.trim(); }
+  get label() { return /** @type {string} */ (this.textContent).trim(); }
 }
 
 customElements.define('base-option', BaseOption);

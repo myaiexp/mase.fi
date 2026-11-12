@@ -5,9 +5,17 @@
 // separately so each rung is driven on its own.
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { start } from './notfound-page.js';
-import { installNotFound, removeNotFound } from './notfound-test-helpers.js';
+import { installNotFound, removeNotFound, byId as $, pick } from './notfound-test-helpers.js';
+/** @import { NotFoundEnv } from './notfound-test-helpers.js' */
 
-let loc, replace, hrefWrites, fetchMock;
+/** @type {NotFoundEnv['loc']} */
+let loc;
+/** @type {NotFoundEnv['replace']} */
+let replace;
+/** @type {NotFoundEnv['hrefWrites']} */
+let hrefWrites;
+/** @type {NotFoundEnv['fetchMock']} */
+let fetchMock;
 
 beforeEach(() => {
   ({ loc, replace, hrefWrites, fetchMock } = installNotFound());
@@ -16,12 +24,14 @@ beforeEach(() => {
 
 afterEach(removeNotFound);
 
+/** @param {string} slug @param {string} url @param {string} [desc] */
 const project = (slug, url, desc = '') => ({ slug, name: slug, desc, url });
 const EXPLORER = project('explorer', 'https://mase.fi/explorer', 'map explorer');
 const GAMES = project('games', 'https://mase.fi/games');
 
 // HEAD answers 200 for paths in `live` and 404 otherwise; GET /updates.json
 // serves `updates`, or 404s when it is null.
+/** @param {{ live?: string[], updates?: unknown }} [served] */
 function serve({ live = [], updates = null } = {}) {
   fetchMock.mockImplementation(async (url, opts = {}) => {
     if (opts.method === 'HEAD') {
@@ -36,8 +46,7 @@ function serve({ live = [], updates = null } = {}) {
 // Every request start() made, as "METHOD url", sorted: HEADs and the routes GET
 // interleave by design (they run in parallel), so only the set is stable.
 const requests = () => fetchMock.mock.calls.map(([u, o]) => `${o?.method ?? 'GET'} ${u}`).sort();
-const $ = (id) => document.getElementById(id);
-const bigLink = () => document.querySelector('#sugg a.big');
+const bigLink = () => pick('#sugg a.big');
 // Run well past the 5s countdown: a confident plan has redirected once by then.
 const runOut = () => vi.advanceTimersByTime(10_000);
 
@@ -58,7 +67,7 @@ describe('start() — the matching ladder', () => {
     await start();
     expect(requests()).toEqual(['GET /updates.json', 'HEAD /explorer', 'HEAD /explorer/operator']);
     expect(bigLink().getAttribute('href')).toBe('/explorer');
-    expect(bigLink().querySelector('.bname').textContent).toBe('map explorer');
+    expect(pick('.bname', bigLink()).textContent).toBe('map explorer');
     expect($('tailnote').hidden).toBe(false);
     expect($('tailnote').textContent).toContain('/operator');
     vi.advanceTimersByTime(4999);
@@ -125,7 +134,7 @@ describe('start() — the matching ladder', () => {
     serve({ updates: { projects: [project('prospect', 'https://prospect.mase.fi', 'lead finder')] } });
     await start();
     expect(bigLink().getAttribute('href')).toBe('https://prospect.mase.fi');
-    expect(bigLink().querySelector('.bname').textContent).toBe('lead finder — moved to a subdomain');
+    expect(pick('.bname', bigLink()).textContent).toBe('lead finder — moved to a subdomain');
     runOut();
     expect(replace).toHaveBeenCalledOnce();
     expect(replace).toHaveBeenCalledWith('https://prospect.mase.fi');
@@ -145,7 +154,7 @@ describe('start() — the matching ladder', () => {
     await start();
     expect(document.querySelector('#sugg .cand')).toBeNull();
     expect(bigLink().getAttribute('href')).toBe('/');
-    expect(bigLink().querySelector('.bname').textContent).toBe('the full directory');
+    expect(pick('.bname', bigLink()).textContent).toBe('the full directory');
     runOut();
     expect(replace).not.toHaveBeenCalled();
     expect(hrefWrites).toEqual([]);
@@ -157,8 +166,8 @@ describe('start() — the matching ladder', () => {
     await start();
     const cands = [...document.querySelectorAll('#sugg .cand')];
     expect(cands.map((a) => a.getAttribute('href'))).toEqual(['/games', '/gems']);
-    expect(cands[0].querySelector('.creason').textContent).toBe('1 char off');
-    expect(bigLink()).toBeNull();
+    expect(pick('.creason', cands[0]).textContent).toBe('1 char off');
+    expect(document.querySelector('#sugg a.big')).toBeNull();
     expect($('countbox').hidden).toBe(true);
     runOut();
     expect(replace).not.toHaveBeenCalled();
@@ -171,7 +180,7 @@ describe('start() — the matching ladder', () => {
     await start();
     expect(requests()).toEqual(['GET /updates.json', 'HEAD /zzqqxx', 'HEAD /zzqqxx/deep']);
     expect(bigLink().getAttribute('href')).toBe('/');
-    expect(bigLink().querySelector('.bname').textContent).toBe('the full directory — 2 active projects');
+    expect(pick('.bname', bigLink()).textContent).toBe('the full directory — 2 active projects');
     expect($('countbox').hidden).toBe(true);
     runOut();
     expect(replace).not.toHaveBeenCalled();
@@ -189,7 +198,7 @@ describe('start() — the matching ladder', () => {
     loc.pathname = '/zzqqxx';
     await start();
     expect(bigLink().getAttribute('href')).toBe('/');
-    expect(bigLink().querySelector('.bname').textContent).toBe('the full directory');
+    expect(pick('.bname', bigLink()).textContent).toBe('the full directory');
     runOut();
     expect(replace).not.toHaveBeenCalled();
   });

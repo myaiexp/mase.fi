@@ -5,12 +5,15 @@
 import { describe, it, expect, vi, afterEach } from 'vitest';
 import { fetchData, entriesFor } from './data.js';
 import { logStats } from './log-stats.js';
-import { entry, stubFetch } from './data-test-helpers.js';
+import { entry, stubFetch, appData } from './data-test-helpers.js';
+
+/** @import { Entry, Stats } from './types.js' */
 
 // ---- helpers -------------------------------------------------------------
 
+/** @param {Entry[]} entries */
 function dataWith(entries) {
-  return { entries };
+  return appData({ entries });
 }
 
 afterEach(() => {
@@ -265,7 +268,7 @@ describe('fetchData routing', () => {
     const data = await fetchData();
     for (const key of ['totalCommits', 'totalEntries', 'archivedLogs', 'logFirst', 'logLast',
       'commitsByProject', 'archivedByProject']) {
-      expect(data.stats[key], key).toBeUndefined();
+      expect(data.stats[/** @type {keyof Stats} */ (key)], key).toBeUndefined();
     }
     expect(logStats(data).totalCommits).toBe(1);
   });
@@ -275,26 +278,5 @@ describe('fetchData routing', () => {
     const data = await fetchData();
     expect(data.hasArchive).toBe(false);
     expect(data.stats.totalCommits).toBeUndefined();
-  });
-});
-
-// ---- fetchData date routing ----------------------------------------------
-// Contract tests for normalizeDate / parseEntryDate / utcDayStart live in
-// dates.test.js. These only pin that fetchData runs each raw entry.date
-// through the normalizer into the UI-shaped entry.
-
-describe('fetchData date normalization', () => {
-  async function dateOf(rawDate) {
-    stubFetch({ projects: [], entries: [{ category: 'daily', date: rawDate, text: 't' }] });
-    const data = await fetchData();
-    return data.entries[0].date;
-  }
-
-  it('runs a bare YYYY-MM-DD through normalizeDate', async () => {
-    expect(await dateOf('2026-01-01')).toBe('2026-01-01T00:00');
-  });
-
-  it('runs a full ISO timestamp through normalizeDate', async () => {
-    expect(await dateOf('2026-01-01T08:30:45.123Z')).toBe('2026-01-01T08:30');
   });
 });

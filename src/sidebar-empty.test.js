@@ -5,6 +5,8 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { renderChanlist } from './sidebar.js';
 import { buildRegistry, channelById } from './registry.js';
+import { appData, entry } from './data-test-helpers.js';
+import { $$ } from './dom-test-helpers.js';
 
 function mount() {
   document.body.replaceChildren();
@@ -15,23 +17,23 @@ function mount() {
   }
 }
 
-const sidebarIds = () => [...document.querySelectorAll('#chanlist .chan')].map(el => el.dataset.ch);
-const tabIds = () => [...document.querySelectorAll('#tabbar .tab')].map(el => el.dataset.ch);
+const sidebarIds = () => $$('#chanlist .chan').map(el => el.dataset.ch);
+const tabIds = () => $$('#tabbar .tab').map(el => el.dataset.ch);
 
 describe('sidebar hides empty projects', () => {
-  const data = {
+  const data = appData({
     projects: [
       { channel: 'routed', slug: 'routed', heat: 0.5 },
       { channel: 'by-slug', slug: 'byslug', heat: 0.5 },
       { channel: 'empty', slug: 'empty', heat: 0 },
     ],
     entries: [
-      { channel: 'routed', category: 'daily', projectSlug: 'routed', projectChannel: 'routed' },
+      entry('daily', 'routed', { projectSlug: 'routed', projectChannel: 'routed' }),
       // A row carrying the slug but no projectChannel still counts for the project.
-      { channel: 'activity', category: 'log', projectSlug: 'byslug' },
-      { channel: 'home', category: 'daily' },
+      entry('log', 'activity', { projectSlug: 'byslug' }),
+      entry('daily', 'home'),
     ],
-  };
+  });
 
   beforeEach(() => {
     mount();
@@ -50,7 +52,8 @@ describe('sidebar hides empty projects', () => {
 
   it('hides every project when nothing is loaded, but not home or activity', () => {
     mount();
-    const none = { projects: data.projects };
+    // No entries array at all, not just an empty one: the list must still render.
+    const none = appData({ projects: data.projects, entries: undefined });
     buildRegistry(none);
     renderChanlist(none, () => {});
     expect(sidebarIds()).toEqual(['home', 'activity']);

@@ -13,18 +13,34 @@ import { fileURLToPath } from 'node:url';
 
 export const SCRIPTS_DIR = dirname(fileURLToPath(import.meta.url));
 
+/** @returns {string} */
 export function makeTempDir() {
   return mkdtempSync(join(tmpdir(), 'mase-fi-scripts-'));
 }
 
+/** @param {string} dir */
 export function cleanup(dir) {
   rmSync(dir, { recursive: true, force: true });
 }
 
+/**
+ * @param {string} file
+ * @param {unknown} obj
+ */
 export function writeJson(file, obj) {
   writeFileSync(file, JSON.stringify(obj, null, 2));
 }
 
+/**
+ * @typedef {Record<string, unknown>} Row  One entry/project row of an updates fixture.
+ * @typedef {{ entries: Row[], projects: Row[], stats?: Row, [key: string]: unknown }} UpdatesDoc
+ */
+
+/**
+ * Parsed fixture contents; the tests know the shape.
+ * @param {string} file
+ * @returns {UpdatesDoc}
+ */
 export function readJson(file) {
   return JSON.parse(readFileSync(file, 'utf8'));
 }
@@ -34,6 +50,7 @@ export function readJson(file) {
 // dropped, and an omitted one falls back to a hermetic stand-in. ARCHIVE_FILE is
 // dropped rather than defaulted so the script derives it beside UPDATES_FILE.
 const UNREACHABLE = 'http://127.0.0.1:1/';
+/** @type {Record<string, () => string | undefined>} */
 const hermeticDefaults = {
   // The live /tmp/mase-updates-json.lock: a concurrent deploy would wait on us, and we on it.
   UPDATES_LOCK: () => join(tmpdir(), `mase-fi-test-${process.pid}.lock`),
@@ -53,6 +70,10 @@ const hermeticDefaults = {
 
 // The env a pipeline script runs under: host env, Helsinki TZ, the caller's
 // overrides, and hermeticDefaults for whatever live resource the caller left out.
+/**
+ * @param {Record<string, string | undefined>} [env]
+ * @returns {NodeJS.ProcessEnv}
+ */
 export function scriptEnv(env = {}) {
   // Pin Helsinki unless the caller overrides TZ, so a spawned script never
   // inherits a hostile host TZ (e.g. `TZ=Pacific/Kiritimati vitest`). Only an
@@ -61,6 +82,7 @@ export function scriptEnv(env = {}) {
   // their own date calls. The pin applies to this child environment only: it
   // does not set the vitest process TZ, so fixtures or helpers that call
   // `new Date()` in-process still follow the host TZ.
+  /** @type {NodeJS.ProcessEnv} */
   const merged = { ...process.env, TZ: 'Europe/Helsinki', ...env };
   for (const [key, fallback] of Object.entries(hermeticDefaults)) {
     if (key in env) continue;
@@ -75,6 +97,12 @@ export function scriptEnv(env = {}) {
 // stderr } for both success and non-zero exits so tests can assert on the refusal
 // paths (malformed JSON, bad category, lock busy). Throws only on harness misuse:
 // a call without its own UPDATES_FILE, whose script default is the live store.
+/**
+ * @param {string} name
+ * @param {string[]} [args]
+ * @param {Record<string, string | undefined>} [env]
+ * @returns {{ status: number | null, stdout: string, stderr: string }}
+ */
 export function runScript(name, args = [], env = {}) {
   if (!env.UPDATES_FILE) {
     throw new Error('runScript: UPDATES_FILE must be set — the script default is the live /var/lib/mase-fi/updates.json');
@@ -88,6 +116,11 @@ export function runScript(name, args = [], env = {}) {
 
 // An executable that prints to stderr and exits 1 — the default for a CLI a test
 // did not stub, so an unplanned call fails loudly instead of reaching the real one.
+/**
+ * @param {string} dir
+ * @param {string} name
+ * @returns {string}
+ */
 function writeFailingStub(dir, name) {
   const path = join(dir, name);
   writeFileSync(path, `#!/usr/bin/env bash\necho "${name}: unstubbed call from a test" >&2\nexit 1\n`);
@@ -95,6 +128,11 @@ function writeFailingStub(dir, name) {
   return path;
 }
 
+/**
+ * @param {string} dir
+ * @param {string} name
+ * @returns {string}
+ */
 function writeOkStub(dir, name) {
   const path = join(dir, name);
   writeFileSync(path, '#!/usr/bin/env bash\nexit 0\n');
@@ -106,6 +144,7 @@ function writeOkStub(dir, name) {
 // `TZ="Europe/Helsinki" date +%Y-%m-%d`; runScript pins the same TZ so a
 // fixture seeded before spawn cannot drift). Shell out so there is zero chance
 // of TZ drift between the fixture and the script.
+/** @returns {string} */
 export function todayHelsinki() {
   const r = spawnSync('date', ['+%Y-%m-%d'], {
     env: { ...process.env, TZ: 'Europe/Helsinki' },
@@ -117,6 +156,11 @@ export function todayHelsinki() {
 // Write an executable stub standing in for `claude -p` (CLAUDE_BIN). `output` is
 // printed verbatim to stdout; a non-zero `exitCode` simulates a failed/timed-out
 // call so the daily-summary fallback path can be exercised.
+/**
+ * @param {string} dir
+ * @param {{ output?: string, exitCode?: number, prelude?: string }} [opts]
+ * @returns {string}
+ */
 export function writeClaudeStub(dir, { output = '', exitCode = 0, prelude = '' } = {}) {
   const path = join(dir, 'claude-stub');
   // Record argv (NUL-separated) so tests can assert flags like --tools ""; then
@@ -137,6 +181,10 @@ exit ${exitCode}
   return path;
 }
 
+/**
+ * @param {string} dir
+ * @returns {string[]}
+ */
 export function readClaudeArgv(dir) {
   return readFileSync(join(dir, 'claude-argv'), 'utf8').split('\0');
 }
@@ -146,8 +194,14 @@ export function readClaudeArgv(dir) {
 // a dated refusal, in `indefinite` exit 3 with the no-valid-date refusal, in `unknown`
 // exit 1 (helm could not answer); every other project is clear (exit 0). Each call's
 // argv is appended to `<stub>.calls`, read back with readHelmCalls.
+/**
+ * @param {string} dir
+ * @param {{ embargoed?: string[], indefinite?: string[], unknown?: string[], name?: string }} [opts]
+ * @returns {string}
+ */
 export function writeHelmStub(dir, { embargoed = [], indefinite = [], unknown = [], name = 'helm-stub' } = {}) {
   const path = join(dir, name);
+  /** @type {(names: string[], body: string) => string} */
   const arm = (names, body) => (names.length ? `  ${names.join('|')}) ${body} ;;\n` : '');
   const body = `#!/usr/bin/env bash
 printf '%s\\n' "$*" >> ${JSON.stringify(`${path}.calls`)}
@@ -163,6 +217,10 @@ echo "$3: no feed embargo"
   return path;
 }
 
+/**
+ * @param {string} stubPath
+ * @returns {string[]}
+ */
 export function readHelmCalls(stubPath) {
   const calls = `${stubPath}.calls`;
   return existsSync(calls) ? readFileSync(calls, 'utf8').split('\n').filter(Boolean) : [];

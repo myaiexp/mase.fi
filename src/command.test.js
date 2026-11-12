@@ -9,7 +9,7 @@
 // command-applysearch.test.js; formatRelativeActivity in command-format.test.js.
 // Shared DOM harness: command-test-helpers.js.
 import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { setupDom, setChannels, ch, type, items, cc } from './command-test-helpers.js';
+import { appData, setupDom, setChannels, ch, type, items, cc, byId, $ } from './command-test-helpers.js';
 
 // command-complete.js reads getChannels/chAccent from the registry leaf;
 // command.js only needs navigate from the routing orchestrator. Stub both so
@@ -29,7 +29,10 @@ vi.mock('./data.js', () => ({
 // Re-imported fresh per test so module state (the autocomplete `selection`, the
 // lazy DOM refs) starts clean and command-complete binds to the same mocked
 // registry instance the test sees.
-let command, registry;
+/** @type {typeof import('./command.js')} */
+let command;
+/** @type {typeof import('./registry.js')} */
+let registry;
 
 beforeEach(async () => {
   vi.resetModules();
@@ -46,7 +49,7 @@ beforeEach(async () => {
 describe('autocomplete render', () => {
   beforeEach(() => {
     setChannels(registry, [ch('home'), ch('explorer', 'explorer', 'file explorer'), ch('activity')]);
-    command.initCommand({});
+    command.initCommand(appData());
   });
 
   it('renders only the channels matching a partial "/foo" query', () => {
@@ -65,7 +68,7 @@ describe('autocomplete render', () => {
   it('escapes the channel topic into the description cell', () => {
     setChannels(registry, [ch('explorer', 'explorer', 'a <b> topic')]);
     type('/exp');
-    expect(items()[0].querySelector('.cc-desc').innerHTML).toBe('a &lt;b&gt; topic');
+    expect($(items()[0], '.cc-desc').innerHTML).toBe('a &lt;b&gt; topic');
   });
 
   // Regression for audit #6282: data-ch used to interpolate m.id raw into
@@ -104,7 +107,7 @@ describe('autocomplete render', () => {
     type('/');
     expect(items()).toHaveLength(8);
     expect(items().map((el) => el.dataset.ch)).toEqual(Array.from({ length: 8 }, (_, i) => `chan${i}`));
-    expect(cc().querySelector('kbd').textContent).toBe('8');
+    expect($(cc(), 'kbd').textContent).toBe('8');
   });
 
   it('ArrowUp from the first row wraps to the last rendered row, not an unrendered match', () => {
@@ -145,12 +148,12 @@ describe('autocomplete render', () => {
 // ---- combobox ARIA (autocomplete announced to screen readers) ------------
 
 describe('combobox ARIA', () => {
-  const input = () => document.getElementById('cmd-input');
+  const input = () => byId('cmd-input');
   const options = () => [...cc().querySelectorAll('[role="option"]')];
 
   beforeEach(() => {
     setChannels(registry, [ch('home'), ch('explorer'), ch('activity')]);
-    command.initCommand({ meta: { server: 'irc.test', bootTime: Date.now() } });
+    command.initCommand(appData({ meta: { server: 'irc.test', bootTime: Date.now() } }));
   });
 
   it('slash mode marks the popup a listbox of options with an active descendant', () => {

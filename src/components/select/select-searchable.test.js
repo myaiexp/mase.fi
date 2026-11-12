@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 // <base-select searchable>: typed filtering, no-matches state, close/reset of the query
 import { describe, it, expect, beforeAll, afterEach } from 'vitest';
-import { createSelect, getMenu, getTrigger, getOptions } from './select-test-helpers.js';
+import { createSelect, getMenu, getTrigger, getOptions, $, $$ } from './select-test-helpers.js';
 
 beforeAll(async () => {
   await import('./select.js');
@@ -38,8 +38,13 @@ describe('base-select searchable', () => {
 
   // Insert `ch` the way a keystroke does: replace the current selection, or
   // insert at the caret when the selection is collapsed.
+  /**
+   * @param {HTMLInputElement} input
+   * @param {string} ch
+   */
   function insertText(input, ch) {
-    input.setRangeText(ch, input.selectionStart, input.selectionEnd, 'end');
+    // jsdom reports a caret on text inputs, so neither end is null here.
+    input.setRangeText(ch, /** @type {number} */ (input.selectionStart), /** @type {number} */ (input.selectionEnd), 'end');
     input.dispatchEvent(new Event('input', { bubbles: true }));
   }
 
@@ -142,7 +147,7 @@ describe('base-select searchable', () => {
     input.value = 'carrot';
     input.dispatchEvent(new Event('input', { bubbles: true }));
 
-    const headers = [...getMenu(el).querySelectorAll('.group-header')];
+    const headers = $$(getMenu(el), '.group-header');
     expect(headers[0].style.display).toBe('none');
     expect(headers[1].style.display).not.toBe('none');
   });
@@ -155,8 +160,7 @@ describe('base-select searchable', () => {
     input.value = 'zzz';
     input.dispatchEvent(new Event('input', { bubbles: true }));
 
-    const noMatch = getMenu(el).querySelector('.no-matches');
-    expect(noMatch).toBeTruthy();
+    const noMatch = $(getMenu(el), '.no-matches');
     expect(noMatch.style.display).not.toBe('none');
   });
 
@@ -168,7 +172,7 @@ describe('base-select searchable', () => {
     input.value = 'zzz';
     input.dispatchEvent(new Event('input', { bubbles: true }));
     expect(el.isOpen).toBe(true);
-    expect(getMenu(el).querySelector('.no-matches').style.display).not.toBe('none');
+    expect($(getMenu(el), '.no-matches').style.display).not.toBe('none');
 
     input.dispatchEvent(new KeyboardEvent('keydown', { key: 'Tab', bubbles: true }));
     expect(el.isOpen).toBe(false);
@@ -251,7 +255,7 @@ describe('base-select searchable', () => {
     // Filter abandoned: every option visible again (incl. the selected Apple,
     // which the restored input now displays) and no-matches stays hidden.
     expect(getOptions(el).filter(o => o.style.display !== 'none')).toHaveLength(2);
-    expect(getMenu(el).querySelector('.no-matches').style.display).toBe('none');
+    expect($(getMenu(el), '.no-matches').style.display).toBe('none');
   });
 
   it('close resets hidden group headers after a filtered search', () => {
@@ -264,7 +268,7 @@ describe('base-select searchable', () => {
     const input = getTrigger(el);
     input.value = 'carrot';
     input.dispatchEvent(new Event('input', { bubbles: true }));
-    const headers = [...getMenu(el).querySelectorAll('.group-header')];
+    const headers = $$(getMenu(el), '.group-header');
     expect(headers[0].style.display).toBe('none');
 
     el.close();

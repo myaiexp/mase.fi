@@ -1,7 +1,9 @@
 // Sidebar channel list + mobile tabbar rendering, plus active-channel highlight.
 import { chAccent, chHeat, getChannels, channelById } from './registry.js';
 import { escapeHtml } from './html.js';
+/** @import { AppData, Channel, Entry } from './types.js' */
 
+/** @param {Channel} c */
 function chanRow(c) {
   const heat = chHeat(c.id);
   const cells = 5;
@@ -23,6 +25,10 @@ function chanRow(c) {
 // list leaves it out; the registry keeps it, so the hash and "/" still reach it.
 // Hot-file entries only: a project whose only rows are archived logs stays
 // hidden until a reload after it posts again, which is accepted.
+/**
+ * @param {Entry[] | undefined} entries
+ * @returns {(c: Channel) => boolean}
+ */
 function projectsWithEntries(entries) {
   const keys = new Set();
   for (const e of entries || []) {
@@ -32,10 +38,14 @@ function projectsWithEntries(entries) {
   return (c) => keys.has('ch:' + c.id) || (!!c.project?.slug && keys.has('slug:' + c.project.slug));
 }
 
-/** Render the desktop sidebar (#chanlist) and the mobile tabbar (#tabbar). Wires click → navigate. */
+/**
+ * Render the desktop sidebar (#chanlist) and the mobile tabbar (#tabbar). Wires click → navigate.
+ * @param {AppData} data
+ * @param {(id: string) => void} navigate
+ */
 export function renderChanlist(data, navigate) {
-  const $chanlist = document.getElementById('chanlist');
-  const $tabbar = document.getElementById('tabbar');
+  const $chanlist = /** @type {HTMLElement} */ (document.getElementById('chanlist'));
+  const $tabbar = /** @type {HTMLElement} */ (document.getElementById('tabbar'));
 
   const groups = [['system', 'server'], ['projects', 'projects']];
   const hasEntries = projectsWithEntries(data.entries);
@@ -47,10 +57,10 @@ export function renderChanlist(data, navigate) {
   $chanlist.innerHTML = html;
 
   // Mobile tabs: home + activity + first 4 projects
-  const primary = [
+  const primary = /** @type {Channel[]} */ ([
     channelById('home'), channelById('activity'),
     ...data.projects.slice(0, 4).map(p => channelById(p.channel)),
-  ].filter(Boolean);
+  ].filter(Boolean));
   $tabbar.innerHTML = primary.map(c => `
     <button class="tab" data-ch="${escapeHtml(c.id)}" aria-label="${escapeHtml(c.name)} channel" style="--ch-accent:${chAccent(c.id)}">
       <span class="tab-hash" aria-hidden="true">#</span>
@@ -59,29 +69,33 @@ export function renderChanlist(data, navigate) {
     </button>
   `).join('');
 
-  $chanlist.querySelectorAll('.chan').forEach(el => {
-    el.addEventListener('click', () => navigate(el.dataset.ch));
+  $chanlist.querySelectorAll('.chan').forEach(node => {
+    const el = /** @type {HTMLElement} */ (node);
+    el.addEventListener('click', () => navigate(/** @type {string} */ (el.dataset.ch)));
     // role=link rows aren't natively keyboard-operable; activate on Enter/Space
     // (Space is preventDefaulted so it navigates instead of scrolling the list).
     el.addEventListener('keydown', e => {
       if (e.key === 'Enter' || e.key === ' ') {
         e.preventDefault();
-        navigate(el.dataset.ch);
+        navigate(/** @type {string} */ (el.dataset.ch));
       }
     });
   });
   // .tab is a native <button> — Enter/Space activation comes for free.
-  $tabbar.querySelectorAll('.tab').forEach(el => {
-    el.addEventListener('click', () => navigate(el.dataset.ch));
+  $tabbar.querySelectorAll('.tab').forEach(node => {
+    const el = /** @type {HTMLElement} */ (node);
+    el.addEventListener('click', () => navigate(/** @type {string} */ (el.dataset.ch)));
   });
 }
 
 /**
  * Highlight the active channel on both sidebar rows and mobile tabs: the .active
  * class drives the visual state, aria-current="page" exposes it to assistive tech.
+ * @param {string} id
  */
 export function setActiveChannel(id) {
-  for (const el of document.querySelectorAll('.chan, .tab')) {
+  for (const node of document.querySelectorAll('.chan, .tab')) {
+    const el = /** @type {HTMLElement} */ (node);
     const active = el.dataset.ch === id;
     el.classList.toggle('active', active);
     if (active) el.setAttribute('aria-current', 'page');

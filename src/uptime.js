@@ -1,5 +1,6 @@
 // Cosmetic "server" readouts shared by the sidebar tickers and the /uptime command
 
+/** @param {number} ms @returns {string} */
 export function formatUptime(ms) {
   const s = Math.floor(ms / 1000);
   const d = Math.floor(s / 86400);

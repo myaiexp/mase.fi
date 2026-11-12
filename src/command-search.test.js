@@ -15,19 +15,31 @@ vi.mock('@chenglou/pretext/rich-inline', () => ({
 import { walkRichInlineLineRanges, materializeRichInlineLineRange } from '@chenglou/pretext/rich-inline';
 import { layoutRow } from './feed-layout.js';
 import { applySearch } from './command-search.js';
+import { $ } from './command-test-helpers.js';
 
 // One pretext fragment; itemIndex points into buildItems' list [pill?, body].
+/**
+ * @param {number} itemIndex
+ * @param {string} text
+ * @param {number} [gapBefore]
+ */
 const frag = (itemIndex, text, gapBefore = 0) => ({ itemIndex, text, gapBefore });
 
 // A node's children as text, <mark> runs bracketed: ['x ', '[ab]', ' z'].
+/** @param {Node} el */
 const shape = (el) => [...el.childNodes].map((n) => (n.nodeName === 'MARK' ? `[${n.textContent}]` : n.textContent));
 
+/** @param {Element} row */
 const dimmed = (row) => row.classList.contains('search-dim');
 
+/** @type {HTMLElement} */
 let feed;
 
 // A .feed-row as populateRow leaves it, laid out by layoutRow with pretext
 // returning `lines` (one fragment array per line), appended to the feed.
+/**
+ * @param {{ raw: string, project?: string, feature?: boolean, lines: ReturnType<typeof frag>[][] }} opts
+ */
 function addRow({ raw, project = '', feature = false, lines }) {
   const row = document.createElement('div');
   row.className = `feed-row cat-${feature ? 'feature' : 'log'}`;
@@ -36,8 +48,13 @@ function addRow({ raw, project = '', feature = false, lines }) {
   const msg = document.createElement('div');
   msg.className = 'msg';
   row.append(msg);
-  walkRichInlineLineRanges.mockImplementationOnce((prepared, width, cb) => lines.forEach((_, i) => cb(i)));
-  materializeRichInlineLineRange.mockImplementation((prepared, i) => ({ fragments: lines[i] }));
+  vi.mocked(walkRichInlineLineRanges).mockImplementationOnce((_prepared, _width, cb) => {
+    lines.forEach((_, i) => cb(/** @type {never} */ (i))); // mocked pretext: the range is just the line index
+    return lines.length;
+  });
+  vi.mocked(materializeRichInlineLineRange).mockImplementation(
+    (_prepared, i) => /** @type {never} */ (/** @type {unknown} */ ({ fragments: lines[/** @type {number} */ (/** @type {unknown} */ (i))] })), // mocked pretext shapes
+  );
   layoutRow(row, 300, '13px monospace');
   feed.append(row);
   return row;
@@ -54,7 +71,7 @@ describe('applySearch on laid-out feed rows', () => {
     const hit = addRow({ raw: 'Shipped the WORLD map', lines: [[frag(0, 'Shipped the WORLD map')]] });
     const miss = addRow({ raw: 'goodbye moon', lines: [[frag(0, 'goodbye moon')]] });
     applySearch(feed, 'world');
-    expect(shape(hit.querySelector('.msg > .line'))).toEqual(['Shipped the ', '[WORLD]', ' map']);
+    expect(shape($(hit, '.msg > .line'))).toEqual(['Shipped the ', '[WORLD]', ' map']);
     expect(dimmed(hit)).toBe(false);
     expect(dimmed(miss)).toBe(true);
     expect(miss.querySelector('mark')).toBeNull();
@@ -63,7 +80,7 @@ describe('applySearch on laid-out feed rows', () => {
   it('wraps every hit in a text node, with and without text before it', () => {
     const row = addRow({ raw: 'ab x ab y ab z', lines: [[frag(0, 'ab x ab y ab z')]] });
     applySearch(feed, 'ab');
-    expect(shape(row.querySelector('.line'))).toEqual(['[ab]', ' x ', '[ab]', ' y ', '[ab]', ' z']);
+    expect(shape($(row, '.line'))).toEqual(['[ab]', ' x ', '[ab]', ' y ', '[ab]', ' z']);
   });
 
   it('highlights inside the pill and a gap-offset body span, leaving elements intact', () => {
@@ -74,7 +91,7 @@ describe('applySearch on laid-out feed rows', () => {
       lines: [[frag(0, '#helm'), frag(1, 'fixed the helm tabs', 4)]],
     });
     applySearch(feed, 'helm');
-    const line = row.querySelector('.msg > .line');
+    const line = $(row, '.msg > .line');
     const [pill, body] = line.children;
     expect(line.children).toHaveLength(2);
     expect(pill.className).toBe('proj-pill');
@@ -98,7 +115,7 @@ describe('applySearch on laid-out feed rows', () => {
     expect(feed.querySelector('mark')).toBeNull();
     expect(dimmed(hit)).toBe(false);
     expect(dimmed(miss)).toBe(false);
-    const line = hit.querySelector('.line');
+    const line = $(hit, '.line');
     expect(line.childNodes).toHaveLength(1);
     expect(line.textContent).toBe('ab x ab');
   });
@@ -108,7 +125,7 @@ describe('applySearch on laid-out feed rows', () => {
     applySearch(feed, 'ab');
     // "b x" spans the first mark's edge; it only matches once that mark is unwrapped.
     applySearch(feed, 'b x');
-    expect(shape(row.querySelector('.line'))).toEqual(['a', '[b x]', ' ab']);
+    expect(shape($(row, '.line'))).toEqual(['a', '[b x]', ' ab']);
   });
 
   it('skips rows without a .msg and dims a row with no data-raw', () => {

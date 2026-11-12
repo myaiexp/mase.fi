@@ -1,14 +1,17 @@
 // @vitest-environment jsdom
-import { readFileSync } from 'node:fs';
+// BaseToast tests: show, timed fade-out, stacking, type classes, the base.css-owned look
 import { join } from 'node:path';
 import { describe, it, expect, beforeAll, beforeEach, afterEach, vi } from 'vitest';
+import { inlineBaseCss } from '../../../scripts/build-base-css.js';
 
 // The visual contract. BaseToast only stamps these classes; a second inline
 // geometry would not show up in the DOM assertions below.
 // join, not new URL(import.meta.url): under the jsdom vitest environment Vite
 // rewrites that URL off the file: scheme and fileURLToPath throws.
-const baseCss = readFileSync(join(import.meta.dirname, '../../base.css'), 'utf8');
+// The published sheet, not the @import index: the rules live in src/base/*.css.
+const baseCss = inlineBaseCss(join(import.meta.dirname, '../../base.css'));
 
+/** @type {typeof import('./toast.js').BaseToast} */
 let BaseToast;
 
 beforeAll(async () => {
@@ -27,21 +30,33 @@ afterEach(() => {
   if (container) container.remove();
 });
 
+/** @returns {HTMLElement} the toast container; a missing one fails the test */
+function getContainer() {
+  const c = /** @type {HTMLElement | null} */ (document.querySelector('[data-toast-container]'));
+  if (!c) throw new Error('toast container missing');
+  return c;
+}
+
+/** @returns {HTMLElement} the first toast in the container */
+function firstToast() {
+  return /** @type {HTMLElement} */ (getContainer().children[0]);
+}
+
 describe('BaseToast', () => {
   it('show() creates a toast element in the container', () => {
     BaseToast.show('test message');
-    const container = document.querySelector('[data-toast-container]');
+    const container = getContainer();
     expect(container).toBeTruthy();
     expect(container.classList.contains('toast-container')).toBe(true);
     expect(container.children.length).toBe(1);
-    expect(container.children[0].textContent).toBe('test message');
+    expect(firstToast().textContent).toBe('test message');
     // Omitted type is info, the same class an explicit 'info' gets.
-    expect(container.children[0].className).toBe('toast toast-info');
+    expect(firstToast().className).toBe('toast toast-info');
   });
 
   it('toast auto-removes after duration', () => {
     BaseToast.show('gone soon', 'info', 100);
-    const container = document.querySelector('[data-toast-container]');
+    const container = getContainer();
     expect(container.children.length).toBe(1);
     vi.advanceTimersByTime(500); // 100ms duration + 300ms fade-out
     expect(container.children.length).toBe(0);
@@ -49,8 +64,8 @@ describe('BaseToast', () => {
 
   it('fades out (opacity 0) before removal, not abruptly', () => {
     BaseToast.show('fading', 'info', 100);
-    const container = document.querySelector('[data-toast-container]');
-    const toast = container.children[0];
+    const container = getContainer();
+    const toast = /** @type {HTMLElement} */ (container.children[0]);
 
     // The opacity transition is what makes the fade visible rather than a snap.
     expect(toast.style.transition).toBe('opacity 0.3s');
@@ -74,14 +89,14 @@ describe('BaseToast', () => {
   it('multiple toasts stack vertically', () => {
     BaseToast.show('first');
     BaseToast.show('second');
-    const container = document.querySelector('[data-toast-container]');
+    const container = getContainer();
     expect(container.children.length).toBe(2);
   });
 
   it('stamps the type class and leaves geometry to base.css', () => {
     BaseToast.show('error msg', 'error');
-    const container = document.querySelector('[data-toast-container]');
-    const toast = container.children[0];
+    const container = getContainer();
+    const toast = /** @type {HTMLElement} */ (container.children[0]);
     expect(toast.className).toBe('toast toast-error');
     // Position, stacking, padding, border and type color are the stylesheet's.
     // An inline copy is how the two recipes drifted.
@@ -106,13 +121,13 @@ describe('BaseToast', () => {
     ['info', 'toast toast-info'],
   ])('%s stamps %s', (type, className) => {
     BaseToast.show('msg', type);
-    const toast = document.querySelector('[data-toast-container]').children[0];
+    const toast = firstToast();
     expect(toast.className).toBe(className);
   });
 
   it('an unknown type falls back to info, not a class base.css does not style', () => {
     BaseToast.show('nope', 'banana');
-    const toast = document.querySelector('[data-toast-container]').children[0];
+    const toast = firstToast();
     expect(toast.className).toBe('toast toast-info');
   });
 
@@ -121,22 +136,24 @@ describe('BaseToast', () => {
     for (const [type, token] of Object.entries(types)) {
       const rule = baseCss.match(new RegExp(`\\.toast-${type}\\s*\\{[^}]*\\}`));
       expect(rule, `.toast-${type} missing from base.css`).not.toBeNull();
-      expect(rule[0]).toContain(`var(${token})`);
+      expect(/** @type {RegExpMatchArray} */ (rule)[0]).toContain(`var(${token})`);
     }
     const container = baseCss.match(/\.toast-container\s*\{[^}]*\}/);
     expect(container, '.toast-container missing from base.css').not.toBeNull();
-    expect(container[0]).toContain('bottom:');
-    expect(container[0]).toContain('z-index:');
-    expect(container[0]).toContain('max-width:');
-    expect(container[0]).toContain('overflow-wrap:');
-    expect(container[0]).not.toMatch(/(^|\n)\s*top\s*:/);
+    const containerRule = /** @type {RegExpMatchArray} */ (container)[0];
+    expect(containerRule).toContain('bottom:');
+    expect(containerRule).toContain('z-index:');
+    expect(containerRule).toContain('max-width:');
+    expect(containerRule).toContain('overflow-wrap:');
+    expect(containerRule).not.toMatch(/(^|\n)\s*top\s*:/);
     const toast = baseCss.match(/\.toast\s*\{[^}]*\}/);
-    expect(toast[0]).toContain('padding:');
-    expect(toast[0]).toContain('border:');
+    const toastRule = /** @type {RegExpMatchArray} */ (toast)[0];
+    expect(toastRule).toContain('padding:');
+    expect(toastRule).toContain('border:');
     // The phone cap is on .toast-container. .toast is shared with helm's own
     // notifier, which already widths #toast-container; a max-width here would
     // restyle that notifier too.
-    expect(toast[0]).not.toContain('max-width');
+    expect(toastRule).not.toContain('max-width');
   });
 
   it('container is created only once', () => {

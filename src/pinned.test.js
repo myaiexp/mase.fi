@@ -12,6 +12,8 @@
 // Activity card totals after loadArchive: pinned-archive.test.js
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { renderPinned, cardHead } from './pinned.js';
+import { appData } from './data-test-helpers.js';
+import { $ } from './dom-test-helpers.js';
 import * as beam from './beam.js';
 
 // renderPinned('home', …) calls mountBeam, which probes matchMedia. jsdom doesn't
@@ -31,7 +33,7 @@ afterEach(() => {
   document.body.replaceChildren();
 });
 
-const pinnedEl = () => document.getElementById('pinned');
+const pinnedEl = () => $('#pinned');
 
 describe('cardHead', () => {
   it('escapes chip keys, values, and the right-hand slot (no live markup)', () => {
@@ -67,7 +69,7 @@ describe('renderPinned — home', () => {
         logEntry({ date: '2026-03-20T09:00', projectSlug: 'porssi' }), // newest → last push
       ],
     };
-    renderPinned('home', data);
+    renderPinned('home', appData(data));
     const html = pinnedEl().innerHTML;
     expect(html).toContain('2 active');   // projects.length
     expect(html).toContain('2 ·');        // commit total, not claimed to be in this feed
@@ -77,7 +79,7 @@ describe('renderPinned — home', () => {
   });
 
   it('falls back to an em-dash when there is no last push', () => {
-    renderPinned('home', { projects: [], entries: [], stats: {} });
+    renderPinned('home', appData({ projects: [], entries: [], stats: {} }));
     const html = pinnedEl().innerHTML;
     expect(html).toContain('0 active');
     expect(html).toContain('0 ·');
@@ -88,15 +90,15 @@ describe('renderPinned — home', () => {
   // "since" reads as the channel's age, so it is the log's first month — the same
   // range #activity draws — never a hardcoded year.
   it('dates "since" from the log start, the wider of stats.logFirst and memory', () => {
-    const since = () => pinnedEl().querySelector('.ch-meta:nth-child(3)').textContent;
-    renderPinned('home', {
+    const since = () => $('.ch-meta:nth-child(3)', pinnedEl()).textContent;
+    renderPinned('home', appData({
       stats: { logFirst: '2026-03-05' }, projects: [],
       entries: [logEntry({ date: '2026-08-01T08:00', projectSlug: 'x' })],
-    });
+    }));
     expect(since()).toBe('since2026-03');
-    renderPinned('home', { stats: {}, projects: [], entries: [logEntry({ date: '2026-08-01T08:00', projectSlug: 'x' })] });
+    renderPinned('home', appData({ stats: {}, projects: [], entries: [logEntry({ date: '2026-08-01T08:00', projectSlug: 'x' })] }));
     expect(since()).toBe('since2026-08');
-    renderPinned('home', { projects: [], entries: [], stats: {} });
+    renderPinned('home', appData({ projects: [], entries: [], stats: {} }));
     expect(since()).toBe('since—');
   });
 
@@ -106,7 +108,7 @@ describe('renderPinned — home', () => {
       projects: [{ channel: 'x' }],
       entries: [logEntry({ date: '2026-05-01T08:00', projectSlug: '<script>alert(1)</script>' })],
     };
-    renderPinned('home', data);
+    renderPinned('home', appData(data));
     expect(pinnedEl().querySelector('script')).toBeNull();
     expect(pinnedEl().innerHTML).toContain('&lt;script&gt;');
     expect(pinnedEl().innerHTML).not.toContain('<script>');
@@ -121,7 +123,7 @@ describe('renderPinned — home', () => {
       projects: [],
       entries: [logEntry({ date: '<s>day</s>T<u/>xy', projectSlug: 'x' })],
     };
-    renderPinned('home', data);
+    renderPinned('home', appData(data));
     expect(pinnedEl().querySelector('s')).toBeNull();
     expect(pinnedEl().querySelector('u')).toBeNull();
     expect(pinnedEl().innerHTML).toContain('&lt;s&gt;day&lt;/s&gt;');
@@ -132,7 +134,7 @@ describe('renderPinned — home', () => {
 
 describe('renderPinned — unmatched channel', () => {
   it('renders nothing for a channel that is neither home/activity nor a project', () => {
-    renderPinned('does-not-exist', { projects: [], entries: [], stats: {} });
+    renderPinned('does-not-exist', appData({ projects: [], entries: [], stats: {} }));
     expect(pinnedEl().innerHTML).toBe('');
   });
 });
@@ -142,13 +144,13 @@ describe('renderPinned — beam teardown', () => {
     const unmount = vi.spyOn(beam, 'unmountBeam');
     const mount = vi.spyOn(beam, 'mountBeam');
 
-    renderPinned('home', { projects: [], entries: [], stats: {} });
+    renderPinned('home', appData({ projects: [], entries: [], stats: {} }));
     expect(unmount).toHaveBeenCalled();
     expect(mount).toHaveBeenCalled();
 
     unmount.mockClear();
     mount.mockClear();
-    renderPinned('activity', { projects: [], entries: [], stats: {} });
+    renderPinned('activity', appData({ projects: [], entries: [], stats: {} }));
     expect(unmount).toHaveBeenCalled();
     expect(mount).not.toHaveBeenCalled();
 
